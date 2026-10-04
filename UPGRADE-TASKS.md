@@ -85,6 +85,103 @@ packages/backend/src/publication/topics.ts(327,3)
 **建议 B**：它正是 4.0.0 为「只属于自己站的功能」准备的机制，且长期不与上游冲突。
 但需要先读模块机制，是独立的一步。
 
+## 阶段 1B：把主题大事记做成 `modules/chronicle/` 模块（用户选定 B）
+
+### 为什么必须做成模块（不是修 bug）
+
+`docs/architecture.md` 的硬约束：
+
+> 框架里没有、只有你这个站要的功能，做成模块 …… **框架的代码不导入任何模块**，只读这三份清单，
+> 所以合并本仓库以后的更新时，不容易和你自己的功能冲突。插口不够用时，在框架里加一个通用的插口，
+> 而不是把这个功能写进框架。
+
+我现在恢复的 `packages/backend/src/publication/topics.ts` 里有 `import { companyMilestones, curatedChronicle } from "./chronicles.ts"`
+—— **违反该约束**，每次跟进上游都会冲突。这正是要做成模块的原因。
+
+### 模块的固定结构（文档）
+
+```
+modules/chronicle/
+  module.ts        地址：页面、跳转、交给 api 的路径（packages/contracts/src/modules.ts）
+  server.ts        接进后端：接口、定时任务、队列、事件回调、后台数据（packages/backend/src/modules.ts）
+  web.tsx          接进网页：页面、导航项、主题页与后台的部件（apps/web/app/modules.ts）
+  migrations/      它自己的表（与 database/migrations 一起按文件名排序执行）
+  tests/           它的测试，npm test 一起跑
+  package.json     名为 @aihot/chronicle 的 npm 包
+```
+
+登记三处 + 依赖 + Dockerfile：
+```
+site/modules/index.ts   MODULES 数组加它（地址）
+site/modules/server.ts  SERVER_MODULES 数组加它（后端）
+site/modules/web.ts     WEB_MODULES 数组加它（网页）
+site/package.json       dependencies 里写 "@aihot/chronicle": "*"
+Dockerfile              COPY modules/chronicle/package.json modules/chronicle/
+```
+
+### 用哪个插口：`ServerModule.topics.page`
+
+`packages/backend/src/modules.ts` 第 214–231 行，注释直接写着 "What a topic page asks a module's part of it
+(publication/topics.ts loadTopicPage)"：
+
+```ts
+topics?: {
+  page?: {
+    /** Computed from every member of the topic index when the index is read, and kept with it. */
+    index?: (members: readonly TopicMember[], now: Date) => Promise<unknown>;
+    /**
+     * The members it may name, read again with the page, and its part from them as they are now…
+     * Null when it has no part on the page.
+     */
+    read: (ask: TopicPageAsk) => { recheck: string[]; part: (current: ReadonlyMap<string, TopicMember>) => unknown } | null;
+  };
+  marks?: () => Promise<Record<string, Brand>>;
+};
+```
+
+`TopicPageAsk`（同文件 127–137 行）给了 `topic` / `page` / `members` / `index` / `now` —— 够算 chronicle。
+
+### 旧字段 → 模块部分的映射
+
+旧版 `topics.ts` 的返回（`cc66cce`）与模块机制对应关系：
+
+| 旧字段 | 旧来源 | 模块里怎么做 |
+|---|---|---|
+| `kinds` | `CHRONICLE_KINDS` 常量（`topic-chronicle.ts`） | 常量，直接在 `part` 里给出 |
+| `chronicle` | `selectTopicChronicle(topic, shown, window)`，仅首页且 `group !== "company"` | 用 `ask.index` 算，放 `part` |
+| `milestones` | `companyMilestones(history, picked)`，仅首页且 `group === "company"` | 同上；`history` 来自 `curatedChronicle(slug)`（`chronicles.ts`） |
+| `highlights` | `selectTopicHighlights(topic, shown, window)`，仅首页 | 同上 |
+
+`recheck` 填模块会点名的文章 id（`chronicleReadReports` 那批），让撤回与更正对一分钟前的索引也生效。
+
+### 要搬进模块的文件（现被我放在框架里）
+
+```
+packages/backend/src/publication/chronicles.ts        → modules/chronicle/（后端逻辑）
+packages/backend/src/publication/topic-chronicle.ts   → modules/chronicle/
+industry/chronicle.ts                                 → modules/chronicle/（行业定义，262 行）
+packages/contracts/src/site.ts 里的 Topic* 类型        → 可留在 contracts（纯类型，框架也要用）
+apps/web/app/features/topic/Chronicle.tsx             → modules/chronicle/web/
+apps/web/app/routes/topic.tsx 的 chronicle 部分        → 模块的 web.tsx 部件
+```
+
+### `topics.ts` 要怎么改（框架侧）
+
+1. **删掉** `import { companyMilestones, curatedChronicle } from "./chronicles.ts"` 等对功能的直接引用
+2. 改成遍历 `serverModules()` 的 `topics.page`，把各模块的 `part` 结果收进 `modules` 字段
+3. `TopicPage` 契约里的 `kinds`/`chronicle`/`milestones`/`highlights` 可以**去掉** —— 它们会成为
+   `modules.chronicle` 的内容（与 4.0.0 的 `modules: Record<string, unknown>` 一致）
+4. 若上游 `topics.ts` 已经有遍历模块插口的代码，**优先用它**，只在缺失时补
+
+**注意**：第 3 步意味着 web 侧（`routes/topic.tsx`）要从 `page.modules.chronicle` 取数据，
+而不是从顶层字段 —— 这要一并改。
+
+### 先做的事
+
+**先读上游 4.0.0 的 `topics.ts`**，确认它是否已经实现了「遍历 `serverModules()` 的 `topics.page`」。
+若已实现，则 `modules` 字段的填充逻辑本来就在，我只需把 chronicle 做成模块，**框架一行都不用改**
+（这也是 B 的最大好处）。当前那 1 个类型错误会随 `TopicPage` 契约调整而消失。
+
 ## 后续阶段（阶段 1 之后）
 
 ### 阶段 2：我们自己的迁移重建表

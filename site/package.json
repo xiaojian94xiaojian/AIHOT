@@ -3,6 +3,8 @@
   "private": true,
   "type": "module",
   "sideEffects": false,
+  "dependencies": { "@aihot/chronicle": "*" },
+
   "exports": {
     ".": "./site.ts",
     "./models": "./models.ts",
