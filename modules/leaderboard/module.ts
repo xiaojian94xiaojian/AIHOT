@@ -25,6 +25,10 @@ export const leaderboardModule = defineModule({
     // 放在 category / sources / rules 之后：这个通配段会匹配任何 slug。
     { path: "leaderboard/:slug", file: "web/model.tsx" },
   ],
-  // 网页与 api 是两个进程：网页各页都以 /api/site/leaderboard* 取数，这些地址归 api 进程答。
-  apiPaths: [/^\/api\/site\/leaderboard\//],
+  // 网页与 api 是两个进程，这两组地址都归 api 进程答：
+  //   /api/site/leaderboard*  —— 网页各页的取数
+  //   /model-providers/*、/leaderboard-sources/* —— 页面上的厂商标志与评测来源图标
+  //     （由 server.ts 的 staticAssets 发出）。**这一条不能少**：引擎只把这里列出的地址
+  //     转发给 api，漏了就会被 web 进程当成页面路由，结果是 404。
+  apiPaths: [/^\/api\/site\/leaderboard\//, /^\/(model-providers|leaderboard-sources)\//],
 });
