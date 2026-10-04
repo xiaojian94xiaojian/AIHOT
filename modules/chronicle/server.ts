@@ -15,6 +15,7 @@ import {
   type ChronicleTopic,
 } from "./backend/chronicle.ts";
 import { companyMilestones, curatedChronicle } from "./backend/curated.ts";
+import { orgNamesOf, termsOf } from "./backend/pack.ts";
 
 /** 本模块在 TopicPage.modules 下的名字。 */
 const PART = "chronicle";
@@ -46,13 +47,9 @@ function toReport(m: TopicMember): ChronicleReport {
   };
 }
 
-/** chronicle 需要的主题形状；方向/形态的词表在 industry/topics.json 的 chronicleTerms。 */
+/** chronicle 需要的主题形状；方向/形态的词表与公司的名字取自行业包（见 backend/pack.ts）。 */
 function toChronicleTopic(ask: TopicPageAsk): ChronicleTopic {
-  const t = ask.topic as typeof ask.topic & { chronicleTerms?: string[]; orgNames?: string[] };
-  const terms = t.chronicleTerms?.length
-    ? new RegExp(`(${t.chronicleTerms.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})`)
-    : null;
-  return { slug: t.slug, group: t.group, entityId: t.entityId, terms, orgNames: t.orgNames ?? [] };
+  return { slug: ask.topic.slug, group: ask.topic.group, entityId: ask.topic.entityId, terms: termsOf(ask.topic.slug), orgNames: orgNamesOf(ask.topic.slug) };
 }
 
 export interface ChroniclePart {
@@ -74,19 +71,30 @@ export const chronicleServerModule: ServerModule = {
         const first = ask.page === 1;
         if (!first) return null;
         const topic = toChronicleTopic(ask);
-        const reports = ask.members.map(toReport);
+        // 索引是一分钟前的；本模块点名的那些报道要按「现在」重读一遍（TopicPageAsk 的约定），
+        // 所以分数、标签、事实主体改了、或者报道被撤回，都在这一页立刻生效，不用等索引过期。
         // 公司看策展历史（modules/chronicle 读 industry/chronicles/{slug}.json）。
         const history = topic.group === "company" ? curatedChronicle(topic.slug) : undefined;
-        const window = { now: ask.now, through: history?.through };
-        const named = chronicleReadReports(reports, window);
-        const picked = selectTopicChronicle(topic, named, window);
-        const part: ChroniclePart = {
-          kinds: CHRONICLE_KINDS,
-          chronicle: topic.group !== "company" ? picked : [],
-          milestones: topic.group === "company" ? companyMilestones(history, picked) : [],
-          highlights: selectTopicHighlights(topic, named, window),
+        const named = chronicleReadReports(ask.members.map(toReport), { now: ask.now, through: history?.through });
+        return {
+          recheck: named.map((r) => r.id),
+          part: (current: ReadonlyMap<string, TopicMember>) => {
+            // 只留还是这个主题成员的：掉了的（撤回、换标签、改主体）就不进大事记。
+            const shown = named.flatMap((r) => {
+              const now = current.get(r.id);
+              return now && now.topics.includes(topic.slug) ? [toReport(now)] : [];
+            });
+            const window = { now: ask.now, through: history?.through };
+            const picked = selectTopicChronicle(topic, shown, window);
+            const part: ChroniclePart = {
+              kinds: CHRONICLE_KINDS,
+              chronicle: topic.group !== "company" ? picked : [],
+              milestones: topic.group === "company" ? companyMilestones(history, picked) : [],
+              highlights: selectTopicHighlights(topic, shown, window),
+            };
+            return part;
+          },
         };
-        return { recheck: named.map((r) => r.id), part: () => part };
       },
     },
   },

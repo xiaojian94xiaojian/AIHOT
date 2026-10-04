@@ -2,9 +2,12 @@
 // union_ids / emails; opaque sessions stored hashed, and an audit trail for every manual change.
 // Development may impersonate an admin with DEV_AUTH_ROLE=admin; production refuses to start with it.
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import type { FastifyReply, FastifyRequest } from "fastify";
+import { ZodError } from "zod";
 import { audit } from "../audit.ts";
 import { config, credential } from "../config.ts";
 import { sql } from "../db.ts";
+import { sendProblem } from "../lib/http.ts";
 import { sha256 } from "../lib/ids.ts";
 
 export const SESSION_COOKIE = "aihot_admin";
@@ -23,6 +26,36 @@ export interface AdminPrincipal {
   name: string;
   csrf: string;
   dev: boolean;
+}
+
+export type AdminHandler = (req: FastifyRequest, reply: FastifyReply, admin: AdminPrincipal) => Promise<unknown>;
+
+/**
+ * Guard for /api/admin/*: a live session (or the development stand-in); writes need the CSRF token.
+ * A module's own admin routes (modules/<name>/server.ts) use this too, so the guard has one definition.
+ */
+export function adminHandler(fn: AdminHandler) {
+  return async (req: FastifyRequest, reply: FastifyReply) => {
+    reply.header("Cache-Control", "no-store");
+    const admin = await sessionPrincipal(req.headers.cookie);
+    if (!admin) return sendProblem(req, reply, { status: 401, code: "unauthorized", detail: "Sign in to the admin first." });
+    if (req.method !== "GET" && req.method !== "HEAD" && req.headers["x-csrf-token"] !== admin.csrf) {
+      return sendProblem(req, reply, { status: 403, code: "forbidden", detail: "Missing or stale CSRF token." });
+    }
+    try {
+      return await fn(req, reply, admin);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return sendProblem(req, reply, { status: 400, code: "invalid_request", detail: error.issues.map((issue) => `${issue.path.join(".") || "请求"}: ${issue.message}`).join("; ").slice(0, 300) });
+      }
+      if ((error as { statusCode?: number }).statusCode === 400 || error instanceof SyntaxError) {
+        return sendProblem(req, reply, { status: 400, code: "invalid_request", detail: String((error as Error).message).slice(0, 300) });
+      }
+      if ((error as { code?: string }).code === "conflict") return sendProblem(req, reply, { status: 409, code: "conflict", detail: (error as Error).message });
+      req.log.error({ err: error, path: req.url.split("?")[0] }, "admin api error");
+      return sendProblem(req, reply, { status: 500, code: "internal_error", detail: String((error as Error).message).slice(0, 300) });
+    }
+  };
 }
 
 function secret(): string {

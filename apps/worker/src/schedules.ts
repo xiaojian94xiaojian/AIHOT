@@ -64,6 +64,9 @@ export async function registerSchedules(boss: PgBoss) {
     const queue = `cron.${s.name}`;
     await ensureQueue(queue, { policy: "singleton", retryLimit: 1, expireInSeconds: 3600 });
     await boss.schedule(queue, s.cron, {}, { tz: "Asia/Shanghai", missed: s.missed ?? "skip" });
+    // A schedule that has never run on this database (a new site, or one whose table is still empty) runs
+    // once now instead of waiting for its first slot; pg-boss's singleton policy keeps the cron run out.
+    if (await s.runOnStart?.()) await boss.send(queue, {}, { singletonKey: `${s.name}.start` });
     // Schedules fire at minute boundaries; a 15 s pickup keeps them on time with a third of the polling.
     await boss.work(queue, { pollingIntervalSeconds: 15 }, async () => recordRun(s.name, s.run));
   }

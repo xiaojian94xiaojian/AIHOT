@@ -19,6 +19,12 @@ export interface Scheduled {
   missed?: "skip" | "once";
   /** Read when the worker starts: false removes the schedule and its execution queue; run history remains. */
   when?: () => boolean;
+  /**
+   * Read when the worker starts: true runs it once right away, so work that has never run here (a new
+   * site, or one whose table is still empty) does not wait for the first slot of its cron. Answer false
+   * once it has run; the cron run and this one cannot both be queued (pg-boss's singleton policy).
+   */
+  runOnStart?: () => boolean | Promise<boolean>;
 }
 
 /** A model step (editorial/models.ts); its default model comes from site/models.ts, else `default`. */
@@ -175,6 +181,12 @@ export interface RequestNotices {
 }
 
 export interface ServerModule {
+  /**
+   * Marks and pictures of its own, served from the repository's assets/ (routes/static.ts): the key is the
+   * address it is served under ("/model-providers") and the value the directory under assets/. Only `.svg`
+   * and `.png` files whose names are lower-case letters, digits and dashes are served.
+   */
+  staticAssets?: Record<string, string>;
   /** Its folder under modules/. */
   name: string;
   /** Its HTTP routes, registered before the engine's v1 fallbacks (apps/api/src/app.ts). */

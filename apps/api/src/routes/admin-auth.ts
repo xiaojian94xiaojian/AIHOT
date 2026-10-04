@@ -1,10 +1,10 @@
 // Admin sign-in and the /api/admin guard. Public routes never read the session.
-import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { ZodError } from "zod";
+import type { FastifyInstance, FastifyReply } from "fastify";
 import type { AdminMe } from "@aihot/contracts/admin";
 import { DEPLOYMENT, SITE } from "@aihot/site";
 import { config } from "@aihot/backend/config";
 import {
+  adminHandler,
   completeLogin,
   cookie,
   endSession,
@@ -18,9 +18,11 @@ import {
   SESSION_DAYS,
   sessionPrincipal,
   STATE_COOKIE,
-  type AdminPrincipal,
 } from "@aihot/backend/admin/auth";
-import { sendProblem } from "../http/respond.ts";
+
+// The engine's routes and tests reach the guard through here (it is defined in the backend package so a
+// module's own admin routes can use the same one).
+export { adminHandler, type AdminHandler } from "@aihot/backend/admin/auth";
 
 /** Cookies are Secure whenever the site is served over HTTPS. */
 const secure = () => config.siteUrl.startsWith("https://");
@@ -44,33 +46,6 @@ function tooManyAttempts(ip: string): boolean {
 }
 
 const loginPage = (returnTo: string, error?: string) => `/admin/login?${new URLSearchParams({ return: safeReturn(returnTo), ...(error ? { error } : {}) })}`;
-
-export type AdminHandler = (req: FastifyRequest, reply: FastifyReply, admin: AdminPrincipal) => Promise<unknown>;
-
-/** Guard for /api/admin/*: a live session (or the development stand-in); writes need the CSRF token. */
-export function adminHandler(fn: AdminHandler) {
-  return async (req: FastifyRequest, reply: FastifyReply) => {
-    reply.header("Cache-Control", "no-store");
-    const admin = await sessionPrincipal(req.headers.cookie);
-    if (!admin) return sendProblem(req, reply, { status: 401, code: "unauthorized", detail: "Sign in to the admin first." });
-    if (req.method !== "GET" && req.method !== "HEAD" && req.headers["x-csrf-token"] !== admin.csrf) {
-      return sendProblem(req, reply, { status: 403, code: "forbidden", detail: "Missing or stale CSRF token." });
-    }
-    try {
-      return await fn(req, reply, admin);
-    } catch (error) {
-      if (error instanceof ZodError) {
-        return sendProblem(req, reply, { status: 400, code: "invalid_request", detail: error.issues.map((issue) => `${issue.path.join(".") || "请求"}: ${issue.message}`).join("; ").slice(0, 300) });
-      }
-      if ((error as { statusCode?: number }).statusCode === 400 || error instanceof SyntaxError) {
-        return sendProblem(req, reply, { status: 400, code: "invalid_request", detail: String((error as Error).message).slice(0, 300) });
-      }
-      if ((error as { code?: string }).code === "conflict") return sendProblem(req, reply, { status: 409, code: "conflict", detail: (error as Error).message });
-      req.log.error({ err: error, path: req.url.split("?")[0] }, "admin api error");
-      return sendProblem(req, reply, { status: 500, code: "internal_error", detail: String((error as Error).message).slice(0, 300) });
-    }
-  };
-}
 
 /** Feishu sign-in: the state cookie, then Feishu's authorization page. */
 function feishuRedirect(reply: FastifyReply, returnTo: string) {
