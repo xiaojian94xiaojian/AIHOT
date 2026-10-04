@@ -446,10 +446,72 @@ export interface TopicsResponse {
   topics: TopicSummary[];
 }
 
+
+/**
+ * What a milestone is: a key of the industry pack's kinds (industry/chronicle.ts). In the AI demo pack a
+ * model release, a product launch, research, a company's own news (its topic page) or industry news.
+ */
+export type TopicMilestoneKind = string;
+
+/** How the pages show one kind of milestone. */
+export interface TopicKind {
+  label: string;
+  /** Its track lies above the axis, with the strongest mark (AI pack: models). */
+  above: boolean;
+  /** What a topic launches itself, with the accent mark (AI pack: models and products). */
+  launch: boolean;
+}
+
+/** One event of a topic's chronicle, from the report that heads it. */
+export interface TopicEvent {
+  id: string;
+  /** The report's headline. */
+  title: string;
+  /** The event's name in the chronicle: "Claude Opus 5.5 发布". */
+  label: string;
+  at: string;
+  kind: TopicMilestoneKind;
+  /** Its event page when it belongs to a public story, else the article page. */
+  href: string;
+}
+
+export interface TopicMonth {
+  /** Beijing calendar month, YYYY-MM. */
+  month: string;
+  events: TopicEvent[];
+}
+
+/** A milestone on a company's chronicle band: its curated history, then what the site picked up since. */
+export interface TopicMilestone {
+  /** "2022", "2022-11" or "2022-11-30", Beijing calendar. */
+  date: string;
+  kind: TopicMilestoneKind;
+  /** Its name in the chronicle: as curated, or the label of what the site picked up. */
+  title: string;
+  /** The headline of the report the site picked it up from; null for curated history. */
+  headline: string | null;
+  summary: string | null;
+  /** Its event page, its article page or (curated history) the original; null when it has none. */
+  href: string | null;
+  external: boolean;
+  /** A defining event of the curated history, its title set in bold; never set on what the site picked up. */
+  major: boolean;
+}
+
+
 export interface TopicPage {
   topic: TopicSummary & { groupName: string; /** Every listed report, selected or not. */ poolTotal: number };
   /** The site's modules' parts of the page, under their names; each module's web part draws its own. */
   modules: Record<string, unknown>;
+  // 4.0.0 把主题大事记移出框架时删掉了下面这几个字段；本站把它作为模块恢复，故与 modules 并存。
+  /** Every kind of milestone by key. */
+  kinds: Record<TopicMilestoneKind, TopicKind>;
+  /** The rest is for the first page only. A direction's or a form's months, newest first. */
+  chronicle: TopicMonth[];
+  /** A company's chronicle band, oldest first. */
+  milestones: TopicMilestone[];
+  /** The most important events of the last 30 days. */
+  highlights: TopicEvent[];
   items: FeedItemSummary[];
   page: number;
   pageCount: number;

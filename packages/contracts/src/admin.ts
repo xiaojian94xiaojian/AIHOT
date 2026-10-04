@@ -368,3 +368,67 @@ export interface AdminSelectBenchCases {
   rows: Array<{ case_id: string; title: string; stratum: string | null; gold: "select" | "reject" | "either"; by_model: Record<string, AdminSelectBenchDecision> }>;
   strata: Array<{ stratum: string | null; n: number }>;
 }
+
+// 4.0.0 把 Codex 重置监控移出框架时删掉了这些类型；本站把它作为模块恢复，故放回。
+// Reset monitor corrections
+
+export interface AdminMonitorEventPost {
+  postId: string;
+  stage: string;
+  action: string;
+  text: string;
+  originalText: string;
+  publishedAt: Timestamp;
+  url: string;
+}
+
+export interface AdminMonitorEvent {
+  id: string;
+  type: "direct_reset" | "reset_credit";
+  status: "announced" | "confirmed";
+  label: string;
+  display_label: string;
+  scope: string;
+  schedule: { precision: string; from: Timestamp; through: Timestamp; label: string } | null;
+  estimate: { label: string; basis: string } | null;
+  presentation: Record<string, any> | null;
+  confirmed_at: Timestamp | null;
+  occurred_on: Timestamp | null;
+  confirmation_basis: string | null;
+  withdrawn: boolean;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+  posts: AdminMonitorEventPost[];
+}
+
+export interface AdminMonitorEvents {
+  events: AdminMonitorEvent[];
+}
+
+export interface AdminMonitorPost {
+  id: string;
+  published_at: Timestamp;
+  text: string;
+  url: string;
+  translation: string | null;
+  processed_at: Timestamp | null;
+  receipt_id: number | null;
+  origin: string;
+  propositions: Array<Record<string, any>> | null;
+  needs_review: boolean | null;
+  held: Array<{ action: string; excerpt: string }> | null;
+  reviewed: boolean | null;
+  skipped: boolean | null;
+  failures: { count: number; since: Timestamp; error?: string } | null;
+  relevant: boolean | null;
+  outage: unknown;
+  links: Array<{ eventId: string; stage: string }>;
+}
+
+export interface AdminMonitorPosts {
+  page: number;
+  filter: string;
+  rows: AdminMonitorPost[];
+}
+
+// Settings
