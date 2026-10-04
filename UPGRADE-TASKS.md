@@ -182,6 +182,40 @@ apps/web/app/routes/topic.tsx 的 chronicle 部分        → 模块的 web.tsx 
 若已实现，则 `modules` 字段的填充逻辑本来就在，我只需把 chronicle 做成模块，**框架一行都不用改**
 （这也是 B 的最大好处）。当前那 1 个类型错误会随 `TopicPage` 契约调整而消失。
 
+## 阶段 1B 完成（含一个易踩的坑）
+
+模块已端到端接上：`modules/chronicle/` 九个文件，根与 web 类型检查均 0 错误。
+
+```
+modules/chronicle/
+  package.json       exports: ./module ./server ./backend/* ./web
+  module.ts          地址声明（无自己的页面）
+  server.ts          接 ServerModule.topics.page，part 给出 kinds/chronicle/milestones/highlights
+  web.tsx            WebModule，topicPage 部件用动态 import 加载
+  topic-part.tsx     TopicPagePart 实现（shows / Block / entries / news）
+  Chronicle.tsx      从 apps/web/app/features/topic/ 搬入（311 行）
+  backend/rules.ts           行业定义（原 industry/chronicle.ts）
+  backend/chronicle.ts       里程碑算法（原 publication/topic-chronicle.ts）
+  backend/curated.ts         策展历史（原 publication/chronicles.ts）
+```
+
+### 坑：`modules/<名字>/web/` 子目录不被 TypeScript 纳入
+
+`apps/web/tsconfig.json` 的 include 里写着 `"../../modules/*/web/**/*"`，但实测**该子目录下的文件不参与检查**：
+放在 `modules/chronicle/web/` 里时，`web.tsx` 动态 import 它报 `TS2307 Cannot find module`，
+两个 `.tsx` 都解析不了（后缀 `.tsx` 与无后缀都试过）。**放到模块根目录就正常**（根目录被 `*/*.ts` 覆盖）。
+
+**所以部件文件放模块根目录，不要放进 `web/` 子目录。** 上游没有示例模块，这个约定只能靠实测确定；
+以后上游补了示例模块，应核对它把部件放在哪里。
+
+### 其它实测结论
+
+- 模块 `package.json` 要给**显式** exports（`"./*": "./*"` 解析不到 `./module`）
+- 从模块 import 引擎文件用包别名（`@aihot/web/modules`、`@aihot/backend/...`），不要用 `../../../apps/...`
+- `modules/tsconfig.json` **不是 JSX 配置**（缺 `--jsx`，moduleResolution 要求 `.js` 后缀），
+  不能往里加 `*/web/**/*.tsx` —— 会一次冒出 74 个错误。web 侧交给 `apps/web` 自己的 tsconfig
+- web 侧取数：`topic.tsx` 已在用 `loadParts((m) => m.topicPage)` + `data.modules[name]`，**框架一行未改**
+
 ## 后续阶段（阶段 1 之后）
 
 ### 阶段 2：我们自己的迁移重建表

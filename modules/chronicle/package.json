@@ -6,7 +6,8 @@
   "exports": {
     "./module": "./module.ts",
     "./server": "./server.ts",
-    "./backend/*": "./backend/*.ts"
+    "./backend/*": "./backend/*.ts",
+    "./web": "./web.tsx"
   },
   "dependencies": {
     "@aihot/backend": "*",
