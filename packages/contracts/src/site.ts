@@ -503,15 +503,6 @@ export interface TopicPage {
   topic: TopicSummary & { groupName: string; /** Every listed report, selected or not. */ poolTotal: number };
   /** The site's modules' parts of the page, under their names; each module's web part draws its own. */
   modules: Record<string, unknown>;
-  // 4.0.0 把主题大事记移出框架时删掉了下面这几个字段；本站把它作为模块恢复，故与 modules 并存。
-  /** Every kind of milestone by key. */
-  kinds: Record<TopicMilestoneKind, TopicKind>;
-  /** The rest is for the first page only. A direction's or a form's months, newest first. */
-  chronicle: TopicMonth[];
-  /** A company's chronicle band, oldest first. */
-  milestones: TopicMilestone[];
-  /** The most important events of the last 30 days. */
-  highlights: TopicEvent[];
   items: FeedItemSummary[];
   page: number;
   pageCount: number;
