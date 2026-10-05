@@ -6,10 +6,12 @@
 //   http         -> apps/api/src/app.ts 注册完框架路由后遍历 serverModules()
 //   schedules    -> apps/worker/src/schedules.ts 与框架的定时任务一起排
 //   models       -> editorial/models.ts 的 capabilities()，默认模型从 site/models.ts 取
-//   staticAssets -> routes/static.ts 提供 /model-providers 的厂商标志
+//   http 里的图标路由 -> 用引擎的 sendFile 发本模块 assets/ 下的厂商标志与评测来源标志
 //   admin/alerts/agent/llms -> 后台徽章与运行页、健康告警、Agent 指南与 MCP 工具
 import type { FastifyReply, FastifyRequest } from "fastify";
+import path from "node:path";
 import { z } from "zod";
+import { sendFile } from "@aihot/api/routes/static";
 import type { Finding } from "@aihot/backend/notify/feishu";
 import { beijingStamp } from "@aihot/backend/notify/feishu";
 import type { ServerModule } from "@aihot/backend/modules";
@@ -22,6 +24,12 @@ import { runLeaderboardRound } from "./backend/method/run.ts";
 
 /** 与旧版一致：站点接口的答案缓存两分钟，共享缓存五分钟。 */
 const CACHE = "public, max-age=120, s-maxage=300, stale-while-revalidate=600";
+/** 图标几乎不变；旧版服务这两个目录时就是一周。 */
+const MARK_CACHE = "public, max-age=604800";
+/** 本模块自己带的图标：对外地址 → assets/ 下的目录。 */
+const ASSET_DIRS: Record<string, string> = { "/model-providers": "model-providers", "/leaderboard-sources": "leaderboard-sources" };
+/** 图标放在模块里，跟着模块走（不是仓库根的 assets/）。 */
+const ASSETS = path.join(import.meta.dirname, "assets");
 
 /** 抓取与计算是否真的出网（采集总闸；关掉时只用已经存下的快照算一轮）。 */
 const collecting = () => process.env.COLLECT_ENABLED === "true";
@@ -85,7 +93,7 @@ async function unmarkedFinding(): Promise<Finding[]> {
     key: "leaderboard.marks",
     level: "digest",
     title: `模型榜有 ${models.length} 个模型没有厂商标志，暂时显示首字母`,
-    detail: `${models.slice(0, 8).join("、")}；标志文件放 assets/model-providers，映射在本模块的 backend/registry.ts`,
+    detail: `${models.slice(0, 8).join("、")}；标志文件放本模块的 assets/model-providers，映射在 backend/registry.ts`,
   }];
 }
 
@@ -138,6 +146,17 @@ export const leaderboardServerModule: ServerModule = {
     app.get("/api/site/leaderboard/rules", guarded(async (req, reply) => {
       return sendJsonWithEtag(req, reply, await loadRulesData(), { etagPrefix: "lb-rules", cacheControl: CACHE });
     }));
+
+    // 网页上的图标：厂商标志与评测来源标志，放本模块的 assets/ 下（模块自包含）。
+    // 发送用引擎的 sendFile（apps/api/src/routes/static.ts 导出，带 ETag/304 与按扩展名定类型）；
+    // 地址由 module.ts 的 apiPaths 认领，否则会被网页进程当成页面路由。
+    for (const [prefix, dir] of Object.entries(ASSET_DIRS)) {
+      app.get(`${prefix}/:file`, (req, reply) => {
+        const file = (req.params as { file: string }).file;
+        if (!/^[a-z0-9-]+\.(svg|png)$/.test(file)) return reply.code(404).send();
+        return sendFile(req, reply, path.join(ASSETS, dir, file), { cacheControl: MARK_CACHE });
+      });
+    }
   },
 
   // 每天四次上游检查；只有证据变了才发布新的一轮（runLeaderboardRound 自己判断）。
@@ -158,9 +177,7 @@ export const leaderboardServerModule: ServerModule = {
     leaderboard: { label: "模型榜（证据归纳与口径校准）", env: "LEADERBOARD_MODEL", purposes: ["leaderboard.calibrate"] },
   },
 
-  // 厂商标志与评测来源的标志（assets/model-providers/、assets/leaderboard-sources/），
-  // 由 routes/static.ts 提供。
-  staticAssets: { "/model-providers": "model-providers", "/leaderboard-sources": "leaderboard-sources" },
+  // 厂商标志与评测来源的标志（本模块的 assets/），由上面的 http 插口发出。
 
   // 「榜单里有多少模型还没有厂商标志」给后台导航的徽章用（web 侧声明 count: "leaderboard"）。
   admin: {

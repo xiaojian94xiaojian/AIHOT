@@ -28,7 +28,7 @@ export const leaderboardModule = defineModule({
   // 网页与 api 是两个进程，这两组地址都归 api 进程答：
   //   /api/site/leaderboard*  —— 网页各页的取数
   //   /model-providers/*、/leaderboard-sources/* —— 页面上的厂商标志与评测来源图标
-  //     （由 server.ts 的 staticAssets 发出）。**这一条不能少**：引擎只把这里列出的地址
+  //     （由 server.ts 的 http 插口用引擎的 sendFile 发出，图标放本模块的 assets/）。**这一条不能少**：引擎只把这里列出的地址
   //     转发给 api，漏了就会被 web 进程当成页面路由，结果是 404。
   apiPaths: [/^\/api\/site\/leaderboard\//, /^\/(model-providers|leaderboard-sources)\//],
 });

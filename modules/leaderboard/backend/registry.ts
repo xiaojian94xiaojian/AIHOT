@@ -99,7 +99,7 @@ export function formatScore(value: number | null | undefined, format: LbScoreFor
   return grouping.format(value);
 }
 
-// Every model mark lives in assets/model-providers (served at /model-providers/) and is chosen here.
+// Every model mark lives in this module's assets/model-providers (served at /model-providers/) and is chosen here.
 // Model-family marks win over company marks: a Qwen mark identifies Qwen, not Alibaba.
 const FAMILY_MARKS: Array<[RegExp, string]> = [
   [/^claude/, "anthropic.svg"],

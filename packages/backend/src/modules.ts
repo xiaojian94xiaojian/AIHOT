@@ -181,12 +181,6 @@ export interface RequestNotices {
 }
 
 export interface ServerModule {
-  /**
-   * Marks and pictures of its own, served from the repository's assets/ (routes/static.ts): the key is the
-   * address it is served under ("/model-providers") and the value the directory under assets/. Only `.svg`
-   * and `.png` files whose names are lower-case letters, digits and dashes are served.
-   */
-  staticAssets?: Record<string, string>;
   /** Its folder under modules/. */
   name: string;
   /** Its HTTP routes, registered before the engine's v1 fallbacks (apps/api/src/app.ts). */
