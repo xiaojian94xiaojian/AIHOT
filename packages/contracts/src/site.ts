@@ -189,7 +189,7 @@ export interface HotEntryView {
   participants: HotParticipant[];
   /** Hourly heat over the 24 hours up to the ranking, oldest first; null where no comparable snapshot exists. */
   spark: Array<number | null>;
-  /** The story's AI digest, else its fact statement. */
+  /** A card excerpt of the story's AI digest, else its fact statement; full text is on the event page. */
   summary: string | null;
   /** The latest development, one line. */
   latest: string | null;
@@ -446,7 +446,6 @@ export interface TopicsResponse {
   topics: TopicSummary[];
 }
 
-
 /**
  * What a milestone is: a key of the industry pack's kinds (industry/chronicle.ts). In the AI demo pack a
  * model release, a product launch, research, a company's own news (its topic page) or industry news.
@@ -498,6 +497,11 @@ export interface TopicMilestone {
   major: boolean;
 }
 
+/** Phone search only needs links, not the topic pages or full hot ranking. */
+export interface SearchSuggestions {
+  topics: Array<TopicLink & { group: TopicGroupKey }>;
+  hot: Array<{ rank: number; title: string; to: string }>;
+}
 
 export interface TopicPage {
   topic: TopicSummary & { groupName: string; /** Every listed report, selected or not. */ poolTotal: number };

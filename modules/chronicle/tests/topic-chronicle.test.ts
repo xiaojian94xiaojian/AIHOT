@@ -1,4 +1,4 @@
-// Topic milestones: the rules in publication/topic-chronicle.ts with the AI pack's industry/chronicle.ts,
+// Topic milestones: the rules in backend/chronicle.ts with the AI pack's industry/chronicle.ts,
 // on reports as the topic index reads them. Written before the code, from the ways it can go wrong:
 // - kinds: a company's month is filled by one kind, so its models crowd out its products or industry
 //   news displaces both; news about several companies (a third-party report) shows as one company's own;

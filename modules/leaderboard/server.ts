@@ -79,7 +79,7 @@ async function staleSources(now: number): Promise<Finding[]> {
   if (!stale.length) return [];
   return [{
     key: "leaderboard.fetch",
-    level: "digest",
+    level: "later",
     title: `模型榜有 ${stale.length} 个评测来源超过一天没抓到，榜单暂用上一份数据`,
     detail: stale.slice(0, 6).map(([k, s]) => `${k}：${s.error ?? "失败"}（上次成功 ${beijingStamp(s.lastOkAt!)}）`).join("；"),
   }];
@@ -91,7 +91,7 @@ async function unmarkedFinding(): Promise<Finding[]> {
   if (!models.length) return [];
   return [{
     key: "leaderboard.marks",
-    level: "digest",
+    level: "later",
     title: `模型榜有 ${models.length} 个模型没有厂商标志，暂时显示首字母`,
     detail: `${models.slice(0, 8).join("、")}；标志文件放本模块的 assets/model-providers，映射在 backend/registry.ts`,
   }];
