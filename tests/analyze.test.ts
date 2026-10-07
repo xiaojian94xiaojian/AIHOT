@@ -166,11 +166,11 @@ test("the prefilter's BLOCK stops everything; UNKNOWN goes on like PASS", async 
   const vague = await analyzeArticle(vagueId);
   assert.deepEqual([vague!.output!.relevance, vague!.output!.selected, vague!.output!.titleZh], ["pass", true, "理解标题 VAGUE"]);
   assert.equal((await row(vagueId)).output.prefilter.label, "UNKNOWN", "the prefilter's own answer stays on record");
-  // Nothing but a title and no page to fetch: the BLOCK counts as UNKNOWN and is scored, but the
-  // translation writes nothing from a bare title, so it waits for material instead of being published.
+  // Nothing but a title and no page to fetch: the BLOCK counts as UNKNOWN, but a bare title is not worth
+  // two paid score calls, and it is too little text to write up (runSummarize), so it waits for material.
   const bare = await analyzeArticle(await article("BARE", { bodyText: null, excerpt: null, bodyStatus: "none" }));
-  assert.deepEqual([bare!.output!.relevance, bare!.output!.selected, bare!.output!.score], ["unknown", false, FLOOR - 3]);
-  assert.deepEqual(calls("BARE").sort(), ["prefilter", "score", "score", "structure"]);
+  assert.deepEqual([bare!.output!.relevance, bare!.output!.selected, bare!.output!.score], ["unknown", false, null]);
+  assert.deepEqual(calls("BARE").sort(), ["prefilter", "structure"]);
 });
 
 test("a feed summary alone: the article page is fetched first, then the whole article is judged", async () => {

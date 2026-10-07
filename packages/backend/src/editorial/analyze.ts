@@ -59,9 +59,17 @@ export const UNDERSTAND_FLOOR = SELECTION.understandFloor;
 /**
  * Call parameters per score model. The GLM scorer runs at temperature 1 with high reasoning (the model
  * registry adds top_p and thinking) and up to 180 s per call.
+ *
+ * The DeepSeek scorer reasons by default and this deployment scores with temperature 1, the parameters it
+ * ran with while it was called glm-5.3-flash-selection. It needs the room: measured over 30 days, the same
+ * prompt and model at 32 768 finished 18 of 12 704 calls with a failure (0.14%, p50 19 s), while the
+ * 1 024-token default below (4 000 reasoning tokens on the preset, so 5 024) failed 59 of 5 911 (1.0%,
+ * p50 28 s) — a model that reasons up to the limit leaves a cut-off answer. Its long answers are real:
+ * 17 700–23 000 completion tokens, up to 240 s.
  */
 const SCORE_CALL: Record<string, { temperature: number; maxTokens: number; timeoutMs: number }> = {
   "glm-5.3-flash-selection": { temperature: 1, maxTokens: 65_536, timeoutMs: 180_000 },
+  "deepseek-v4.1-flash-scorer": { temperature: 1, maxTokens: 32_768, timeoutMs: 300_000 },
 };
 const scoreCall = (model: string) => SCORE_CALL[model] ?? { temperature: 0.2, maxTokens: 1024, timeoutMs: 120_000 };
 
@@ -413,7 +421,11 @@ export async function runAnalysis(a: AnalyzeInputArticle, opts: StepOpts = {}): 
   // The structure step needs nothing from the scores: it runs beside them.
   const structure = runStructure(a, opts).then((value) => ({ value }), (error: unknown) => ({ error }));
   try {
-    const scores = await runSelectionScores(a, opts);
+    // Nothing but a title to judge: a score of a bare title says nothing (measured over 7 days, 1 028 such
+    // items averaged 15.4 and none was ever selected), and the item cannot be published without a Chinese
+    // title and summary either way (normalizeAnalysis). So the two paid score calls are left out and the
+    // item stays relevance "unknown" until its page arrives and the analysis runs again with material.
+    const scores = missingEvidence(a) ? null : await runSelectionScores(a, opts);
     const sum = scores && !scores.refused && scores.values.length === SCORE_CALLS ? scores.values.reduce((total, v) => total + v, 0) : null;
     const near = sum !== null && (sum >= scores!.threshold * SCORE_CALLS || sum > UNDERSTAND_FLOOR * SCORE_CALLS);
     const s = await structure;
