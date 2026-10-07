@@ -2,11 +2,9 @@
 // the right over the page it came from, and the bar's back button slides it away again. Such links opt in
 // with React Router's `viewTransition`; the router then wraps the page change in a view transition, and
 // this marks on <html data-vt> which way it goes for app.css. The browser's own back (a swipe, a button)
-// keeps the browser's animation, and the desktop changes pages at once. WebKit is left out of it, for the
-// reason in lib/view-transitions.ts.
+// keeps the browser's animation, and the desktop changes pages at once.
 import { useLayoutEffect } from "react";
 import { useLocation, useNavigationType } from "react-router";
-import { dropViewTransitionsOnWebKit } from "../../lib/view-transitions";
 import { isPhone } from "./screens";
 
 let goingBack = false;
@@ -21,10 +19,7 @@ export function usePageTransition() {
   const { key } = useLocation();
   const type = useNavigationType();
   useLayoutEffect(() => {
-    // Before this document's first navigation can ask for a transition; cheap and idempotent after that.
-    dropViewTransitionsOnWebKit();
     document.documentElement.dataset.vt = !isPhone() ? "none" : goingBack ? "back" : type === "POP" ? "none" : "push";
     goingBack = false;
   }, [key]);
 }
-
