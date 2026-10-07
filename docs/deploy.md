@@ -77,6 +77,16 @@ docker compose run --rm setup && docker compose up -d
 
 下面按时间从新到旧列出每次更新要注意的事。
 
+#### 手机上不再用视图过渡（2026 年 10 月 7 日）
+
+没有新增环境变量或数据库迁移。
+
+**iPhone 上点开任何一条内容都不再白屏。** WebKit 在合成视图过渡（View Transitions）时会终止页面的渲染进程，而手机版面用 React Router 的 `viewTransition` 给「点进下一层」做了滑入动画：真实站点上点任意一张卡片都会让页面崩溃，整页加载同一篇文章却正常（那条路径不建立过渡），Chromium 一直正常。现在 `apps/web/app/lib/view-transitions.ts` 在文档加载后把 `document.startViewTransition` 遮蔽成不可用，只对 WebKit 生效；React Router 在该 API 不是函数时按普通导航处理，与浏览器本来就不支持时的行为一致，页面照常切换，只是少了滑入动画。
+
+注意 iOS 上的 Chrome（CriOS）、Firefox（FxiOS）和 Edge（EdgiOS）：它们的 UA 里带 Chromium 的字样，但底层同样是 WebKit，实测崩溃与 Safari 一模一样，所以判据**不**排除它们；只排除真正的 Chromium（`Chrome/`、`Chromium/`、`Edg/`、`EdgA/`）。
+
+自己改过 `apps/web/app/components/shell/transitions.ts` 的站，合并时看这一处：`usePageTransition` 在 effect 开头调用了它。
+
 #### 原帖展示与引擎同步（2026 年 10 月 6 日）
 
 没有新增必填环境变量或数据库迁移。自己维护 `site/site.ts` 的站点需补上 `REPORTS.quiet`，可对照示范配置：日报时段内有资料经过评判、但没有新大事时照常出刊，用这两句做标题与导语；导语的 `{start}`、`{end}` 是时段起止。没有任何资料经过评判仍算采集或判断失败，不伪装成平静的一天。
