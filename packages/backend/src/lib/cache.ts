@@ -54,3 +54,23 @@ export function cachedByKey<K, T>(name: (key: K) => string, load: (key: K) => Pr
     return entry.get(key);
   };
 }
+
+/**
+ * A public search that overlapping callers share: identical searches that arrive while one is running
+ * wait for its read, and nothing is kept once it settles, so a finished or failed read is never reused.
+ * A call that names its own clock (a replay, a historical read) and any call `isSearch` rejects read on
+ * their own.
+ */
+export function sharedSearch<K, T>(name: (key: K) => string, load: (key: K, now: Date) => Promise<T>, isSearch: (key: K) => boolean): (key: K, now?: Date) => Promise<T> {
+  const pending = new Map<string, Promise<T>>();
+  return (key, now) => {
+    if (now || !isSearch(key)) return load(key, now ?? new Date());
+    const id = name(key);
+    let read = pending.get(id);
+    if (!read) {
+      read = load(key, new Date()).finally(() => pending.delete(id));
+      pending.set(id, read);
+    }
+    return read;
+  };
+}

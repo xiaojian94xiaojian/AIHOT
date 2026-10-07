@@ -1,6 +1,6 @@
 // Evaluates the production pairwise event-relation judge on a user-supplied gold set.
 // Usage: node --env-file=.env scripts/eval-relations.ts --gold .data/relation-gold.jsonl
-//        [--models default,deepseek-flash] [--split development] [--n 200] [--thresholds 0.75,0.8]
+//        [--models default,deepseek-flash] [--split development] [--n 200] [--thresholds <review,tie>]
 // The same pair prompt/schema as production is used; receipts make identical re-runs reusable.
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -11,6 +11,7 @@ import { PAIR_SYSTEM, PairSchema, RELATE_PROMPT_VERSION, pairUser } from "@aihot
 import { ModelOutputError, chatJson } from "@aihot/backend/providers/llm";
 import { completeReceipt } from "@aihot/backend/providers/receipts";
 import {
+  DEFAULT_RELATION_THRESHOLDS,
   parseRelationGoldJsonl,
   relationMetrics,
   sampleRelationGold,
@@ -28,7 +29,7 @@ const { values } = parseArgs({
     split: { type: "string", default: "all" },
     concurrency: { type: "string", default: "6" },
     seed: { type: "string", default: "7" },
-    thresholds: { type: "string", default: "0.75,0.8" },
+    thresholds: { type: "string" },
   },
 });
 
@@ -37,7 +38,9 @@ async function main() {
   const concurrency = positiveInt(values.concurrency!, "concurrency");
   const seed = Number(values.seed);
   if (!Number.isInteger(seed)) throw new Error("--seed must be an integer");
-  const thresholds = values.thresholds!.split(",").map((value) => Number(value.trim()));
+  const thresholds = values.thresholds
+    ? values.thresholds.split(",").map((value) => Number(value.trim()))
+    : DEFAULT_RELATION_THRESHOLDS;
   if (!thresholds.length || thresholds.some((value) => !Number.isFinite(value) || value < 0 || value > 1)) {
     throw new Error("--thresholds must be comma-separated numbers between 0 and 1");
   }
@@ -55,10 +58,11 @@ async function main() {
     // so a cold run scores the same cases as a cached run and never retries a pair within one run.
     const requests = new Map<string, ReturnType<typeof chatJson<typeof PairSchema>>>();
     const results = await pmap(sample, concurrency, async (row) => {
+      let shared = false;
       try {
         const user = pairUser(toReportView(row.a), toReportView(row.b));
         let request = requests.get(user);
-        const shared = request !== undefined;
+        shared = request !== undefined;
         if (!request) {
           request = (async () => {
             const res = await chatJson({
@@ -81,7 +85,7 @@ async function main() {
         return { row, out: res.data, receiptId: res.receiptId, reused: shared || res.reused, error: null as string | null };
       } catch (error) {
         const receiptId = error instanceof ModelOutputError ? error.receiptId : null;
-        return { row, out: null, receiptId, reused: false, error: String(error).slice(0, 300) };
+        return { row, out: null, receiptId, reused: shared, error: String(error).slice(0, 300) };
       }
     });
 
@@ -103,16 +107,18 @@ async function main() {
       n: sample.length,
       evaluated: metrics.evaluated,
       errors: metrics.errors,
+      coverage: metrics.coverage,
       accuracy: metrics.accuracy,
+      completeAccuracy: metrics.completeAccuracy,
       macroF1: metrics.macroF1,
       reused: results.filter((result) => result.reused).length,
       ...usage,
       wallSeconds: Math.round((Date.now() - started) / 1000),
     };
-    const storyThresholds = thresholds.map((threshold) => storyTieMetrics(predictions, threshold));
+    const storyThresholds = thresholds.map((threshold) => storyTieMetrics(predictions, threshold, sample.length));
     console.log(JSON.stringify(summary));
     console.log(storyThresholds.map((metric) =>
-      `  story t=${metric.threshold} P=${metric.precision} R=${metric.recall} F1=${metric.f1}`,
+      `  story t=${metric.threshold} P=${metric.precision} R=${metric.recall} F1=${metric.f1} coverage=${metric.coverage} completeAccuracy=${metric.completeAccuracy}`,
     ).join("\n"));
 
     report[model] = {

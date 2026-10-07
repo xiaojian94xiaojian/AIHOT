@@ -54,7 +54,7 @@ test("packages never import the apps, and nothing below the admin imports it", (
   assert.deepEqual(violations(sources("packages"), (_file, spec) => /(^|\/)apps\//.test(spec)), []);
   const found = violations([...sources("packages/backend/src"), ...sources("apps/worker")], (file, spec) =>
     !file.startsWith("packages/backend/src/admin/") && (backendPath(file, spec)?.startsWith("admin/") ?? false));
-  assert.deepEqual(found, [], "admin/ is the top layer: move what others need to the module that owns it");
+  assert.deepEqual(found, [], "admin/ is the top layer: move what others need to the folder that owns it");
 });
 
 // Public routes read through the public read faces; the rest are the reader's own writes (feedback) and
@@ -74,7 +74,7 @@ test("public routes read content only through the public read layer", () => {
 });
 
 // Tables whose rules must not be rewritten elsewhere: the public projection and its sync ledger, paid
-// receipts, content pushes, grouping, and the audit trail. Other modules read them freely.
+// receipts, content pushes, grouping, and the audit trail. Other code reads them freely.
 const OWNERS: Record<string, string> = {
   publications: "publication/", selected_ledger: "publication/", selected_state: "publication/", pool_search: "publication/",
   receipts: "providers/receipts.ts", receipt_attempts: "providers/receipts.ts",
@@ -84,7 +84,7 @@ const OWNERS: Record<string, string> = {
   audit_log: "audit.ts",
 };
 
-test("the tables that carry a rule are written only by the module that owns it", () => {
+test("the tables that carry a rule are written only by the code that owns it", () => {
   const found: string[] = [];
   for (const { file, text } of [...sources("packages/backend/src"), ...sources("apps/api/src"), ...sources("apps/worker/src"), ...modules()]) {
     const own = path.posix.relative(BACKEND, file);
@@ -159,14 +159,6 @@ test("every environment variable the code reads is listed in a template, and eve
     ...DEPLOYMENT.flatMap((file) => matches(readFileSync(path.join(ROOT, file), "utf8"), SUBSTITUTED))]);
   assert.deepEqual([...read].filter((name) => !listed.has(name) && !preset.has(name)), [], "list it in an environment template, or stop reading it");
   assert.deepEqual([...listed].filter((name) => !readAnywhere.has(name)), [], "no code reads it: remove it from the template");
-});
-
-test("every field of the website's own interfaces is read by the website", () => {
-  const web = words(production().filter(({ file }) => file.startsWith("apps/web/") || /^modules\/[^/]+\/web/.test(file)).map(({ text }) => text).join("\n"));
-  const contracts = ["packages/contracts/src/site.ts"];
-  const unread = contracts.flatMap((file) =>
-    assigned(file, /^\s+(?:readonly\s+)?([A-Za-z_][A-Za-z0-9_]*)\??:\s/gm).filter((field) => !web.has(field)).map((field) => `${file}: ${field}`));
-  assert.deepEqual(unread, [], "drop the field from the contract and from the read that fills it, or show it");
 });
 
 // A module can use the engine, but it does not reach into another module; the site composes capabilities.

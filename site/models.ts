@@ -30,12 +30,12 @@ export const PRESETS: Record<string, ModelPreset> = {
   // （providers/llm.ts），因为它对所有预设都生效。
   "glm-5.3-flash": {
     service: "zhipu", model: "glm-5.3-flash", baseUrlEnv: "ZHIPU_BASE_URL", apiKeyEnv: "ZHIPU_API_KEY",
-    extra: { reasoning_effort: "low" }, jsonMode: true,
+    extra: { reasoning_effort: "low" }, jsonMode: true, vision: true,
   },
   // The scorer's parameters for glm-5.3-flash (score calls; temperature 1 is set per call).
   "glm-5.3-flash-selection": {
     service: "zhipu", model: "glm-5.3-flash", baseUrlEnv: "ZHIPU_BASE_URL", apiKeyEnv: "ZHIPU_API_KEY",
-    extra: { reasoning_effort: "high", top_p: 0.95 }, jsonMode: true,
+    extra: { reasoning_effort: "high", top_p: 0.95 }, jsonMode: true, vision: true,
   },
   // DeepSeek Flash reasons by default; structured tasks switch it off. deepseek-flash-think keeps it on,
   // with room in the output for the reasoning.

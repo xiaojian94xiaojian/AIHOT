@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import { closeDb, sql } from "@aihot/backend/db";
 import { upsertMaterial } from "@aihot/backend/content/materials";
-import { translatePending } from "@aihot/backend/editorial/translate";
+import { translateArticle, translatePending } from "@aihot/backend/editorial/translate";
 import { stopBoss } from "@aihot/backend/jobs/queue";
 import { publishArticle } from "@aihot/backend/publication/publish";
 import { buildApp } from "../apps/api/src/app.ts";
@@ -119,6 +119,43 @@ test("links and images inside a paragraph survive the translation, or the paragr
   assert.ok(tr!.body_html.includes(`chart-${T}.png`), "the chart stays");
   assert.ok(tr!.body_html.includes('<a href="https://example.com/kept">never keeps</a>'), "a paragraph that loses its link stays in the original");
   assert.equal(tr!.complete, false);
+  const receipts = await sql<{ status: string }[]>`SELECT status FROM receipts WHERE purpose = 'translate_body' AND subject LIKE ${`article:${id}@1#%`}`;
+  assert.ok(receipts.length >= 2, "the initial batch and fallback/retry batches are retained");
+  assert.ok(receipts.every((receipt) => receipt.status === "completed"), "every paid batch covered by the committed translation is completed");
+});
+
+test("translation storage and receipt completion commit together, then reuse the saved answer", async () => {
+  const { articleId: id } = await upsertMaterial({
+    sourceId: SOURCE, url: `${URL_}-receipt`, title: `Receipt ${T}`, language: "en",
+    bodyText: `Receipt lifecycle ${T}.`, bodyHtml: `<p>Receipt lifecycle ${T}.</p>`,
+    bodyStatus: "ok", via: "fetch", publishedAt: new Date(), discoveredAt: new Date(Date.now() + 1_500_000),
+  });
+  await sql`INSERT INTO analyses (article_id, input_revision, origin, relevance, category, title_zh, summary_zh, reason_zh, score, selected)
+            VALUES (${id}, 1, 'rule', 'pass', 'ai-models', ${`回执-${T}`}, '摘要', '理由', 90, true)`;
+  await publishArticle(id, { releasedAt: new Date(Date.now() - 60_000) });
+
+  await sql.unsafe(`CREATE FUNCTION fail_translation_receipt() RETURNS trigger LANGUAGE plpgsql AS $body$ BEGIN
+    IF NEW.status = 'completed' AND NEW.purpose = 'translate_body' THEN RAISE EXCEPTION 'receipt commit interrupted'; END IF;
+    RETURN NEW; END $body$`);
+  await sql`CREATE TRIGGER fail_translation_receipt BEFORE UPDATE ON receipts FOR EACH ROW EXECUTE FUNCTION fail_translation_receipt()`;
+  const before = provider.hits();
+  try {
+    await assert.rejects(translateArticle(id), /receipt commit interrupted/);
+  } finally {
+    await sql`DROP TRIGGER fail_translation_receipt ON receipts`;
+    await sql`DROP FUNCTION fail_translation_receipt()`;
+  }
+  assert.equal(provider.hits(), before + 1);
+  assert.equal((await sql`SELECT 1 FROM translations WHERE article_id = ${id}`).length, 0, "translation write rolls back with receipt completion");
+  const [received] = await sql<{ status: string }[]>`SELECT status FROM receipts WHERE purpose = 'translate_body' AND subject = ${`article:${id}@1#0`}`;
+  assert.equal(received!.status, "received");
+
+  const retried = await translateArticle(id);
+  assert.equal(retried.status, "translated");
+  assert.equal(provider.hits(), before + 1, "retry reuses the already received provider answer");
+  const [completed] = await sql<{ status: string }[]>`SELECT status FROM receipts WHERE purpose = 'translate_body' AND subject = ${`article:${id}@1#0`}`;
+  assert.equal(completed!.status, "completed");
+  assert.equal((await sql`SELECT 1 FROM translations WHERE article_id = ${id}`).length, 1);
 });
 
 test("the post a selected X post quotes is translated once and shown with the item", async () => {
@@ -139,6 +176,7 @@ test("the post a selected X post quotes is translated once and shown with the it
   const item = JSON.parse(res.body) as { x: { quoted: { text: string; translation: string | null } } };
   assert.deepEqual([item.x.quoted.text, item.x.quoted.translation], [`Introducing Claude Sonnet 5.5 ${T}`, "隆重推出 Sonnet 5.5。"]);
   await translatePending({ limit: 1 });
-  const receipts = await sql`SELECT 1 FROM receipts WHERE purpose = 'translate_quoted' AND subject = ${`quote:${tweetId}`}`;
+  const receipts = await sql<{ status: string }[]>`SELECT status FROM receipts WHERE purpose = 'translate_quoted' AND subject = ${`quote:${tweetId}`}`;
   assert.equal(receipts.length, 1, "translated once");
+  assert.equal(receipts[0]!.status, "completed");
 });

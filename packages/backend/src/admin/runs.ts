@@ -14,6 +14,7 @@ const STALE_HEARTBEAT_MS = 3 * 60_000;
 type Runs = BeforeJson<AdminRuns>;
 
 export async function runsOverview(): Promise<Runs> {
+  const currentJobs = (await Promise.all(serverModules().flatMap((m) => m.admin?.currentJobs ? [m.admin.currentJobs()] : []))).flat();
   const [
     heartbeats,
     latest,
@@ -32,7 +33,11 @@ export async function runsOverview(): Promise<Runs> {
     sql<Runs["jobs"]>`
       WITH latest AS (
         SELECT DISTINCT ON (job) job, started_at, finished_at, status, left(error, 400) AS error
-        FROM job_runs ORDER BY job, started_at DESC, id DESC
+        FROM job_runs
+        -- Registered worker schedules and the modules' current external jobs; the timeline retains history.
+        WHERE EXISTS (SELECT 1 FROM pgboss.schedule s WHERE s.name = 'cron.' || job_runs.job)
+          OR job_runs.job = ANY(${currentJobs}::text[])
+        ORDER BY job, started_at DESC, id DESC
       ), counts AS (
         SELECT job, count(*) FILTER (WHERE status = 'failed')::int AS failed_24h, count(*)::int AS runs_24h
         FROM job_runs WHERE started_at > now() - interval '24 hours' GROUP BY job

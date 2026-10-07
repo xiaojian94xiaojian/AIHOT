@@ -75,4 +75,7 @@ for (const misaligned of [false, true]) test(`SIGTERM finishes the sent ${misali
   assert.equal(active.calls, misaligned ? 3 : 2, 'the first receipt is reused, only missing pieces are requested');
   const [translation] = await sql`SELECT complete,revision FROM translations WHERE article_id=${articleId}`;
   assert.deepEqual({ ...translation }, { complete: true, revision: 1 });
+  const finished = await sql<{ status: string }[]>`SELECT status FROM receipts WHERE purpose='translate_body' AND subject LIKE ${`article:${articleId}@1#%`}`;
+  assert.ok(finished.length >= (misaligned ? 3 : 2));
+  assert.ok(finished.every((receipt) => receipt.status === 'completed'), 'all batches covered by the committed translation complete after resume');
 });

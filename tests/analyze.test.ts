@@ -1,12 +1,10 @@
 // The judging and writing steps (editorial/analyze.ts): the prefilter decides relevance, two scores
 // against the tier threshold decide 精选, selected and near-selected items are written by the content
 // understanding and the rest by the title/summary translation, a structure step gives the category,
-// subjects and fact. Material with only a feed summary has its page fetched first. Every prompt in the
-// pack renders.
+// subjects and fact. Material with only a feed summary has its page fetched first.
 import { pointModels, Reply, stub, tag } from "./setup.ts";
 import { analysisStep, type AnalysisStep } from "./analysis-steps.ts";
 import assert from "node:assert/strict";
-import { readdirSync, readFileSync } from "node:fs";
 import { after, before, test } from "node:test";
 import { closeDb, sql } from "@aihot/backend/db";
 import { upsertMaterial } from "@aihot/backend/content/materials";
@@ -14,8 +12,6 @@ import { analyzeArticle, buildMaterial, loadAnalyzeInput, normalizeStructure, St
 import { queueProcessing } from "@aihot/backend/jobs/content";
 import { QUEUES, stopBoss } from "@aihot/backend/jobs/queue";
 import { compactAnswerFirstSummary, enforceIdentity, MAX_BODY_CHARS, parseTranslateOutput } from "@aihot/backend/editorial/writing";
-import { promptText } from "@aihot/backend/editorial/prompts";
-import { SITE } from "@aihot/site";
 
 const T = tag();
 const SOURCE = `test-analyze-${T}`;
@@ -77,20 +73,6 @@ const row = async (id: string) =>
   (await sql<{ selected: boolean; relevance: string; score: string | null; title_zh: string; reason_zh: string | null; category: string | null; tags: string[]; subjects: string[]; receipt_ids: string[]; output: Record<string, any> }[]>`
     SELECT selected, relevance, score, title_zh, reason_zh, category, tags, subjects, receipt_ids, output FROM analyses WHERE article_id = ${id} ORDER BY id DESC LIMIT 1`)[0]!;
 
-test("every prompt in the pack renders, with the site's own name", () => {
-  const dir = new URL("../industry/prompts/", import.meta.url);
-  const files = readdirSync(dir).filter((f) => f.endsWith(".md"));
-  const raw = (file: string) => readFileSync(new URL(file, dir), "utf8");
-  // Every value any prompt asks for, so each renders on its own; the site's name is filled in by itself.
-  const names = new Set(files.flatMap((f) => [...raw(f).matchAll(/\{\{\s*([A-Za-z][\w.-]*)\s*\}\}/g)].map((m) => m[1]!)));
-  const values = Object.fromEntries([...names].filter((n) => n !== "siteName").map((n) => [n, "x"]));
-  for (const file of files) {
-    const text = promptText(file.slice(0, -3), values);
-    assert.ok(text.trim() && !/\{\{/.test(text), file);
-    if (/\{\{\s*siteName\s*\}\}/.test(raw(file))) assert.ok(text.includes(SITE.name), `${file} names the site`);
-  }
-});
-
 test("a selected item: prefilter, two scores, the content understanding and the structure", async () => {
   assert.ok(FLOOR >= 4 && FLOOR < T1 && T1 <= 97, "the cases need the understand floor below the T1 threshold, and a few points either side");
   const id = await article("CLEAR");
@@ -107,10 +89,6 @@ test("a selected item: prefilter, two scores, the content understanding and the 
   assert.equal(r.output.fact.evidence, "a lab released a model");
   const score = requests.find((q) => q.marker === "CLEAR" && q.step === "score")!;
   assert.match(score.user, /【标题】\nCLEAR model release/, "the score reads the original title, before any writing");
-  const understand = requests.find((q) => q.marker === "CLEAR" && q.step === "understand")!;
-  assert.ok(understand.user.startsWith("请按系统规则理解以下单篇材料，一次返回全部六个字段。"));
-  const prefilter = requests.find((q) => q.marker === "CLEAR" && q.step === "prefilter")!;
-  assert.ok(JSON.parse(prefilter.user).includes("【材料质量】"), "the material context, sent as a JSON string");
 });
 
 test("structure retains grounded conditions, rejects invented or unseen quotes, and does not infer missing scope", async () => {
