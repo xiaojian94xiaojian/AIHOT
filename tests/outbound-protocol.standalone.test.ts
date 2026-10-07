@@ -14,13 +14,26 @@ const exec = promisify(execFile);
 const directory = await mkdtemp(path.join(os.tmpdir(), "outbound-protocol-"));
 const cert = path.join(directory, "cert.pem");
 const key = path.join(directory, "key.pem");
-await exec("openssl", ["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", key, "-out", cert,
-  "-days", "1", "-subj", "/CN=outbound.invalid", "-addext",
-  "subjectAltName=DNS:outbound.invalid,DNS:cloudflare-dns.com,IP:127.0.0.1,IP:93.184.216.34"]);
+
+/**
+ * The fixture is a real certificate because these cases check that TLS identity survives routing
+ * (Host, SNI, validation), and node cannot sign one itself: openssl is the only signer here and it is
+ * not installed everywhere (a Windows development machine, for one). Without it the suite is skipped
+ * with this reason instead of failing every case on a missing external tool.
+ */
+let signerMissing = false;
+try {
+  await exec("openssl", ["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", key, "-out", cert,
+    "-days", "1", "-subj", "/CN=outbound.invalid", "-addext",
+    "subjectAltName=DNS:outbound.invalid,DNS:cloudflare-dns.com,IP:127.0.0.1,IP:93.184.216.34"]);
+} catch (error) {
+  if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  signerMissing = true;
+}
 after(() => rm(directory, { recursive: true, force: true }));
 
 for (const route of ["direct", "proxy", "secure-proxy", "dns"] as const) {
-  test(`outbound ${route} negotiates HTTP/1.1 and retains TLS identity`, async () => {
+  test(`outbound ${route} negotiates HTTP/1.1 and retains TLS identity`, { skip: signerMissing ? "openssl is not installed: it signs the fixture certificate" : false }, async () => {
     const { stdout } = await exec(process.execPath, ["--input-type=module", "-e", `
       import { readFileSync } from 'node:fs';
       import { createServer } from 'node:http';
