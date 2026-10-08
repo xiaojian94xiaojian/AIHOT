@@ -209,6 +209,14 @@ DATABASE_URL=postgres://aihot:aihot@127.0.0.1:55432/aihot_ci npm test  # 后端�
   分批方式跑，别指望这个钩子。
 - 本机缺 `pg_dump`、`sh`、`openssl`，所以备份类测试与出站协议测试在本机会跳过或失败 ——
   那是环境，不是代码。
+- **上面这几条不要拿去上游提 PR**（2026-10-08 评估过，结论是「不该提」）。理由都能引到上游文档：
+  非 Docker 的本机运行只支持 Linux / macOS、Windows 请用 WSL2（`README.md`、`docs/deploy.md`）；
+  `CONTRIBUTING.md` 写明备份恢复测试需要 `tar` 与 `pg_dump`/`pg_restore`；CONTRIBUTING 还要求一次 PR
+  只解决一个清楚的问题、不夹带无关改动。同一段探针在两边的实测：顺序启动 150 个短进程，**Windows 复用
+  了 22 个进程号**（第 96 个就撞上，而我们正好有 124 个测试文件、当时失败 22 个），**Linux 0 个**；
+  给子进程发 SIGTERM，**Windows 的子进程处理器根本不跑**（只回 `{ready:true}`，不退出），**Linux 正常**
+  回 `{stopping:true}` 并退出 0。也就是说这是平台语义与已声明的前置工具，不是代码缺陷 —— 要为这门禁
+  求全绿，就在 WSL2 或 Linux 容器里跑。（探针留在仓库外：`E:\cs\pid-probe.mjs`、`E:\cs\sigterm-probe\`。）
 - **依赖子进程 + SIGTERM 的关停测试在本机会挂到超时**（`tests/analyze-shutdown.test.ts`、
   `tests/translate-shutdown.test.ts` 等 5 条）：这些用例 `spawn` 一个 worker 子进程，再给它发 SIGTERM，
   等子进程回一条 `{stopping:true}`。Windows 上发给子进程的 SIGTERM 不会触发它的
