@@ -1,5 +1,5 @@
 {
-  "note": "2026-10-08 权重重置与编辑源包整合：改档表 + 新建源；由 build-artifacts.py 生成",
+  "note": "2026-10-08 权重重置与编辑源包整合：改档表 + 新建源；另含 6 个「T1 只给官方渠道」的补充（个人源降到 T1_5）",
   "retier": {
     "rss-tomtunguz": "T2",
     "x-account-chatgpt": "T1",
@@ -48,7 +48,13 @@
     "x-account-kling-ai": "T1",
     "x-account-rauchg": "T1_5",
     "x-account-nvidiartxspark": "T1",
-    "x-account-reach_vb": "T1_5"
+    "x-account-reach_vb": "T1_5",
+    "x-account-elonmusk": "T1_5",
+    "x-account-mntruell": "T1_5",
+    "rss-dwarkesh": "T1_5",
+    "rss-gary-marcus": "T1_5",
+    "rss-lilianweng": "T1_5",
+    "rss-interconnects": "T1_5"
   },
   "newSources": [
     {

@@ -1927,7 +1927,7 @@ select a.id, r.purpose from receipts r
 | 项 | 值 |
 |---|---|
 | 启用中的 editorial 源 | 250 → **281**（含新建 31） |
-| 分级分布 | T1 34→**72**、T1_5 81→**95**、T2 135→**110**、EXCLUDE_MP 0→**4** |
+| 分级分布 | T1 34→**66**、T1_5 81→**101**、T2 135→**110**、EXCLUDE_MP 0→**4**（含补做的 6 个个人源） |
 | 源总数 | 450 → **481** |
 | `sources.first_party` 归一 | 109 行（列值与 tier 不一致的清零） |
 | `publications.first_party` 归一 | 1210 行 |
@@ -1973,7 +1973,7 @@ gcloud compute ssh weijianlin@aihot --zone=asia-east2-c \
 
 | 检查 | 结果 |
 |---|---|
-| 分级分布 | T1 72 / T1_5 95 / T2 110 / EXCLUDE_MP 4（启用中的 editorial） |
+| 分级分布 | T1 66 / T1_5 101 / T2 110 / EXCLUDE_MP 4（启用中的 editorial） |
 | `sources.first_party` 与 tier 不一致 | 0 |
 | `publications.first_party` 与 tier 不一致 | 0 |
 | 重发任务 | 48/48 completed |
@@ -1988,7 +1988,13 @@ gcloud compute ssh weijianlin@aihot --zone=asia-east2-c \
 重发即可；`industry/sources.json` 的旧副本在 `E:\cs\hot\2026-10-08\sources.json.bak`。新建的 31 个源可以
 `enabled=false` 或直接删除（它们还没有历史判断价值）。
 
-## 还没做的一条
+## 补做的一条（同日）
 
-T1 名单里还有 5 个**个人源**（`@elonmusk`、`@mntruell`、Lilian Weng、Dwarkesh Patel、Nathan Lambert）——
-它们本来就是 T1，本次沿用；按「T1 只给官方渠道」的判据应落 T1_5，等确认后再改。
+T1 名单里原本还有 6 个**个人源**，按「T1 只给官方渠道」的判据已全部降到 `T1_5`：`@elonmusk`（115 条）、
+`@mntruell`、`rss-dwarkesh`、`rss-gary-marcus`、`rss-lilianweng`、`rss-interconnects`。改后启用中的
+editorial 分布是 **T1 66 / T1_5 101 / T2 110 / EXCLUDE_MP 4**；这 6 个源的重发任务全部 completed，
+`publications.first_party` 与 tier 不一致仍为 0（这次重发把该刷的都刷到了，没有再手工 UPDATE）。
+
+**仍不一致、待定的两条**：同一个人两个渠道档位不同 —— `@lilianweng`（X，T2）与 `rss-lilianweng`
+（博客，T1_5）、`@natolambert`（X，T2）与 `rss-interconnects`（博客，T1_5）。要对齐就把这两个 X 账号
+也提到 T1_5（门槛 76→65 并获得推送资格）；没有确认前保持 T2。

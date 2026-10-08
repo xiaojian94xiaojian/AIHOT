@@ -1195,8 +1195,8 @@
           "initialBackfillLimit": 8
         }
       },
-      "tier": "T1",
-      "first_party": true,
+      "tier": "T1_5",
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -1366,8 +1366,8 @@
           "initialBackfillLimit": 8
         }
       },
-      "tier": "T1",
-      "first_party": true,
+      "tier": "T1_5",
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -1667,8 +1667,8 @@
           "initialBackfillLimit": 8
         }
       },
-      "tier": "T1",
-      "first_party": true,
+      "tier": "T1_5",
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -2131,8 +2131,8 @@
           "initialBackfillLimit": 8
         }
       },
-      "tier": "T1",
-      "first_party": true,
+      "tier": "T1_5",
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -3331,8 +3331,8 @@
           "initialBackfillLimit": 8
         }
       },
-      "tier": "T1",
-      "first_party": true,
+      "tier": "T1_5",
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -3979,8 +3979,8 @@
           "initialBackfillLimit": 8
         }
       },
-      "tier": "T1",
-      "first_party": true,
+      "tier": "T1_5",
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
