@@ -2026,3 +2026,35 @@ editorial 分布是 **T1 66 / T1_5 101 / T2 110 / EXCLUDE_MP 4**；这 6 个源�
 | `src-cbf787802c` Golem.de | `fetch failed` |
 | `src-153dacfb29`、`src-22a6ec4b2c` | `Blocked cross-origin redirect for a protected request`，最后成功 10-02 |
 | `src-3a691df5b3`、`src-f6d2ad6f1b` | 偶发超时 / HTTP 406，但今天成功过，先观察 |
+
+## 氛围源：停用采不到的 + 补进文档点名的（同上日）
+
+**停用 6 个从来采不到内容的**（`enabled=false`，随时可开回来）：
+
+| 源 | 症状 |
+|---|---|
+| DEV Community、SiliconANGLE、车东西 | `json_list` 字段映射不对：`no items mapped (check title/url paths)` |
+| Golem.de | `fetch failed` |
+| InfoWorld、Thurrott | 跨域重定向被拦，最后成功停在 10-02 |
+
+**新增 5 个 `source-split-all-2026-10-08.md` 第四节点名、但台账里没有的**（全部 `hot_signal` + `T2`，
+只喂热度、不进精选；已于 13:40 UTC 全部抓取成功）：
+
+| id | 名称 | feed | 首次抓到 |
+|---|---|---|---|
+| `src-qbitai` | 量子位 | `https://www.qbitai.com/feed` | 10 条 |
+| `src-sspai` | 少数派 | `https://sspai.com/feed` | 10 条（探测时只回 1 条，采集器拿到 10 条） |
+| `src-ifanr` | 爱范儿 | `https://www.ifanr.com/feed` | 20 条 |
+| `src-ruanyifeng` | 阮一峰的网络日志 | `https://www.ruanyifeng.com/blog/atom.xml` | 3 条（atom） |
+| `src-meituan-tech` | 美团技术团队 | `https://tech.meituan.com/feed` | 10 条 |
+
+氛围源现在 **102 启用 + 6 停用 = 108**。文档第二节点名的那些（Techmeme、cnBeta、钛媒体、36氪、虎嗅、
+新浪科技、V2EX、掘金、DEV Community、宝玉）**早就都在库里**，这次没重复添加。
+
+> ⚠️ **文档只写了氛围源的「数量」，没写名单**：`source-split-all-2026-10-08.md` 里 118 个 X 氛围源与
+> 139 个媒体氛围源只有分类计数（举了 10 个例子），完整名单在缺失的
+> `backend-import-aihot-hot-signal-2026-10-08`（185 条）与 `backend-import-aihot-roster-x-gap-2026-10-08`
+> （60 条）两个包里。要补全这两个包里的源，得先拿到文件。
+
+`美团技术团队` 是第一方官方博客但非 AI 垂直，按「只喂热度」放在氛围源；要当精选源是改 `participation_mode`
+与 tier 两行的事。

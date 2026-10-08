@@ -20,6 +20,8 @@ interface Mapping {
   newSources: Array<{ id: string; name: string; handle: string; tier: string; identity: string }>;
   /** Sources the editorial package lists as editorial that are still hot_signal here. */
   editorial?: string[];
+  /** Signal sources named in source-split-all-2026-10-08.md but missing from the registry. */
+  newSignalSources?: Array<{ id: string; name: string; kind: string; feedUrl: string; intervalMinutes: number }>;
 }
 
 const dryRun = process.argv.includes("--dry-run");
@@ -45,8 +47,9 @@ const missing = Object.keys(data.retier).filter((id) => !byId.has(id));
 const creates = data.newSources.filter((s) => !byId.has(s.id));
 /** The package lists these as editorial (they create events and reach the public pool); here they were signals. */
 const toEditorial = (data.editorial ?? []).filter((id) => byId.get(id)?.participation_mode !== "editorial");
+const newSignals = (data.newSignalSources ?? []).filter((s) => !byId.has(s.id));
 
-console.log(`改档 ${retier.length} 个源；新建 ${creates.length} 个源；转精选源 ${toEditorial.length} 个；改档表里对不上库的 ${missing.length} 个`);
+console.log(`改档 ${retier.length} 个源；新建 ${creates.length} 个 X 源；新建 ${newSignals.length} 个氛围源；转精选源 ${toEditorial.length} 个；改档表里对不上库的 ${missing.length} 个`);
 if (missing.length) console.log("  对不上：", missing.join(", "));
 for (const [id, tier] of retier.slice(0, 8)) {
   const row = byId.get(id)!;
@@ -74,6 +77,12 @@ await sql.begin(async (tx) => {
   for (const id of toEditorial) {
     await tx`UPDATE sources SET participation_mode = 'editorial', updated_at = now() WHERE id = ${id}`;
   }
+  for (const s of newSignals) {
+    // Heat only: a signal source never enters the pool, so tier is just its face ordering on /hot.
+    await tx`
+      INSERT INTO sources (id, name, kind, config, tier, first_party, participation_mode, interval_minutes, tags, site_fulltext, syndicate_fulltext, enabled, next_fetch_at)
+      VALUES (${s.id}, ${s.name}, ${s.kind}, ${tx.json({ feedUrl: s.feedUrl } as never)}, 'T2', false, 'hot_signal', ${s.intervalMinutes}, '{}'::text[], false, false, true, now())`;
+  }
   for (const s of creates) {
     const config = { query: `from:${s.handle} -filter:replies`, _aihot: { initialBackfillLimit: 8 } };
     assertSupportedConfig("x_search", config);
@@ -90,7 +99,7 @@ for (const id of [...retier.map(([id]) => id), ...toEditorial]) {
   await enqueue(QUEUES.republishSource, { sourceId: id }, { singletonKey: id });
   queued += 1;
 }
-console.log(`已写入：改档 ${retier.length}，新建 ${creates.length}，转精选源 ${toEditorial.length}，入队重发 ${queued}`);
+console.log(`已写入：改档 ${retier.length}，新建 X 源 ${creates.length}，新建氛围源 ${newSignals.length}，转精选源 ${toEditorial.length}，入队重发 ${queued}`);
 
 const after = await sql<{ tier: string; n: number }[]>`
   SELECT tier, count(*)::int AS n FROM sources WHERE participation_mode = 'editorial' AND enabled GROUP BY tier ORDER BY tier`;

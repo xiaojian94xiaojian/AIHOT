@@ -8830,6 +8830,81 @@
       "site_fulltext": true,
       "syndicate_fulltext": false,
       "enabled": true
+    },
+    {
+      "id": "src-qbitai",
+      "name": "量子位",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.qbitai.com/feed"
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 30,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "src-sspai",
+      "name": "少数派",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://sspai.com/feed"
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "src-ifanr",
+      "name": "爱范儿",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.ifanr.com/feed"
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 30,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "src-ruanyifeng",
+      "name": "阮一峰的网络日志",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.ruanyifeng.com/blog/atom.xml"
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 120,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "src-meituan-tech",
+      "name": "美团技术团队",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://tech.meituan.com/feed"
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 120,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
     }
   ]
 }
