@@ -1841,3 +1841,63 @@ for (const file of readdirSync(dir).filter(f => f.endsWith(".sql")).sort()) { if
 ```
 
 同号但文件名不同 → 各自记账、各自执行。只是编号不美观。
+
+---
+
+# 部署结果（2026-10-08）：合并上游 #153 那次
+
+## 部署了什么
+
+`upgrade-4.0` 合并上游 7 个提交后的镜像（含 #153「没有材料就等材料」、原生视频保留、SelectBench 指标、
+向量缓存淘汰修复）。公开接口版本仍是 4.0.0，**本轮没有新迁移**（已应用迁移数部署前后都是 77）。
+
+| 项 | 值 |
+|---|---|
+| 镜像 digest | `sha256:1353a8f31b78f055b9ffdd19bb1b3d1f0c1d75ac77d7b6393a04b090f0e2c22c` |
+| 部署时间 | 2026-10-08 20:35（+0800） |
+| 回滚点 | 服务器上的 `app:rollback-7be14a2bd52e`（**pulling 之前**打的标签，见「坑 2」） |
+| 挂载目录同步 | `scripts/eval-selection.ts`（更新）+ `scripts/eval-selection-core.ts`（**服务器上原本没有**） |
+
+`database/` 与 `industry/` 本轮无改动，所以没有迁移要单独上传。脚本上传后按 `DEPLOY-NOTES` 的老规矩
+`sed -i 's/\r$//'` 去掉了 CRLF，再用「本地按 LF 归一化后的 md5」比对通过（`7eec8aaa…` / `d10d1c03…`）。
+
+## ⚠️ 新踩到的坑：`COPY . .` 会把仓库根目录的转储打进镜像
+
+`Dockerfile` 用的是 `COPY . .`，而 `.dockerignore` 只排除 `node_modules` / `.env` / `.git` 等。
+仓库根目录当时躺着 4 个 `aihot-db-*.sql.gz`（**合计 544.6 MB**）和一个 `aihot-upload.zip`：
+不处理的话它们会进镜像层并被推到 Artifact Registry。
+
+这次的处置：构建前把 4 个转储临时移出仓库目录，构建+推送完再移回（`.zip` 只有 1.6 MB，进了镜像）。
+**下次构建前二选一**：把转储挪出 `E:\cs\aihot`（交接文档本来就建议拷回本机一份），或给 `.dockerignore`
+加 `*.sql.gz`、`*.zip`。
+
+## 三条独立证据证明新版在跑
+
+| 证据 | 值 |
+|---|---|
+| api / worker / web 容器的镜像 | 三个都是 `sha256:1353a8f31b78`，与服务器 `RepoDigests` 一致 |
+| 容器内的代码 | `grep "missingEvidence(a) && !original"` = 1；`deepseek-v4.1-flash-scorer` 的 `maxTokens: 32_768` 在；`/app/scripts/eval-selection-core.ts` 在 |
+| 站点 smoke | 在 **web 容器**里跑 `node /app/scripts/smoke.ts --base http://localhost:3000`：**30/30 通过** |
+
+> smoke 要在 `aihot-web-1` 里跑，别在 worker 里跑 —— worker 不监听 3000，全项都会是
+> `TypeError: fetch failed`（这次白跑了一轮）。
+
+## 部署后复核
+
+| 检查 | 结果 |
+|---|---|
+| 20 个公开地址（`/`、`/all`、`/more`、`/privacy`、`/feed.xml`、`/feed/all.xml`、`/llms.txt`、`/robots.txt`、`/sitemap.xml`、`/manifest.webmanifest`、`/openapi-v1.json`、`/api/health`、`/api/v1/items`、`/api/v1/hot-topics`、`/api/v1/selected/snapshot`、`/og/site.png`、`/icon.png`、`/favicon.ico`、`/leaderboard`、`/admin/login`） | 全部 **200** |
+| worker 启动以来日志里的 error/50 | **0** |
+| 待处理（`processing_state in ('new','pending')`） | **0** |
+| 部署后是否还在给无正文条目评分 | **0 次**（复核 SQL 见下） |
+
+行为变化（#153）此刻已生效但还没遇到样本：无正文条目本来就少（实测约每天 85 条），复核用这条 SQL：
+
+```sql
+select a.id, r.purpose from receipts r
+  join articles a on r.subject = 'article:'||a.id||'@'||a.revision
+ where r.created_at > timestamptz '2026-10-08 12:35:00+00'
+   and coalesce(btrim(a.body_text),'') = '' and coalesce(btrim(a.excerpt),'') = ''
+   and coalesce(btrim(a.x_post->>'text'),'') = '' and coalesce(btrim(a.x_post->'quoted'->>'text'),'') = '';
+-- 只应看到 prefilter（有时加一条关于原帖的路径）；出现 score/structure/understand/summarize 就是没生效
+```
