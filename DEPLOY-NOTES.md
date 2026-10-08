@@ -2058,3 +2058,36 @@ editorial 分布是 **T1 66 / T1_5 101 / T2 110 / EXCLUDE_MP 4**；这 6 个源�
 
 `美团技术团队` 是第一方官方博客但非 AI 垂直，按「只喂热度」放在氛围源；要当精选源是改 `participation_mode`
 与 tier 两行的事。
+
+## 氛围源全量包（ambient-sources-full-2026-10-08，同日）
+
+`ambient-sources-full-2026-10-08.csv/.md` 是氛围源的完整清单：**X 126 + 媒体/社区 59 + 待判待补 83**。
+逐条与库里比对后：
+
+| 项 | 数量 | 处理 |
+|---|---|---|
+| X 氛围源 | 126 | 77 个库里没有 → 新建 **71** 个；43 个已在跑；**6 个是已纠正的旧 handle，跳过**（见下）|
+| 媒体/社区 | 59 | **全部已在库**（53 rss + 6 json_list）；3 个地址与包不同（当前都能跑，未改）|
+| 待判/待补 | 83 | 包内明确「⛔ 未进包」（缺地址/handle），**保持不动** |
+
+**跳过的 6 个旧 handle**：`@ChatGPTapp`、`@cognition_labs`、`@elevenlabsio`、`@xai`、`@OpenRouterAI`、
+`@ManusAI_HQ` —— 简介里写着「New account: @cognition」「Now at @SpaceXAI」，`source-split-all` 的 §5.1 已把
+它们纠正成新 handle，而新 handle 在**精选源**里（本次已整合）。按旧 handle 建源只会抓到空或别人的内容。
+
+**顺手修好 5 个一直采不到的媒体源**（包给了正确接法，实测可用后重新启用）：
+
+| 源 | 原来为什么失败 | 改法 | 结果 |
+|---|---|---|---|
+| DEV Community | 缺字段映射 | `dev.to/api/articles` + `title/url/description/published_at` 映射 | 3 条 |
+| SiliconANGLE、车东西 | 缺字段映射 | WordPress 映射（`title.rendered` / `{link}` / `excerpt.rendered` / `date`）| 各 3 条 |
+| InfoWorld、Thurrott | `infoworld.com` → `www.` 跨域跳转被拦 | 直接写 `www.` 地址 | 各 6 条 |
+| Golem.de | `fetch failed`（地址正确也抓不到）| — | **仍停用** |
+
+氛围源现在 **179 个**（X 115 + rss 58 + json 6），除 Golem.de 外全部启用。
+
+**新 X 源的采集受 SocialData 预算节流**：首轮 115 个 X 氛围源里 43 个成功、52 个报
+`Budget for socialdata exhausted (minute)` —— 这是 `budgets` 表的每分钟熔断在起作用，会随预算回填自动继续，
+不是故障。X 源从 ~190 增到 ~261 个，若嫌慢可在后台「设置 → 预算」调高 socialdata 的配额。
+
+**包内自带的边界提醒已按它执行**：Gary Marcus 与 Simon Willison 的**博客**在精选源（现在是 T1_5），
+他们的 **X 号**留在氛围源（`@garymarcus`、`@simonw` 本次新建）；Hacker News 归精选（现有两个 HN 源保持停用）。

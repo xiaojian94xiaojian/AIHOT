@@ -1,0 +1,975 @@
+{
+  "note": "2026-10-08 氛围源全量包：新建 X 氛围源（跳过 6 个已纠正的旧 handle）+ 修 6 个媒体源的接法",
+  "newSignalSources": [
+    {
+      "id": "x-account-aigclink",
+      "name": "X：AIGCLINK (@aigclink)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:aigclink -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "未分类"
+    },
+    {
+      "id": "x-account-garymarcus",
+      "name": "X：Gary Marcus (@garymarcus)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:garymarcus -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "未分类"
+    },
+    {
+      "id": "x-account-simonw",
+      "name": "X：Simon Willison (@simonw)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:simonw -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-alexalbert__",
+      "name": "X：Alex Albert (@alexalbert__)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:alexalbert__ -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "官方人员"
+    },
+    {
+      "id": "x-account-kevinweil",
+      "name": "X：Kevin Weil 🇺🇸 (@kevinweil)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:kevinweil -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-antonosika",
+      "name": "X：Anton Osika – eu/acc (@antonosika)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:antonosika -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-rowancheung",
+      "name": "X：Rowan Cheung (@rowancheung)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:rowancheung -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-lijigang_com",
+      "name": "X：李继刚 (@lijigang_com)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:lijigang_com -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-justinlin610",
+      "name": "X：Junyang Lin (@JustinLin610)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:JustinLin610 -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "官方人员"
+    },
+    {
+      "id": "x-account-huybery",
+      "name": "X：Binyuan Hui (@huybery)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:huybery -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "官方人员"
+    },
+    {
+      "id": "x-account-berkeley_ai",
+      "name": "X：Berkeley AI Research (@berkeley_ai)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:berkeley_ai -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-venturetwins",
+      "name": "X：Justine Moore (@venturetwins)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:venturetwins -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-scottwu46",
+      "name": "X：Scott Wu (@ScottWu46)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:ScottWu46 -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-stanfordailab",
+      "name": "X：Stanford AI Lab (@StanfordAILab)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:StanfordAILab -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-geoffreyhinton",
+      "name": "X：Geoffrey Hinton (@geoffreyhinton)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:geoffreyhinton -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-patloeber",
+      "name": "X：Patrick Loeber (@patloeber)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:patloeber -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "官方人员"
+    },
+    {
+      "id": "x-account-milvusio",
+      "name": "X：Milvus (@milvusio)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:milvusio -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-jinaai_",
+      "name": "X：Jina AI (@JinaAI_)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:JinaAI_ -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-thejustinwelsh",
+      "name": "X：Justin Welsh (@thejustinwelsh)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:thejustinwelsh -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-qdrant_engine",
+      "name": "X：Qdrant (@qdrant_engine)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:qdrant_engine -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-aidotengineer",
+      "name": "X：AI Engineer (@aiDotEngineer)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:aiDotEngineer -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-character_ai",
+      "name": "X：Character.AI (@character_ai)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:character_ai -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-mem0ai",
+      "name": "X：mem0 (@mem0ai)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:mem0ai -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-itspaulai",
+      "name": "X：Paul Couvert (@itsPaulAi)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:itsPaulAi -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-hwchase17",
+      "name": "X：Harrison Chase (@hwchase17)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:hwchase17 -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-recraftai",
+      "name": "X：Recraft (@recraftai)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:recraftai -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-llama_index",
+      "name": "X：LlamaIndex 🦙 (@llama_index)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:llama_index -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-dify_ai",
+      "name": "X：Dify (@dify_ai)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:dify_ai -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-ollama",
+      "name": "X：ollama (@ollama)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:ollama -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-flowiseai",
+      "name": "X：FlowiseAI (@FlowiseAI)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:FlowiseAI -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-pika_labs",
+      "name": "X：Pika (@pika_labs)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:pika_labs -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-ideogram_ai",
+      "name": "X：Ideogram (@ideogram_ai)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:ideogram_ai -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-v0",
+      "name": "X：v0 (@v0)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:v0 -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-aisdk",
+      "name": "X：AI SDK (@aisdk)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:aisdk -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-fishaudio",
+      "name": "X：Fish Audio (@FishAudio)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:FishAudio -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-windsurf_ai",
+      "name": "X：Windsurf (@windsurf_ai)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:windsurf_ai -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-_mohansolo",
+      "name": "X：Varun Mohan (@_mohansolo)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:_mohansolo -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-lovart_ai",
+      "name": "X：LovartAI (@lovart_ai)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:lovart_ai -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-figma",
+      "name": "X：Figma (@figma)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:figma -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-genspark_ai",
+      "name": "X：Genspark (@genspark_ai)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:genspark_ai -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-heybarsee",
+      "name": "X：Barsee 🐶 (@heyBarsee)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:heyBarsee -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号-聚合"
+    },
+    {
+      "id": "x-account-lennysan",
+      "name": "X：Lenny Rachitsky (@lennysan)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:lennysan -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-notionhq",
+      "name": "X：Notion (@NotionHQ)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:NotionHQ -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-akothari",
+      "name": "X：Akshay Kothari (@akothari)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:akothari -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-aibreakfast",
+      "name": "X：AI Breakfast (@AiBreakfast)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:AiBreakfast -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号-聚合"
+    },
+    {
+      "id": "x-account-diabrowser",
+      "name": "X：Dia (@diabrowser)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:diabrowser -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-skywork_ai",
+      "name": "X：Skywork (@Skywork_ai)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:Skywork_ai -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-naval",
+      "name": "X：Naval (@naval)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:naval -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-aaditsh",
+      "name": "X：Aadit Sheth (@aaditsh)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:aaditsh -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号-聚合"
+    },
+    {
+      "id": "x-account-augmentcode",
+      "name": "X：Augment Code (@augmentcode)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:augmentcode -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-fellouai",
+      "name": "X：Fellou (@FellouAI)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:FellouAI -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-poe_platform",
+      "name": "X：Poe (@poe_platform)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:poe_platform -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-lmarena_ai",
+      "name": "X：lmarena.ai (@lmarena_ai)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:lmarena_ai -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-replicate",
+      "name": "X：Replicate (@replicate)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:replicate -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-a16z",
+      "name": "X：a16z (@a16z)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:a16z -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-paulg",
+      "name": "X：Paul Graham (@paulg)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:paulg -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-andrewchen",
+      "name": "X：andrew chen (@andrewchen)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:andrewchen -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-browser_use",
+      "name": "X：Browser Use (@browser_use)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:browser_use -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-raydalio",
+      "name": "X：Ray Dalio (@RayDalio)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:RayDalio -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-shl",
+      "name": "X：Sahil Lavingia (@shl)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:shl -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-nickfloats",
+      "name": "X：Nick St. Pierre (@nickfloats)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:nickfloats -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-fireworksai_hq",
+      "name": "X：Fireworks AI (@FireworksAI_HQ)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:FireworksAI_HQ -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-janleike",
+      "name": "X：Jan Leike (@janleike)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:janleike -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-suhail",
+      "name": "X：Suhail (@Suhail)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:Suhail -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-pmbackttfuture",
+      "name": "X：AI产品黄叔 (@PMbackttfuture)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:PMbackttfuture -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-github",
+      "name": "X：GitHub (@github)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:github -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-idoubicc",
+      "name": "X：idoubi (@idoubicc)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:idoubicc -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-martinfowler",
+      "name": "X：Martin Fowler (@martinfowler)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:martinfowler -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-geekbb",
+      "name": "X：Geek (@geekbb)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:geekbb -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-hitw93",
+      "name": "X：Tw93 (@HiTw93)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:HiTw93 -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    },
+    {
+      "id": "x-account-yangyixxxx",
+      "name": "X：Yangyi (@Yangyixxxx)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:Yangyixxxx -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "identity": "个人号"
+    }
+  ],
+  "fixSignalConfigs": [
+    {
+      "id": "src-c378da5a1e",
+      "name": "DEV Community",
+      "enable": true,
+      "config": {
+        "url": "https://dev.to/api/articles?per_page=3",
+        "itemsPath": "",
+        "titlePaths": [
+          "title"
+        ],
+        "urlTemplate": "{url}",
+        "summaryPaths": [
+          "description"
+        ],
+        "externalIdPath": "id",
+        "publishedAtPath": "published_at",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      }
+    },
+    {
+      "id": "src-5c57c60c50",
+      "name": "SiliconANGLE",
+      "enable": true,
+      "config": {
+        "url": "https://siliconangle.com/wp-json/wp/v2/posts?per_page=3",
+        "itemsPath": "",
+        "titlePaths": [
+          "title.rendered"
+        ],
+        "urlTemplate": "{link}",
+        "summaryPaths": [
+          "excerpt.rendered"
+        ],
+        "externalIdPath": "id",
+        "publishedAtPath": "date",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      }
+    },
+    {
+      "id": "src-c2ae08e9af",
+      "name": "车东西",
+      "enable": true,
+      "config": {
+        "url": "https://chedongxi.com/wp-json/wp/v2/posts?per_page=3",
+        "itemsPath": "",
+        "titlePaths": [
+          "title.rendered"
+        ],
+        "urlTemplate": "{link}",
+        "summaryPaths": [
+          "excerpt.rendered"
+        ],
+        "externalIdPath": "id",
+        "publishedAtPath": "date",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      }
+    },
+    {
+      "id": "src-22a6ec4b2c",
+      "name": "InfoWorld",
+      "enable": true,
+      "config": {
+        "url": "https://www.infoworld.com/wp-json/wp/v2/posts?per_page=3",
+        "itemsPath": "",
+        "titlePaths": [
+          "title.rendered"
+        ],
+        "urlTemplate": "{link}",
+        "summaryPaths": [
+          "excerpt.rendered"
+        ],
+        "externalIdPath": "id",
+        "publishedAtPath": "date",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      }
+    },
+    {
+      "id": "src-153dacfb29",
+      "name": "Thurrott",
+      "enable": true,
+      "config": {
+        "url": "https://www.thurrott.com/wp-json/wp/v2/posts?per_page=3",
+        "itemsPath": "",
+        "titlePaths": [
+          "title.rendered"
+        ],
+        "urlTemplate": "{link}",
+        "summaryPaths": [
+          "excerpt.rendered"
+        ],
+        "externalIdPath": "id",
+        "publishedAtPath": "date",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      }
+    },
+    {
+      "id": "src-cbf787802c",
+      "name": "Golem.de",
+      "enable": true,
+      "config": {
+        "feedUrl": "https://golem.de/rss",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      }
+    }
+  ]
+}

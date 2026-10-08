@@ -284,36 +284,46 @@
       "id": "src-qbitai",
       "name": "量子位",
       "kind": "rss",
-      "feedUrl": "https://www.qbitai.com/feed",
-      "intervalMinutes": 30
+      "intervalMinutes": 30,
+      "config": {
+        "feedUrl": "https://www.qbitai.com/feed"
+      }
     },
     {
       "id": "src-sspai",
       "name": "少数派",
       "kind": "rss",
-      "feedUrl": "https://sspai.com/feed",
-      "intervalMinutes": 60
+      "intervalMinutes": 60,
+      "config": {
+        "feedUrl": "https://sspai.com/feed"
+      }
     },
     {
       "id": "src-ifanr",
       "name": "爱范儿",
       "kind": "rss",
-      "feedUrl": "https://www.ifanr.com/feed",
-      "intervalMinutes": 30
+      "intervalMinutes": 30,
+      "config": {
+        "feedUrl": "https://www.ifanr.com/feed"
+      }
     },
     {
       "id": "src-ruanyifeng",
       "name": "阮一峰的网络日志",
       "kind": "rss",
-      "feedUrl": "https://www.ruanyifeng.com/blog/atom.xml",
-      "intervalMinutes": 120
+      "intervalMinutes": 120,
+      "config": {
+        "feedUrl": "https://www.ruanyifeng.com/blog/atom.xml"
+      }
     },
     {
       "id": "src-meituan-tech",
       "name": "美团技术团队",
       "kind": "rss",
-      "feedUrl": "https://tech.meituan.com/feed",
-      "intervalMinutes": 120
+      "intervalMinutes": 120,
+      "config": {
+        "feedUrl": "https://tech.meituan.com/feed"
+      }
     }
   ]
 }
