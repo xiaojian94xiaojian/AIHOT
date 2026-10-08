@@ -2184,3 +2184,101 @@ Gary Marcus 的边界说明一致。转氛围的 3 个已入队重发，它们�
 ⚠️ **成本提醒**：代价是调用量上一个数量级 —— 改前实际约 530 次/天（被 100/小时封顶压出来的），
 现在按需求跑满约 **4 400–6 400 次/天**。SocialData 按请求计费，如果账户额度撑不住，把 editorial 也调到
 120 分钟档即可把日调用砍到约 2 200 次（需求 91+82=173 次/小时），预算也可同步回落。
+
+---
+
+# 部署后观察清单（2026-10-08 收工；次日核对）
+
+## 基线（今天收工时的值，用来对比）
+
+| 指标 | 值 |
+|---|---|
+| 源总数 | **626**（editorial 375 / hot_signal 251）|
+| 启用中的 editorial 分级 | T1 69 / T1_5 100 / T2 107 / EXCLUDE_MP 4 |
+| X 源 | **346**（editorial 183 个 @60 分钟、氛围 163 个 @120 分钟）→ 需求 **265 次/小时** |
+| `socialdata` 预算 | 30 / 300 / **7000**（今天下午从 10/100/1000 调高）|
+| 今天 socialdata 调用 | **610 次**（大部分时间还压在旧预算上）|
+| 本轮新建源 | **176 个**（31 编辑 + 145 氛围），其中 **148 个已抓到内容**（84%）|
+| 近 24 小时 | 信号 1301 条 / 参与方 209；精选 35 条（T1 13、T1_5 15、T2 7）|
+| `rss-tomtunguz` | 近 24 小时 1 条、入选 **0**（降级前：30 天 68 条入选）|
+| 站点 | `/`、`/hot`、`/all`、`/daily` 全 200；worker 0 报错 |
+
+## 1. 成本与配额（最要紧，跑一天再看）
+
+```sql
+-- 每天实际花了多少次 X 抓取
+select created_at::date as day, count(*) from receipts where service='socialdata' group by 1 order by 1 desc limit 3;
+```
+
+- **期望**：约 **4 000–6 400 次/天**（需求 265/小时跑满）。接近 7 000 说明日上限成了瓶颈；
+  远低于 2 000 则说明有别的瓶颈（看下一条）。
+- **看还有没有被挡的源**：
+  ```sql
+  select left(last_error,46) as err, count(*) from sources where last_error is not null group by 1 order by 2 desc limit 5;
+  ```
+- **撑不住就回落**（日调用降到约 2 200 次）：
+  ```sql
+  UPDATE sources SET interval_minutes=120 WHERE kind='x_search' AND enabled AND participation_mode='editorial';
+  UPDATE budgets SET per_minute=10, per_hour=150, per_day=3000 WHERE service='socialdata';
+  ```
+
+## 2. 新源是否真的在工作
+
+```sql
+select count(*) filter (where (select count(*) from articles a where a.source_id = s.id) > 0) || ' / ' || count(*) as "有内容的源"
+from sources s where s.created_at > now() - interval '2 days';
+```
+
+- **期望**：24–48 小时后 ≥ 90%（今天 8 小时时是 148/176）。
+- 仍是 0 条且 `last_error` 又不是预算问题的，逐个查 —— 尤其那 29 个用
+  `news.google.com/rss/search?q=site:<域名>` 兜底的媒体源，Google News 可能限流。
+
+## 3. 权重改动是否按预期起作用
+
+```sql
+-- 精选构成（T1 占比应比改动前高）
+select s.tier, count(*) filter (where p.selected) as selected
+from publications p join sources s on s.id = p.source_id
+where p.timeline_at > now() - interval '1 day' group by 1 order by 1;
+
+-- 4 个 EXCLUDE_MP 火车型：不该再有评分回执（它们仍应出现在 /all）
+select s.id, count(r.id) as score_calls
+from sources s left join receipts r on r.subject like 'article:' || s.id || '@%'
+     and r.purpose='score_article' and r.created_at > now() - interval '1 day'
+where s.id in ('rss-arxiv','rss-arxiv-2','rss-arxiv-3','web-arxiv') group by 1;
+
+-- 3 个转氛围的源：公开池里的条目应为 0
+select s.id, count(*) filter (where p.eligible) as in_pool, count(*) as total
+from publications p join sources s on s.id = p.source_id
+where s.id in ('x-account--akhaliq','x-account-omarsar0','x-account-lilianweng') group by 1;
+
+-- 升到 T1 的源：新发布条目应带一手标记
+select s.id, count(*) filter (where p.first_party) as first_party, count(*) as total
+from publications p join sources s on s.id = p.source_id
+where s.id in ('x-account-runwayml','x-account-googleaidevs','rss-meta-newsroom-ai','x-account-openrouter')
+group by 1;
+```
+
+## 4. 新鲜度（editorial X 从 30 分钟档改成了 60 分钟）
+
+```sql
+select s.name, max(p.timeline_at) as latest
+from publications p join sources s on s.id = p.source_id
+where s.kind='x_search' and s.participation_mode='editorial' and s.tier in ('T1','T1_5') and s.enabled
+group by 1 order by 2 asc limit 10;
+```
+
+- **期望**：主力源的最新条目停在 1–2 小时内。若普遍超过 4 小时，说明配额仍不够，
+  要么调预算、要么只把 T1/T1_5 的间隔收回 30 分钟（约 +60 次/小时）。
+
+## 5. 站点与出刊
+
+- `/`、`/hot`、`/all`、`/daily` 全 200；worker 近 5 分钟 level 50/60 计数为 0。
+- 日报/周报照常出刊：tier 改动会影响事件主位与「（一手）」标注，看一两期是否合理
+  （官方渠道当主位、T2 媒体不作主位）。
+
+## 6. 还没做、但可能想做的
+
+- 83 个待判里仍有 2 个探不到 feed（CTech、Impress Watch），3 个缺 handle 的已放弃 1 个（AppSail 注销）。
+- 那 46 个个人源已经补完（45 个入库），没有遗留。
+- `roster-x-gap`（60 个 X 缺口）如果之后拿到文件，按同一套脚本跑一遍即可。
