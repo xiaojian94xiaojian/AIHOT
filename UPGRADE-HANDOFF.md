@@ -8,13 +8,13 @@
 ## 一、分支与线上状态
 
 ```
-分支 upgrade-4.0：领先上游 origin/main 22 个提交，落后 7
+分支 upgrade-4.0：领先上游 origin/main 24 个提交，落后 0
 远端：已推 fork（xiaojian94xiaojian/AIHOT），本地与远端一致
-线上：https://hot.jian.ing 正在跑，健康
+线上：https://hot.jian.ing 正在跑，健康（**但还没部署这次合并**；线上镜像仍是 10-07 13:55 UTC 那个）
 
-（2026-10-08 核对。落后的 7 个提交是上游这两天合入的，其中 #153 修的就是本文档发现的那条
-框架问题 —— 见「下一步」与「上游动态」。合并上游时 `analyze.ts` 与 `tests/analyze.test.ts`
-会和本分支的同类改动撞上，那时以他们的实现为准。）
+（2026-10-08：已合并上游 7 个提交，其中 #153 修的就是本文档发现的那条框架问题 —— 见「下一步」与
+「上游动态」。他们的实现已进入本分支，我们原来那处改动（只跳过两次评分）交还给上游；
+`tests/analyze.test.ts` 的冲突按上游版本解决。框架侧剩下的差异见下一节。）
 ```
 
 最近几个提交（都在这个分支上，已部署）：
@@ -32,22 +32,24 @@
 
 ### 相对上游改了什么
 
-**框架侧（`packages/`、`apps/`）一共 5 个文件**，逐一列清，避免下次误判：
+**框架侧（`packages/`、`apps/`）一共 4 个文件**，逐一列清，避免下次误判：
 
 | 文件 | 改动 | 性质 |
 |---|---|---|
 | `apps/web/app/app.css` | +36 行 | 恢复 4.0.0 删掉的 `cal-*` 变量与动画（模块要用） |
 | `apps/web/tests/navigation-performance.test.ts` | +6 行 | 给那条用例的 WebKit 上下文摘掉 `startViewTransition`（见「教训 1」） |
-| `tests/analyze.test.ts` | 改断言 | 「无正文条目不评分」后 `BARE` 的预期：`score` 由 `FLOOR-3` 改为 `null`，调用序列去掉两次 `score`（上游 #153 动了同一处断言，合并时按能过的写） |
 | `tests/outbound-protocol.standalone.test.ts` | +17/-4 | 缺 `openssl` 时跳过那 4 条并写明原因 |
 | `tests/sign-in-page.standalone.test.ts` | 新增 | 抓取守卫的单元测试 |
+
+（`tests/analyze.test.ts` 原来也在这个表里 —— 改 `BARE` 的断言。上游 #153 用同一处断言自己实现了
+这条，合并时已按上游版本解决，不再算我们的改动。）
 
 其余框架文件不是「改」，而是**新增**引擎插口或共享代码（上游没有这些文件）：
 `packages/backend/src/lib/http.ts`（各响应助手）、`packages/backend/src/admin/auth.ts`
 （`adminHandler` 移进来）、以及三处插口字段/小改动：
 `packages/backend/src/modules.ts`（+`Scheduled.runOnStart`）、`apps/worker/src/schedules.ts`（用上它）、
-`packages/backend/src/editorial/analyze.ts`（评分预算；「无正文不评分」已由上游 #153 自己实现，
-合并上游后这一项从「我们的改动」里划掉）、
+`packages/backend/src/editorial/analyze.ts`（已只剩评分预算 32 768 这一处 —— 「无正文不评分」
+由上游 #153 实现并已并入）、
 `packages/backend/src/content/extract.ts`（登录页守卫）、
 `packages/backend/src/providers/llm.ts`（网关的会话头适配）、
 `apps/api/src/http/respond.ts` 与 `apps/api/src/routes/admin-auth.ts`（改为 re-export）。
@@ -74,7 +76,9 @@
    不是评分调用；「均分 15.4、入选 0」也不成立。改动前 6 天（10-01 00:00 → 10-07 00:00 UTC）
    实测：11 620 条里 377 条只有标题的条目花了 731 次评分调用（另有 45 次理解写作、7 次摘要写作），
    其中 **29 条凭标题写出的摘要被选中**、均分 73.5，23 条的摘要里模型自己写着正文没取到。
-   这条已提上游（#152），上游当天在 #153 用更窄的判据自行修好并署名。
+   这条已提上游（#152），上游当天在 #153 用更窄的判据自行修好并署名，**并在本次合并里进入本分支** ——
+   所以现在线上跑的是我们的版本（只跳过两次评分），仓库里是他们的版本（预筛之后直接停下，
+   评分、结构抽取、写作都不启动），下次部署会把两者统一。
 6. **出站协议测试**：夹具证书必须真证书（Node 签不了），缺 `openssl` 时连同原因跳过那 4 条。
 7. **登录页守卫的测试**改成 `*.standalone.test.ts`（纯函数测试，不该占用数据库）。
 
@@ -125,6 +129,10 @@ URL 标题 0 条；剩下 4 条纯数字的公开条目（X 的 `2003`、`web-pr
 - 真 iPhone Safari：**不崩**（真机实测过）
 - 上游 Linux CI 的同一构建号：**通过**
 - 本机 Windows 的这份构建：**崩**
+
+2026-10-08 又多一例：合并上游 #151 后，`apps/web/tests/native-video.test.ts` 里 WebKit 那条
+（原生视频播放）在本机 30 秒超时失败，同一用例的 Chromium 那条通过 —— 同一份代码、同一次运行，
+差别只在引擎。别把它当回归。
 
 我在这个问题上错过两次：先把 Windows 构建的行为当成 Safari 的，报了「iPhone 读者点开任何文章
 都会白屏」这个假事故；又在生产代码里加了个不必要的规避，最后撤回。
@@ -186,9 +194,22 @@ DATABASE_URL=postgres://aihot:aihot@127.0.0.1:55432/aihot_ci npm test  # 后端�
 
 - 测试库：docker 容器 `aihot-testdb`，端口 55432，库 `aihot_ci`（干净）与 `aihot_test`（真实数据）。
   库名必须以 `_test` 或 `_ci` 结尾。
-- `Docker Desktop` 与 `aihot-testdb` 关机后不自启，先 `docker start aihot-testdb`。
+- `Docker Desktop` 与 `aihot-testdb` 关机后不自启，先 `docker start aihot-testdb`。Docker Desktop
+  也要等它起来：刚启动时 Postgres 还在恢复，这时跑测试会在建库阶段撞上
+  `57P03 the database system is starting up`，等 `pg_isready` 说 accepting connections 再跑。
+- **全量 `npm test` 在本机会随机有整文件失败**：`PostgresError: database "aihot_ci_f<pid>_ci" already
+  exists`（`42P04`）。每个测试文件的库副本按进程号命名（`tests/databases.ts` 的
+  `${name}_f${process.pid}_${suffix}`），而 Windows 会很快复用进程号，于是后一个文件撞上前一个留下的
+  副本，表现是那个文件在 ~250ms 内失败（单跑同一个文件却通过）。这是夹具的问题，不是代码 ——
+  分批跑（每组十来个文件，每组开头会清掉上一组留下的副本）或重跑即可。2026-10-08 合并上游后文件更多，
+  撞上的概率更高；上游 CI 是 Linux，没这个现象。
 - 本机缺 `pg_dump`、`sh`、`openssl`，所以备份类测试与出站协议测试在本机会跳过或失败 ——
   那是环境，不是代码。
+- **依赖子进程 + SIGTERM 的关停测试在本机会挂到超时**（`tests/analyze-shutdown.test.ts`、
+  `tests/translate-shutdown.test.ts` 等 5 条）：这些用例 `spawn` 一个 worker 子进程，再给它发 SIGTERM，
+  等子进程回一条 `{stopping:true}`。Windows 上发给子进程的 SIGTERM 不会触发它的
+  `process.on('SIGTERM')`（实测：子进程只回了 `{ready:true}`，处理器始终没跑），于是父进程一直等。
+  和代码无关，上游 Linux CI 正常；合并上游时不要拿这几条当回归判据。
 
 ### 部署
 
@@ -215,4 +236,5 @@ gcloud compute ssh weijianlin@aihot --zone=asia-east2-c --command="bash /home/we
 [#153](https://github.com/KKKKhazix/AIHOT/pull/153) `fix: wait for article evidence before scoring and
 writing` 里实现并合并，把仓库作者记为共同作者。他们的版本与我们的略有出入：判据更窄（没有材料
 **且**没有可展示原帖才停，可展示的空文字、纯链接 X 原帖继续原有评分与原样展示），而且连结构抽取与
-写作一起跳过 —— 我们只跳过了两次评分，结构抽取照跑。合并上游后以他们的为准。
+写作一起跳过 —— 我们只跳过了两次评分，结构抽取照跑。**这次合并已经把他们的版本并进来**，
+本分支不再自己持有这处改动。
