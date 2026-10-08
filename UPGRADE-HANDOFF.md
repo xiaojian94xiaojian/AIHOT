@@ -8,7 +8,7 @@
 ## 一、分支与线上状态
 
 ```
-分支 upgrade-4.0：领先上游 origin/main 24 个提交，落后 0
+分支 upgrade-4.0：已合并上游（落后 origin/main 0，本分支自己的提交在其之上）
 远端：已推 fork（xiaojian94xiaojian/AIHOT），本地与远端一致
 线上：https://hot.jian.ing 正在跑，健康（**但还没部署这次合并**；线上镜像仍是 10-07 13:55 UTC 那个）
 
@@ -203,6 +203,10 @@ DATABASE_URL=postgres://aihot:aihot@127.0.0.1:55432/aihot_ci npm test  # 后端�
   副本，表现是那个文件在 ~250ms 内失败（单跑同一个文件却通过）。这是夹具的问题，不是代码 ——
   分批跑（每组十来个文件，每组开头会清掉上一组留下的副本）或重跑即可。2026-10-08 合并上游后文件更多，
   撞上的概率更高；上游 CI 是 Linux，没这个现象。
+- **推送要跳过 ECC 钩子**：`git push` 会跑 `~/.codex/git-hooks/pre-push`（`core.hooksPath` 指过去的），
+  它按 lint / typecheck / test / build 顺序跑存在的脚本；本仓库的 `npm test` 在本机无法全绿（见上面
+  三条环境问题），所以推送用 `ECC_SKIP_PREPUSH=1 git push fork upgrade-4.0`。本地验证按上面的
+  分批方式跑，别指望这个钩子。
 - 本机缺 `pg_dump`、`sh`、`openssl`，所以备份类测试与出站协议测试在本机会跳过或失败 ——
   那是环境，不是代码。
 - **依赖子进程 + SIGTERM 的关停测试在本机会挂到超时**（`tests/analyze-shutdown.test.ts`、
