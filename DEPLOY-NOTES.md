@@ -1998,3 +1998,31 @@ editorial 分布是 **T1 66 / T1_5 101 / T2 110 / EXCLUDE_MP 4**；这 6 个源�
 **仍不一致、待定的两条**：同一个人两个渠道档位不同 —— `@lilianweng`（X，T2）与 `rss-lilianweng`
 （博客，T1_5）、`@natolambert`（X，T2）与 `rss-interconnects`（博客，T1_5）。要对齐就把这两个 X 账号
 也提到 T1_5（门槛 76→65 并获得推送资格）；没有确认前保持 T2。
+## 氛围源（hot_signal）这边的情况（同日核查）
+
+**这轮的氛围源包不在盘上**。`source-split-all-2026-10-08.md` 的落地包表里列了三个包，实际只有编辑源包
+（79 条）在 `E:\cs\hot\2026-10-08`；`backend-import-aihot-hot-signal-2026-10-08`（185 条 = X 126 + 媒体 59）
+和 `backend-import-aihot-roster-x-gap-2026-10-08`（60 条 X）都没有文件，全盘与桌面/下载目录都找过。
+要整合就把文件放进来，按同一套判据处理。
+
+**顺手补了 2 条本该转精选源的**：包里 `participation_mode=editorial`，但库里仍是 `hot_signal` ——
+`@NVIDIARTXSpark`（→ T1）与 `@reach_vb`（→ T1_5）。原因是我上一步只改了 tier 没改模式。
+改后氛围源 105 → **103**，编辑源 283。这两个源已入队重发，`publications` 会按 editorial 重算。
+
+**现有氛围源在正常跑**（103 个启用：rss 53 / x_search 46 / json_list 6）：
+
+| 指标 | 值 |
+|---|---|
+| 信号量 | 近 24h **1231** 条、近 7 天 **7721** 条 |
+| 参与方 | 近 7 天 **340** 个 |
+| 热点榜计算 | `hot_rankings` 最新 **2026-10-08 13:30 UTC**；`story_heat_hourly` 到 13:00 |
+| 页面 | `/hot` 200，接口 10 条（第 1 名：源 16 / 信号 30 / 参与者 46） |
+
+**6 个氛围源实际采集不到东西，建议修或停用**：
+
+| 源 | 症状 |
+|---|---|
+| `src-c378da5a1e` DEV Community、`src-5c57c60c50` SiliconANGLE、`src-c2ae08e9af` 车东西 | `no items mapped (check title/url paths)` —— `json_list` 的字段映射不对 |
+| `src-cbf787802c` Golem.de | `fetch failed` |
+| `src-153dacfb29`、`src-22a6ec4b2c` | `Blocked cross-origin redirect for a protected request`，最后成功 10-02 |
+| `src-3a691df5b3`、`src-f6d2ad6f1b` | 偶发超时 / HTTP 406，但今天成功过，先观察 |

@@ -18,6 +18,8 @@ import { assertSupportedConfig } from "@aihot/backend/sources/config-keys";
 interface Mapping {
   retier: Record<string, string>;
   newSources: Array<{ id: string; name: string; handle: string; tier: string; identity: string }>;
+  /** Sources the editorial package lists as editorial that are still hot_signal here. */
+  editorial?: string[];
 }
 
 const dryRun = process.argv.includes("--dry-run");
@@ -41,8 +43,10 @@ const retier = Object.entries(data.retier).filter(([id, tier]) => {
 });
 const missing = Object.keys(data.retier).filter((id) => !byId.has(id));
 const creates = data.newSources.filter((s) => !byId.has(s.id));
+/** The package lists these as editorial (they create events and reach the public pool); here they were signals. */
+const toEditorial = (data.editorial ?? []).filter((id) => byId.get(id)?.participation_mode !== "editorial");
 
-console.log(`改档 ${retier.length} 个源；新建 ${creates.length} 个源；改档表里对不上库的 ${missing.length} 个`);
+console.log(`改档 ${retier.length} 个源；新建 ${creates.length} 个源；转精选源 ${toEditorial.length} 个；改档表里对不上库的 ${missing.length} 个`);
 if (missing.length) console.log("  对不上：", missing.join(", "));
 for (const [id, tier] of retier.slice(0, 8)) {
   const row = byId.get(id)!;
@@ -67,6 +71,9 @@ await sql.begin(async (tx) => {
   // so these rows need no republish.
   const fixed = await tx`UPDATE sources SET first_party = (tier = 'T1'), updated_at = now() WHERE first_party <> (tier = 'T1')`;
   console.log(`first_party 归一：${fixed.count} 行`);
+  for (const id of toEditorial) {
+    await tx`UPDATE sources SET participation_mode = 'editorial', updated_at = now() WHERE id = ${id}`;
+  }
   for (const s of creates) {
     const config = { query: `from:${s.handle} -filter:replies`, _aihot: { initialBackfillLimit: 8 } };
     assertSupportedConfig("x_search", config);
@@ -79,11 +86,11 @@ await sql.begin(async (tx) => {
 // The projection re-derives from the source row; leave nothing stale behind.
 await getBoss();
 let queued = 0;
-for (const [id] of retier) {
+for (const id of [...retier.map(([id]) => id), ...toEditorial]) {
   await enqueue(QUEUES.republishSource, { sourceId: id }, { singletonKey: id });
   queued += 1;
 }
-console.log(`已写入：改档 ${retier.length}，新建 ${creates.length}，入队重发 ${queued}`);
+console.log(`已写入：改档 ${retier.length}，新建 ${creates.length}，转精选源 ${toEditorial.length}，入队重发 ${queued}`);
 
 const after = await sql<{ tier: string; n: number }[]>`
   SELECT tier, count(*)::int AS n FROM sources WHERE participation_mode = 'editorial' AND enabled GROUP BY tier ORDER BY tier`;

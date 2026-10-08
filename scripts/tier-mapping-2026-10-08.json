@@ -274,5 +274,9 @@
       "tier": "T1_5",
       "identity": "个人号"
     }
+  ],
+  "editorial": [
+    "x-account-nvidiartxspark",
+    "x-account-reach_vb"
   ]
 }

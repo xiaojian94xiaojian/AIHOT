@@ -7154,7 +7154,7 @@
     {
       "name": "Vaibhav Srivastav",
       "kind": "x_search",
-      "participation_mode": "hot_signal",
+      "participation_mode": "editorial",
       "interval_minutes": 60,
       "site_fulltext": false,
       "syndicate_fulltext": false,
@@ -8105,7 +8105,7 @@
     {
       "name": "NVIDIA RTX Spark",
       "kind": "x_search",
-      "participation_mode": "hot_signal",
+      "participation_mode": "editorial",
       "interval_minutes": 60,
       "site_fulltext": false,
       "syndicate_fulltext": false,
