@@ -10579,6 +10579,816 @@
       "site_fulltext": false,
       "syndicate_fulltext": false,
       "enabled": true
+    },
+    {
+      "id": "x-account-andrewcurran_",
+      "name": "X：Andrew Curran (@AndrewCurran_)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:AndrewCurran_ -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-wong2__",
+      "name": "X：wong2 (@wong2__)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:wong2__ -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-hamelhusain",
+      "name": "X：Hamel Husain (@HamelHusain)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:HamelHusain -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-indigox",
+      "name": "X：indigo (@indigox)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:indigox -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-jesselaunz",
+      "name": "X：Jesse Lau 遁一子 (@jesselaunz)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:jesselaunz -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-romainhuet",
+      "name": "X：Romain Huet (@romainhuet)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:romainhuet -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-ajambrosino",
+      "name": "X：Andrew Ambrosino (@ajambrosino)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:ajambrosino -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-khazix0918",
+      "name": "X：卡兹克 (@Khazix0918)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:Khazix0918 -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-huangyun_122",
+      "name": "X：黄赟 (@huangyun_122)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:huangyun_122 -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-xicilion",
+      "name": "X：响马 (@xicilion)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:xicilion -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-davidondrej1",
+      "name": "X：David Ondrej (@DavidOndrej1)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:DavidOndrej1 -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-gneubig",
+      "name": "X：Graham Neubig (@gneubig)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:gneubig -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-saranormous",
+      "name": "X：Sarah Guo (@saranormous)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:saranormous -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-btibor91",
+      "name": "X：Tibor Blaho (@btibor91)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:btibor91 -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-matthewberman",
+      "name": "X：Matthew Berman (@MatthewBerman)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:MatthewBerman -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-bdsqlsz",
+      "name": "X：青龍聖者 (@bdsqlsz)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:bdsqlsz -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-cellinlab",
+      "name": "X：Cell 细胞 (@cellinlab)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:cellinlab -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-tualatrix",
+      "name": "X：图拉鼎 (@tualatrix)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:tualatrix -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-cuimao",
+      "name": "X：CuiMao (@CuiMao)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:CuiMao -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-minchoi",
+      "name": "X：Min Choi (@minchoi)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:minchoi -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-elder_plinius",
+      "name": "X：Pliny the Liberator (@elder_plinius)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:elder_plinius -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-hiteshdotcom",
+      "name": "X：Hitesh Choudhary (@hiteshdotcom)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:hiteshdotcom -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-levelsio",
+      "name": "X：Pieter Levels (@levelsio)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:levelsio -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-mervenoyann",
+      "name": "X：Merve Noyan (@mervenoyann)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:mervenoyann -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-thdxr",
+      "name": "X：Dax Raad (@thdxr)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:thdxr -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-mattshumer_",
+      "name": "X：Matt Shumer (@mattshumer_)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:mattshumer_ -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-eladgil",
+      "name": "X：Elad Gil (@eladgil)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:eladgil -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-nandodf",
+      "name": "X：Nando de Freitas (@NandoDF)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:NandoDF -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-fakepsyho",
+      "name": "X：Psyho (@FakePsyho)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:FakePsyho -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-alexfinn",
+      "name": "X：Alex Finn (@AlexFinn)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:AlexFinn -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-yaojingang",
+      "name": "X：姚金刚 (@yaojingang)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:yaojingang -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-scobleizer",
+      "name": "X：Robert Scoble (@Scobleizer)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:Scobleizer -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-gosailglobal",
+      "name": "X：Jason Zhu (@GoSailGlobal)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:GoSailGlobal -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-mitsuhiko",
+      "name": "X：Armin Ronacher (@mitsuhiko)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:mitsuhiko -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-wey_gu",
+      "name": "X：Wey Gu 古思为 (@wey_gu)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:wey_gu -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-czzzzzzj_",
+      "name": "X：麦当mdldm (@czzzzzzJ_)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:czzzzzzJ_ -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-berryxia",
+      "name": "X：Berry Xia (@berryxia)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:berryxia -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-fofrai",
+      "name": "X：fofr (@fofrAI)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:fofrAI -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-saboo_shubham_",
+      "name": "X：Shubham Saboo (@Saboo_Shubham_)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:Saboo_Shubham_ -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-tomaarsen",
+      "name": "X：Tom Aarsen (@tomaarsen)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:tomaarsen -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-osanseviero",
+      "name": "X：Omar Sanseviero (@osanseviero)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:osanseviero -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-aisafetymemes",
+      "name": "X：AI Safety Memes (@AISafetyMemes)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:AISafetyMemes -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-emostaque",
+      "name": "X：Emad Mostaque (@EMostaque)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:EMostaque -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-theo",
+      "name": "X：Theo (@theo)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:theo -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-bindureddy",
+      "name": "X：Bindu Reddy (@bindureddy)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:bindureddy -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
     }
   ]
 }
