@@ -2883,7 +2883,7 @@
       },
       "tier": "T2",
       "first_party": false,
-      "participation_mode": "editorial",
+      "participation_mode": "hot_signal",
       "interval_minutes": 60,
       "site_fulltext": true,
       "syndicate_fulltext": false,
@@ -3351,7 +3351,7 @@
       },
       "tier": "T2",
       "first_party": false,
-      "participation_mode": "editorial",
+      "participation_mode": "hot_signal",
       "interval_minutes": 60,
       "site_fulltext": true,
       "syndicate_fulltext": false,
@@ -3529,8 +3529,8 @@
           "initialBackfillLimit": 8
         }
       },
-      "tier": "T1_5",
-      "first_party": false,
+      "tier": "T1",
+      "first_party": true,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -3819,7 +3819,7 @@
       },
       "tier": "T2",
       "first_party": false,
-      "participation_mode": "editorial",
+      "participation_mode": "hot_signal",
       "interval_minutes": 60,
       "site_fulltext": true,
       "syndicate_fulltext": false,
@@ -4429,8 +4429,8 @@
           "initialBackfillLimit": 8
         }
       },
-      "tier": "T1_5",
-      "first_party": false,
+      "tier": "T1",
+      "first_party": true,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -10211,6 +10211,366 @@
         "_aihot": {
           "initialBackfillLimit": 8
         }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 30,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "src-bleepingcomputer",
+      "name": "BleepingComputer",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.bleepingcomputer.com/feed/"
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 30,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "src-cnbc-technology",
+      "name": "CNBC Technology",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=19854910"
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 30,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "src-cnet",
+      "name": "CNET",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.cnet.com/rss/news/"
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 30,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "src-computerworld",
+      "name": "Computerworld",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.computerworld.com/feed/"
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 30,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "src-ft-technology",
+      "name": "FT Technology",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.ft.com/technology?format=rss"
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 30,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "src-fortune-tech",
+      "name": "Fortune Tech",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://fortune.com/feed/"
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 30,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "src-nikkei-asia",
+      "name": "Nikkei Asia",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://asia.nikkei.com/rss/feed/nar"
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 30,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "src-numerama",
+      "name": "Numerama",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.numerama.com/feed/"
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 30,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "src-servethehome",
+      "name": "ServeTheHome",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.servethehome.com/feed/"
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 30,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "src-silicon-republic",
+      "name": "Silicon Republic",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.siliconrepublic.com/feed"
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 30,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "src-tech-eu",
+      "name": "Tech.eu",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://tech.eu/feed/"
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 30,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "src-the-bridge",
+      "name": "The Bridge",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://thebridge.jp/feed"
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 30,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "src-the-guardian-technology",
+      "name": "The Guardian Technology",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.theguardian.com/uk/technology/rss"
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 30,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "src-cn-20767",
+      "name": "小众软件",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.appinn.com/feed"
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 30,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "src-cn-83016",
+      "name": "极客公园",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.geekpark.net/rss"
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 30,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "src-cn-28052",
+      "name": "蓝点网",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.landian.news/feed"
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 30,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "src-cn-88456",
+      "name": "智东西",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://news.google.com/rss/search?q=site:zhidx.com&hl=zh-CN&gl=CN&ceid=CN:zh-Hans"
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 30,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "src-cn-41009",
+      "name": "机器之心",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://news.google.com/rss/search?q=site:jiqizhixin.com&hl=zh-CN&gl=CN&ceid=CN:zh-Hans"
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 30,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "src-cn-44068",
+      "name": "麻省理工科技评论中国",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://news.google.com/rss/search?q=site:mittrchina.com&hl=zh-CN&gl=CN&ceid=CN:zh-Hans"
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 30,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "src-cn-86131",
+      "name": "创业邦",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://news.google.com/rss/search?q=site:cyzone.cn&hl=zh-CN&gl=CN&ceid=CN:zh-Hans"
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 30,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "src-cn-49661",
+      "name": "同花顺",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://news.google.com/rss/search?q=site:10jqka.com.cn&hl=zh-CN&gl=CN&ceid=CN:zh-Hans"
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 30,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "src-cn-19886",
+      "name": "手机中国",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://news.google.com/rss/search?q=site:cnmo.com&hl=zh-CN&gl=CN&ceid=CN:zh-Hans"
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 30,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "src-cn-94158",
+      "name": "科技日报",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://news.google.com/rss/search?q=site:stdaily.com&hl=zh-CN&gl=CN&ceid=CN:zh-Hans"
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 30,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "src-semafor",
+      "name": "Semafor",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://news.google.com/rss/search?q=site:semafor.com&hl=en-US&gl=US&ceid=US:en"
       },
       "tier": "T2",
       "first_party": false,

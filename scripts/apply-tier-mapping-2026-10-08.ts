@@ -30,6 +30,8 @@ interface Mapping {
   newSources: Array<{ id: string; name: string; handle: string; tier: string; identity: string }>;
   /** Sources the editorial package lists as editorial that are still hot_signal here. */
   editorial?: string[];
+  /** Sources that only discuss (paper relays, dormant personal accounts): heat only, out of the pool. */
+  toAmbient?: string[];
   /** Ambient sources: stay hot_signal, reach /hot only. */
   newSignalSources?: AmbientSource[];
   /** Ambient sources whose access method was wrong (missing field mapping, blocked redirect). */
@@ -60,6 +62,7 @@ const retier = Object.entries(data.retier).filter(([id, tier]) => {
 const missing = Object.keys(data.retier).filter((id) => !byId.has(id));
 const creates = data.newSources.filter((s) => !byId.has(s.id));
 const toEditorial = (data.editorial ?? []).filter((id) => byId.get(id)?.participation_mode !== "editorial");
+const toAmbient = (data.toAmbient ?? []).filter((id) => byId.get(id)?.participation_mode === "editorial");
 /** The first batch of signal sources recorded only a feedUrl; normalise both shapes to one. */
 const normalise = (s: AmbientSource & { feedUrl?: string; intervalMinutes?: number }) => ({
   id: s.id, name: s.name, kind: s.kind,
@@ -71,7 +74,8 @@ const newSignals = [...(data.newSignalSources ?? []), ...(ambient.newSignalSourc
 const fixes = (ambient.fixSignalConfigs ?? []).filter((s) => byId.has(s.id));
 
 console.log(`改档 ${retier.length}；新建精选源 ${creates.length}；转精选源 ${toEditorial.length}；`
-  + `新建氛围源 ${newSignals.length}；修氛围源配置 ${fixes.length}；改档表里对不上库的 ${missing.length}`);
+  + `新建氛围源 ${newSignals.length}；修氛围源配置 ${fixes.length}；转氛围源 ${toAmbient.length}；`
+  + `改档表里对不上库的 ${missing.length}`);
 if (missing.length) console.log("  对不上：", missing.join(", "));
 for (const [id, tier] of retier.slice(0, 6)) {
   const row = byId.get(id)!;
@@ -99,6 +103,11 @@ await sql.begin(async (tx) => {
   for (const id of toEditorial) {
     await tx`UPDATE sources SET participation_mode = 'editorial', updated_at = now() WHERE id = ${id}`;
   }
+  // Paper relays and dormant personal accounts: their items leave the pool (eligible=false on republish)
+  // and keep counting as heat.
+  for (const id of toAmbient) {
+    await tx`UPDATE sources SET participation_mode = 'hot_signal', updated_at = now() WHERE id = ${id}`;
+  }
   // Ambient sources: heat only, never the pool. Enabled, like the site's other signal sources.
   for (const s of newSignals) {
     assertSupportedConfig(s.kind as never, s.config);
@@ -122,12 +131,12 @@ await sql.begin(async (tx) => {
 // The projection re-derives from the source row; leave nothing stale behind.
 await getBoss();
 let queued = 0;
-for (const id of [...retier.map(([id]) => id), ...toEditorial]) {
+for (const id of [...retier.map(([id]) => id), ...toEditorial, ...toAmbient]) {
   await enqueue(QUEUES.republishSource, { sourceId: id }, { singletonKey: id });
   queued += 1;
 }
 console.log(`已写入：改档 ${retier.length}，新建精选源 ${creates.length}，转精选源 ${toEditorial.length}，`
-  + `新建氛围源 ${newSignals.length}，修配置 ${fixes.length}，入队重发 ${queued}`);
+  + `新建氛围源 ${newSignals.length}，修配置 ${fixes.length}，转氛围源 ${toAmbient.length}，入队重发 ${queued}`);
 
 const counts = await sql<{ participation_mode: string; tier: string; n: number }[]>`
   SELECT participation_mode, tier, count(*)::int AS n FROM sources WHERE enabled GROUP BY 1, 2 ORDER BY 1, 2`;

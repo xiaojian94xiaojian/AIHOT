@@ -1,5 +1,5 @@
 {
-  "note": "2026-10-08 氛围源全量包：新建 X 氛围源（跳过 6 个已纠正的旧 handle）+ 修 6 个媒体源的接法",
+  "note": "2026-10-08 氛围源全量包：新建 X 氛围源（跳过 6 个已纠正的旧 handle）+ 修 6 个媒体源的接法；另补 83 个待判里探到地址的媒体（含 Google News 兜底）",
   "newSignalSources": [
     {
       "id": "x-account-aigclink",
@@ -852,6 +852,222 @@
         }
       },
       "identity": "个人号"
+    },
+    {
+      "id": "src-bleepingcomputer",
+      "name": "BleepingComputer",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.bleepingcomputer.com/feed/"
+      },
+      "intervalMinutes": 30
+    },
+    {
+      "id": "src-cnbc-technology",
+      "name": "CNBC Technology",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=19854910"
+      },
+      "intervalMinutes": 30
+    },
+    {
+      "id": "src-cnet",
+      "name": "CNET",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.cnet.com/rss/news/"
+      },
+      "intervalMinutes": 30
+    },
+    {
+      "id": "src-computerworld",
+      "name": "Computerworld",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.computerworld.com/feed/"
+      },
+      "intervalMinutes": 30
+    },
+    {
+      "id": "src-ft-technology",
+      "name": "FT Technology",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.ft.com/technology?format=rss"
+      },
+      "intervalMinutes": 30
+    },
+    {
+      "id": "src-fortune-tech",
+      "name": "Fortune Tech",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://fortune.com/feed/"
+      },
+      "intervalMinutes": 30
+    },
+    {
+      "id": "src-nikkei-asia",
+      "name": "Nikkei Asia",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://asia.nikkei.com/rss/feed/nar"
+      },
+      "intervalMinutes": 30
+    },
+    {
+      "id": "src-numerama",
+      "name": "Numerama",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.numerama.com/feed/"
+      },
+      "intervalMinutes": 30
+    },
+    {
+      "id": "src-servethehome",
+      "name": "ServeTheHome",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.servethehome.com/feed/"
+      },
+      "intervalMinutes": 30
+    },
+    {
+      "id": "src-silicon-republic",
+      "name": "Silicon Republic",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.siliconrepublic.com/feed"
+      },
+      "intervalMinutes": 30
+    },
+    {
+      "id": "src-tech-eu",
+      "name": "Tech.eu",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://tech.eu/feed/"
+      },
+      "intervalMinutes": 30
+    },
+    {
+      "id": "src-the-bridge",
+      "name": "The Bridge",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://thebridge.jp/feed"
+      },
+      "intervalMinutes": 30
+    },
+    {
+      "id": "src-the-guardian-technology",
+      "name": "The Guardian Technology",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.theguardian.com/uk/technology/rss"
+      },
+      "intervalMinutes": 30
+    },
+    {
+      "id": "src-cn-20767",
+      "name": "小众软件",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.appinn.com/feed"
+      },
+      "intervalMinutes": 30
+    },
+    {
+      "id": "src-cn-83016",
+      "name": "极客公园",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.geekpark.net/rss"
+      },
+      "intervalMinutes": 30
+    },
+    {
+      "id": "src-cn-28052",
+      "name": "蓝点网",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.landian.news/feed"
+      },
+      "intervalMinutes": 30
+    },
+    {
+      "id": "src-cn-88456",
+      "name": "智东西",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://news.google.com/rss/search?q=site:zhidx.com&hl=zh-CN&gl=CN&ceid=CN:zh-Hans"
+      },
+      "intervalMinutes": 30
+    },
+    {
+      "id": "src-cn-41009",
+      "name": "机器之心",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://news.google.com/rss/search?q=site:jiqizhixin.com&hl=zh-CN&gl=CN&ceid=CN:zh-Hans"
+      },
+      "intervalMinutes": 30
+    },
+    {
+      "id": "src-cn-44068",
+      "name": "麻省理工科技评论中国",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://news.google.com/rss/search?q=site:mittrchina.com&hl=zh-CN&gl=CN&ceid=CN:zh-Hans"
+      },
+      "intervalMinutes": 30
+    },
+    {
+      "id": "src-cn-86131",
+      "name": "创业邦",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://news.google.com/rss/search?q=site:cyzone.cn&hl=zh-CN&gl=CN&ceid=CN:zh-Hans"
+      },
+      "intervalMinutes": 30
+    },
+    {
+      "id": "src-cn-49661",
+      "name": "同花顺",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://news.google.com/rss/search?q=site:10jqka.com.cn&hl=zh-CN&gl=CN&ceid=CN:zh-Hans"
+      },
+      "intervalMinutes": 30
+    },
+    {
+      "id": "src-cn-19886",
+      "name": "手机中国",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://news.google.com/rss/search?q=site:cnmo.com&hl=zh-CN&gl=CN&ceid=CN:zh-Hans"
+      },
+      "intervalMinutes": 30
+    },
+    {
+      "id": "src-cn-94158",
+      "name": "科技日报",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://news.google.com/rss/search?q=site:stdaily.com&hl=zh-CN&gl=CN&ceid=CN:zh-Hans"
+      },
+      "intervalMinutes": 30
+    },
+    {
+      "id": "src-semafor",
+      "name": "Semafor",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://news.google.com/rss/search?q=site:semafor.com&hl=en-US&gl=US&ceid=US:en"
+      },
+      "intervalMinutes": 30
     }
   ],
   "fixSignalConfigs": [

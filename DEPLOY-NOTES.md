@@ -2091,3 +2091,40 @@ editorial 分布是 **T1 66 / T1_5 101 / T2 110 / EXCLUDE_MP 4**；这 6 个源�
 
 **包内自带的边界提醒已按它执行**：Gary Marcus 与 Simon Willison 的**博客**在精选源（现在是 T1_5），
 他们的 **X 号**留在氛围源（`@garymarcus`、`@simonw` 本次新建）；Hacker News 归精选（现有两个 HN 源保持停用）。
+
+## 6 个矛盾源的判定 + 83 个待判的处理（同日）
+
+**能不能两者都是？不能。** `participation_mode` 是单值；但热度里本来就有两类参与方
+（`story_signals.kind = editorial | signal`）：精选源作为「精选组」在加热度（就是卡片上的 `sourceCount`），
+氛围源只加 `signalCount`。所以「上公开面 + 加热度」= 精选源一个身份就够，氛围源是「只加热度」。
+
+### 6 个矛盾源（包里判氛围、库里是精选）按判据 + 实测定案
+
+| 源 | 30 天实测 | 判定 | 理由 |
+|---|---|---|---|
+| `@runwayml` | 22 条 / 入选 0 / 均分 32.5 | **精选 T1**（原 T1_5）| 公司官方产品号，发布即当事方消息 |
+| `@googleaidevs` | 2 条 / 入选 0 / 均分 24.5 | **精选 T1**（原 T1_5）| Google 官方开发者渠道 |
+| `@pmarca` | 2 条 / 入选 0 / 均分 56.0 | **精选 T1_5**（不变）| 机构执行层个人（a16z 联创）|
+| `@_akhaliq` | 21 条 / 入选 0 / 均分 27.6 | **氛围源** | 条目全是论文转述 |
+| `@omarsar0` | 65 条 / 入选 0 / 均分 42.2 | **氛围源** | DAIR.AI 聚合号；65 条 0 入选、均分低于 50 的理解线 |
+| `@lilianweng` | 0 条 | **氛围源** | 她的**博客**才是精选源（T1_5）；X 号是讨论号 |
+
+这条同时解决了上一轮遗留的「同一个人两个档」：**博客归精选、X 号归氛围**，与包内对 Simon Willison、
+Gary Marcus 的边界说明一致。转氛围的 3 个已入队重发，它们的条目会退出公开池（`eligible=false`）、仍加热度。
+
+### 83 个待判/待补：4 个已在库、24 个补齐并落地、其余需 handle
+
+- **已在库 4 个**：爱范儿、量子位（本轮新建的氛围源）、Oran Ge（`x-account-oran_ge` T1_5 精选）、
+  Dex Horthy（`x-account-dexhorthy` T2 精选）。
+- **补齐 24 个媒体**（全部 `hot_signal` + T2，只加热度）：The Guardian Technology、Nikkei Asia、CNET、
+  Computerworld、CNBC Technology、BleepingComputer、Silicon Republic、Tech.eu、Numerama、ServeTheHome、
+  FT Technology、Fortune Tech、The Bridge、Semafor、极客公园、蓝点网、小众软件、机器之心、智东西、
+  麻省理工科技评论中国、创业邦、同花顺、手机中国、科技日报。中文那批用
+  `news.google.com/rss/search?q=site:<域名>` 兜底（原生 RSS 已停或没有）。
+- **跳过 2 个重复**：`36氪·AI`（与已有 36氪 同一条 RSSHub 路由）、`掘金 AI 分类`（已有掘金）。
+- **探不到的 2 个**：CTech、Impress Watch（原生与 Google News 都没有可用 feed）。
+- **剩下 46 个 + 3 个待补 handle**：绝大多数是**个人**（Graham Neubig、Sarah Guo、Elad Gil、Armin Ronacher、
+  @levelsio、Matthew Berman、Robert Scoble…）。判定明确 —— **氛围源**（个人评论/转述）；缺的是**可核实的 handle**，
+  猜错会抓到别人的内容，所以没有自动建源。
+
+氛围源现在 **206 个**（X 118 + rss 82 + json 6），全部启用。

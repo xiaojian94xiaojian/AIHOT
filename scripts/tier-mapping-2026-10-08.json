@@ -54,7 +54,9 @@
     "rss-dwarkesh": "T1_5",
     "rss-gary-marcus": "T1_5",
     "rss-lilianweng": "T1_5",
-    "rss-interconnects": "T1_5"
+    "rss-interconnects": "T1_5",
+    "x-account-runwayml": "T1",
+    "x-account-googleaidevs": "T1"
   },
   "newSources": [
     {
@@ -325,5 +327,10 @@
         "feedUrl": "https://tech.meituan.com/feed"
       }
     }
+  ],
+  "toAmbient": [
+    "x-account--akhaliq",
+    "x-account-omarsar0",
+    "x-account-lilianweng"
   ]
 }
