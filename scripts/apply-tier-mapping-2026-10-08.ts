@@ -113,7 +113,7 @@ await sql.begin(async (tx) => {
     assertSupportedConfig(s.kind as never, s.config);
     await tx`
       INSERT INTO sources (id, name, kind, config, tier, first_party, participation_mode, interval_minutes, tags, site_fulltext, syndicate_fulltext, enabled, next_fetch_at)
-      VALUES (${s.id}, ${s.name}, ${s.kind}, ${tx.json(s.config as never)}, 'T2', false, 'hot_signal', 30, '{}'::text[], false, false, true, now())`;
+      VALUES (${s.id}, ${s.name}, ${s.kind}, ${tx.json(s.config as never)}, 'T2', false, 'hot_signal', ${s.intervalMinutes}, '{}'::text[], false, false, true, now())`;
   }
   for (const f of fixes) {
     assertSupportedConfig(byId.get(f.id)!.kind as never, f.config);
