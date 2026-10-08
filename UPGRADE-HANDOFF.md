@@ -8,9 +8,13 @@
 ## 一、分支与线上状态
 
 ```
-分支 upgrade-4.0：领先上游 origin/main 21 个提交，落后 0
+分支 upgrade-4.0：领先上游 origin/main 22 个提交，落后 7
 远端：已推 fork（xiaojian94xiaojian/AIHOT），本地与远端一致
 线上：https://hot.jian.ing 正在跑，健康
+
+（2026-10-08 核对。落后的 7 个提交是上游这两天合入的，其中 #153 修的就是本文档发现的那条
+框架问题 —— 见「下一步」与「上游动态」。合并上游时 `analyze.ts` 与 `tests/analyze.test.ts`
+会和本分支的同类改动撞上，那时以他们的实现为准。）
 ```
 
 最近几个提交（都在这个分支上，已部署）：
@@ -34,7 +38,7 @@
 |---|---|---|
 | `apps/web/app/app.css` | +36 行 | 恢复 4.0.0 删掉的 `cal-*` 变量与动画（模块要用） |
 | `apps/web/tests/navigation-performance.test.ts` | +6 行 | 给那条用例的 WebKit 上下文摘掉 `startViewTransition`（见「教训 1」） |
-| `tests/analyze.test.ts` | 改断言 | 「无正文条目不评分」后 `BARE` 的预期：`score` 由 `FLOOR-3` 改为 `null`，调用序列去掉两次 `score` |
+| `tests/analyze.test.ts` | 改断言 | 「无正文条目不评分」后 `BARE` 的预期：`score` 由 `FLOOR-3` 改为 `null`，调用序列去掉两次 `score`（上游 #153 动了同一处断言，合并时按能过的写） |
 | `tests/outbound-protocol.standalone.test.ts` | +17/-4 | 缺 `openssl` 时跳过那 4 条并写明原因 |
 | `tests/sign-in-page.standalone.test.ts` | 新增 | 抓取守卫的单元测试 |
 
@@ -42,7 +46,8 @@
 `packages/backend/src/lib/http.ts`（各响应助手）、`packages/backend/src/admin/auth.ts`
 （`adminHandler` 移进来）、以及三处插口字段/小改动：
 `packages/backend/src/modules.ts`（+`Scheduled.runOnStart`）、`apps/worker/src/schedules.ts`（用上它）、
-`packages/backend/src/editorial/analyze.ts`（评分预算 + 无正文不评分）、
+`packages/backend/src/editorial/analyze.ts`（评分预算；「无正文不评分」已由上游 #153 自己实现，
+合并上游后这一项从「我们的改动」里划掉）、
 `packages/backend/src/content/extract.ts`（登录页守卫）、
 `packages/backend/src/providers/llm.ts`（网关的会话头适配）、
 `apps/api/src/http/respond.ts` 与 `apps/api/src/routes/admin-auth.ts`（改为 re-export）。
@@ -64,8 +69,12 @@
    `deepseek-v4.1-flash-scorer` 以前落到默认 1024（+4000 推理额度 = 5024），而
    completion 恰好 5024 的有 103 次、邻近值只有 4–6 次 —— 是硬顶。实测：32768 下失败率 0.14%、
    5024 下 1.0%。已补成 `temperature 1, maxTokens 32768, timeoutMs 300000`。
-5. **无正文条目不评分**：`missingEvidence(a)` 为真时跳过两次付费评分（7 天省 4169 次调用，
-   这类条目均分 15.4、入选 0）。`relevance` 的判定没变 —— 没有中文标题摘要的本来就不公开。
+5. **无正文条目不评分**：`missingEvidence(a)` 为真时跳过两次付费评分。**旧版这段写的数字是错的，
+   已按生产库更正**：4169 是那批条目的**全部**付费调用（评分是每条 2 次，见 `SCORE_CALLS`），
+   不是评分调用；「均分 15.4、入选 0」也不成立。改动前 6 天（10-01 00:00 → 10-07 00:00 UTC）
+   实测：11 620 条里 377 条只有标题的条目花了 731 次评分调用（另有 45 次理解写作、7 次摘要写作），
+   其中 **29 条凭标题写出的摘要被选中**、均分 73.5，23 条的摘要里模型自己写着正文没取到。
+   这条已提上游（#152），上游当天在 #153 用更窄的判据自行修好并署名。
 6. **出站协议测试**：夹具证书必须真证书（Node 签不了），缺 `openssl` 时连同原因跳过那 4 条。
 7. **登录页守卫的测试**改成 `*.standalone.test.ts`（纯函数测试，不该占用数据库）。
 
@@ -73,19 +82,22 @@
 
 ## 二、下一步可以做的（按价值排序）
 
-### A. 给上游提 issue：两条真正的框架层问题（未做）
+### A. 给上游提 issue（已做：第一条被上游修好，第二条不提）
 
-只用这两条，**不要**夹带预筛提示词和登录页守卫：
+**第一条已提，上游当天修好。** 2026-10-07 用 `xiaojian94xiaojian` 提了
+[AIHOT#152](https://github.com/KKKKhazix/AIHOT/issues/152)：只有标题、没有正文的条目仍会走两次评分，
+分数够高就凭标题写出摘要并入选（论点按生产库实测写成：377 条、731 次评分调用、29 条入选、均分 73.5）。
+维护者用已有真实响应离线重放确认了这条链，采纳了较窄的判据 —— 没有材料**且**没有可展示原帖才停下 ——
+并且连结构抽取和写作一起跳过，在 [#153](https://github.com/KKKKhazix/AIHOT/pull/153) 合并，
+把仓库作者记为共同作者。**本分支的实现（只跳过两次评分、没有原帖判据）在合并上游后按他们的版本走。**
 
-1. **`analyze.ts`：没有正文的条目仍然花两次付费评分。** 预筛把 BLOCK 降级成 UNKNOWN 放行
-   （原有设计，保留）后，无正文条目照样走评分。生产数据：7 天 1028 条、均分 15.4、入选 0 条，
-   却花掉 4169 次评分调用。改法：`missingEvidence(a)` 为真时不评分。
-2. **`publication/rules.ts` 的 `isPoolEligible` 不检查标题是否有意义。** 它只要求
-   `!!title && (!!summary || originalPost)`，于是标题是 `"220"` 的条目照样进公开池
-   （生产里 77 条进了，均分 1.7、入选 0）。改法方向：拒绝退化的标题（纯数字/纯符号）。
-
-两条都有生产数据、改法小、与站点配置无关。**这个分支上已经有可用实现**（见上面 1、5），
-可以直接引用或作为参考。
+**第二条不提，原因记在这里，免得下次再翻出来。** 原先准备的「`isPoolEligible` 不检查标题是否有意义
+（标题是 `220` 的条目进公开池，77 条，均分 1.7）」经生产数据复核站不住：那批 `220` 就是 `web-arxiv`
+收进来的 133 条登录页文章（见「教训 5」），它们的公开条目现在都是 `withdrawn`（现存 158 条 withdrawn
+里 52 条是纯数字标题，全来自这个源）。当前公开池 12 468 条里，纯数字标题 0 条、不含字母数字 0 条、
+URL 标题 0 条；剩下 4 条纯数字的公开条目（X 的 `2003`、`web-preferred` 的分页页 `2`/`3`/`22`）本来就
+`eligible = false`，不在池里。也就是说这是源配置的后果，正是「教训 5」那一类，不该当成框架缺陷。
+#152 末尾把它作为线索附了一句，没有单独占一条 issue。
 
 ### B. 未查清的一条（可提可不提）
 
@@ -198,3 +210,9 @@ gcloud compute ssh weijianlin@aihot --zone=asia-east2-c --command="bash /home/we
 上游引擎与这个仓库会同步（他们的提交里有 `Engine-Commit:` 一行），所以框架层的修法在引擎仓库里，
 这个仓库只是同步目标 —— 提 issue 时这一点要说清。上游已合并的 #119 里，有两处是我们
 （#117、#118）发现的问题，注释与文档里署了名。
+
+2026-10-07 提的 #152（无正文条目仍评分并凭标题入选）当天被修好：上游在
+[#153](https://github.com/KKKKhazix/AIHOT/pull/153) `fix: wait for article evidence before scoring and
+writing` 里实现并合并，把仓库作者记为共同作者。他们的版本与我们的略有出入：判据更窄（没有材料
+**且**没有可展示原帖才停，可展示的空文字、纯链接 X 原帖继续原有评分与原样展示），而且连结构抽取与
+写作一起跳过 —— 我们只跳过了两次评分，结构抽取照跑。合并上游后以他们的为准。

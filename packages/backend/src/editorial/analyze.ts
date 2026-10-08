@@ -422,10 +422,12 @@ export async function runAnalysis(a: AnalyzeInputArticle, opts: StepOpts = {}): 
   // The structure step needs nothing from the scores: it runs beside them.
   const structure = runStructure(a, opts).then((value) => ({ value }), (error: unknown) => ({ error }));
   try {
-    // Nothing but a title to judge: a score of a bare title says nothing (measured over 7 days, 1 028 such
-    // items averaged 15.4 and none was ever selected), and the item cannot be published without a Chinese
-    // title and summary either way (normalizeAnalysis). So the two paid score calls are left out and the
-    // item stays relevance "unknown" until its page arrives and the analysis runs again with material.
+    // Nothing but a title to judge: a score of a bare title is not evidence, and it is not harmless either —
+    // a high enough sum sends the item through understand, which writes a Chinese title and summary from the
+    // title alone (measured over the 6 days before this change: 377 such items bought 731 score calls, 29 were
+    // selected on the copy invented from their titles, 23 of those summaries say the body was never fetched).
+    // The item cannot be published without that copy anyway (normalizeAnalysis), so the two paid score calls
+    // are left out and it stays relevance "unknown" until its page arrives and the analysis runs again.
     const scores = missingEvidence(a) ? null : await runSelectionScores(a, opts);
     const sum = scores && !scores.refused && scores.values.length === SCORE_CALLS ? scores.values.reduce((total, v) => total + v, 0) : null;
     const near = sum !== null && (sum >= scores!.threshold * SCORE_CALLS || sum > UNDERSTAND_FLOOR * SCORE_CALLS);
