@@ -1,0 +1,272 @@
+{
+  "note": "2026-10-08 权重重置与编辑源包整合：改档表 + 新建源；由 build-artifacts.py 生成",
+  "retier": {
+    "rss-tomtunguz": "T2",
+    "x-account-chatgpt": "T1",
+    "x-account-claudeai": "T1",
+    "x-account-deepseek-ai": "T1",
+    "x-account-geminiapp": "T1",
+    "x-account-google-ai": "T1",
+    "x-account-googledeepmind": "T1",
+    "x-account-msft-research": "T1",
+    "x-account-midjourney": "T1",
+    "x-account-openrouter": "T1",
+    "x-account-perplexity-ai": "T1",
+    "x-account-replit": "T1",
+    "x-account-spacexai": "T1",
+    "x-account-alibaba-qwen": "T1",
+    "web-arxiv": "EXCLUDE_MP",
+    "rss-meta-newsroom-ai": "T1",
+    "rss-modem": "T1",
+    "rss-nvidia-newsroom": "T1",
+    "rss-simon-willison": "T1_5",
+    "rss-arxiv": "EXCLUDE_MP",
+    "rss-arxiv-2": "EXCLUDE_MP",
+    "rss-arxiv-3": "EXCLUDE_MP",
+    "web-blog-2": "T1",
+    "rss-hn-buzzing": "EXCLUDE_MP",
+    "web-github-2": "EXCLUDE_MP",
+    "web-blogs": "T1",
+    "x-account-alexandr-wang": "T1_5",
+    "x-account-karpathy": "T1_5",
+    "x-account-arthurmensch": "T1_5",
+    "x-account-clementdelangue": "T1_5",
+    "x-account-cognition": "T1",
+    "x-account-cohere": "T1",
+    "x-account-cursor-ai": "T1",
+    "x-account-elevenlabs": "T1",
+    "x-account-ericzakariasson": "T1_5",
+    "x-account-drfeifei": "T1_5",
+    "x-account-jeffdean": "T1_5",
+    "x-account-drjimfan": "T1_5",
+    "x-account-officiallogank": "T1_5",
+    "x-account-manusai": "T1",
+    "x-account-hailuo-ai": "T1",
+    "x-account-nvidiaai": "T1",
+    "x-account-thom-wolf": "T1_5",
+    "x-account-ylecun": "T1_5",
+    "x-account-kling-ai": "T1",
+    "x-account-rauchg": "T1_5",
+    "x-account-nvidiartxspark": "T1",
+    "x-account-reach_vb": "T1_5"
+  },
+  "newSources": [
+    {
+      "id": "x-account-huggingface",
+      "name": "X：Hugging Face (@huggingface)",
+      "handle": "huggingface",
+      "tier": "T1",
+      "identity": "官方号"
+    },
+    {
+      "id": "x-account-amasad",
+      "name": "X：Amjad Masad (@amasad)",
+      "handle": "amasad",
+      "tier": "T1_5",
+      "identity": "官方人员"
+    },
+    {
+      "id": "x-account-mikeyk",
+      "name": "X：Mike Krieger (@mikeyk)",
+      "handle": "mikeyk",
+      "tier": "T1_5",
+      "identity": "官方人员"
+    },
+    {
+      "id": "x-account-goodfellow_ian",
+      "name": "X：Ian Goodfellow (@goodfellow_ian)",
+      "handle": "goodfellow_ian",
+      "tier": "T1_5",
+      "identity": "官方人员"
+    },
+    {
+      "id": "x-account-deeplearningai",
+      "name": "X：DeepLearning.AI (@DeepLearningAI)",
+      "handle": "DeepLearningAI",
+      "tier": "T1",
+      "identity": "官方号"
+    },
+    {
+      "id": "x-account-mistralai",
+      "name": "X：Mistral AI (@MistralAI)",
+      "handle": "MistralAI",
+      "tier": "T1",
+      "identity": "官方号"
+    },
+    {
+      "id": "x-account-oran_ge",
+      "name": "X：orange.ai (@oran_ge)",
+      "handle": "oran_ge",
+      "tier": "T1_5",
+      "identity": "官方人员（执行层）"
+    },
+    {
+      "id": "x-account-richardsocher",
+      "name": "X：Richard Socher (@RichardSocher)",
+      "handle": "RichardSocher",
+      "tier": "T1_5",
+      "identity": "官方人员（执行层）"
+    },
+    {
+      "id": "x-account-_philschmid",
+      "name": "X：Philipp Schmid (@_philschmid)",
+      "handle": "_philschmid",
+      "tier": "T1_5",
+      "identity": "官方人员"
+    },
+    {
+      "id": "x-account-boltdotnew",
+      "name": "X：bolt.new (@boltdotnew)",
+      "handle": "boltdotnew",
+      "tier": "T1",
+      "identity": "官方号"
+    },
+    {
+      "id": "x-account-adamdangelo",
+      "name": "X：Adam D'Angelo (@adamdangelo)",
+      "handle": "adamdangelo",
+      "tier": "T1_5",
+      "identity": "官方人员"
+    },
+    {
+      "id": "x-account-julien_c",
+      "name": "X：Julien Chaumond (@julien_c)",
+      "handle": "julien_c",
+      "tier": "T1_5",
+      "identity": "官方人员"
+    },
+    {
+      "id": "x-account-jerryjliu0",
+      "name": "X：Jerry Liu (@jerryjliu0)",
+      "handle": "jerryjliu0",
+      "tier": "T1_5",
+      "identity": "官方人员"
+    },
+    {
+      "id": "x-account-amanrsanger",
+      "name": "X：Aman Sanger (@amanrsanger)",
+      "handle": "amanrsanger",
+      "tier": "T1_5",
+      "identity": "官方人员"
+    },
+    {
+      "id": "x-account-hidecloud",
+      "name": "X：hidecloud (@hidecloud)",
+      "handle": "hidecloud",
+      "tier": "T1_5",
+      "identity": "官方人员"
+    },
+    {
+      "id": "x-account-sualehasif996",
+      "name": "X：Sualeh Asif (@sualehasif996)",
+      "handle": "sualehasif996",
+      "tier": "T1_5",
+      "identity": "官方人员"
+    },
+    {
+      "id": "x-account-weaviate_io",
+      "name": "X：Weaviate • vector database (@weaviate_io)",
+      "handle": "weaviate_io",
+      "tier": "T1",
+      "identity": "官方号"
+    },
+    {
+      "id": "x-account-ericjing_ai",
+      "name": "X：Eric Jing (@ericjing_ai)",
+      "handle": "ericjing_ai",
+      "tier": "T1_5",
+      "identity": "官方人员（执行层）"
+    },
+    {
+      "id": "x-account-taranjeetio",
+      "name": "X：Taranjeet (@taranjeetio)",
+      "handle": "taranjeetio",
+      "tier": "T1_5",
+      "identity": "官方人员"
+    },
+    {
+      "id": "x-account-groqinc",
+      "name": "X：Groq Inc (@GroqInc)",
+      "handle": "GroqInc",
+      "tier": "T1",
+      "identity": "官方号"
+    },
+    {
+      "id": "x-account-lovable_dev",
+      "name": "X：Lovable (@lovable_dev)",
+      "handle": "lovable_dev",
+      "tier": "T1",
+      "identity": "官方号"
+    },
+    {
+      "id": "x-account-heygen_official",
+      "name": "X：HeyGen (@HeyGen_Official)",
+      "handle": "HeyGen_Official",
+      "tier": "T1",
+      "identity": "官方号"
+    },
+    {
+      "id": "x-account-langchainai",
+      "name": "X：LangChain (@LangChainAI)",
+      "handle": "LangChainAI",
+      "tier": "T1",
+      "identity": "官方号"
+    },
+    {
+      "id": "x-account-txhunyuan",
+      "name": "X：Hunyuan (@TXhunyuan)",
+      "handle": "TXhunyuan",
+      "tier": "T1",
+      "identity": "官方号"
+    },
+    {
+      "id": "x-account-notebooklm",
+      "name": "X：NotebookLM (@NotebookLM)",
+      "handle": "NotebookLM",
+      "tier": "T1",
+      "identity": "官方号"
+    },
+    {
+      "id": "x-account-firecrawl_dev",
+      "name": "X：Firecrawl (@firecrawl_dev)",
+      "handle": "firecrawl_dev",
+      "tier": "T1",
+      "identity": "官方号"
+    },
+    {
+      "id": "x-account-hey_im_monica",
+      "name": "X：Monica_IM (@hey_im_monica)",
+      "handle": "hey_im_monica",
+      "tier": "T1",
+      "identity": "官方号"
+    },
+    {
+      "id": "x-account-lexfridman",
+      "name": "X：Lex Fridman (@lexfridman)",
+      "handle": "lexfridman",
+      "tier": "T2",
+      "identity": "个人号-记者"
+    },
+    {
+      "id": "x-account-ycombinator",
+      "name": "X：Y Combinator (@ycombinator)",
+      "handle": "ycombinator",
+      "tier": "T2",
+      "identity": "官方号"
+    },
+    {
+      "id": "x-account-latentspacepod",
+      "name": "X：Latent.Space (@latentspacepod)",
+      "handle": "latentspacepod",
+      "tier": "T2",
+      "identity": "个人号-记者"
+    },
+    {
+      "id": "x-account-_catwu",
+      "name": "X：cat (@_catwu)",
+      "handle": "_catwu",
+      "tier": "T1_5",
+      "identity": "个人号"
+    }
+  ]
+}

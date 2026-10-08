@@ -88,7 +88,7 @@
         }
       },
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -106,7 +106,7 @@
         }
       },
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -183,7 +183,7 @@
         }
       },
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -294,7 +294,7 @@
           "initialBackfillLimit": 8
         }
       },
-      "tier": "T2",
+      "tier": "T1_5",
       "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 60,
@@ -403,7 +403,7 @@
       "kind": "web_list",
       "config": {},
       "tier": "T2",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 60,
       "site_fulltext": false,
@@ -441,7 +441,7 @@
         }
       },
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -535,7 +535,7 @@
         }
       },
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -616,7 +616,7 @@
         }
       },
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -695,7 +695,7 @@
         }
       },
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -728,7 +728,7 @@
         }
       },
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -748,7 +748,7 @@
         }
       },
       "tier": "T2",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 60,
       "site_fulltext": true,
@@ -768,7 +768,7 @@
         }
       },
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -788,7 +788,7 @@
         }
       },
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -884,7 +884,7 @@
       "kind": "web_list",
       "config": {},
       "tier": "T2",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 60,
       "site_fulltext": false,
@@ -933,7 +933,7 @@
       "kind": "rss",
       "config": {},
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": false,
@@ -971,7 +971,7 @@
         }
       },
       "tier": "T2",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 60,
       "site_fulltext": true,
@@ -991,7 +991,7 @@
         },
         "publishedAtSelector": "time"
       },
-      "tier": "T2",
+      "tier": "T1",
       "first_party": true,
       "participation_mode": "editorial",
       "interval_minutes": 60,
@@ -1015,7 +1015,7 @@
         }
       },
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -1035,7 +1035,7 @@
         }
       },
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -1055,7 +1055,7 @@
         }
       },
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -1127,7 +1127,7 @@
         }
       },
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -1196,7 +1196,7 @@
         }
       },
       "tier": "T1",
-      "first_party": false,
+      "first_party": true,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -1349,7 +1349,7 @@
         "publishedAtSelector": "span:contains(20)"
       },
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -1390,7 +1390,7 @@
         }
       },
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -1497,7 +1497,7 @@
       "name": "Hacker News 热门（buzzing.cc 中文翻译）",
       "kind": "web_list",
       "config": {},
-      "tier": "T2",
+      "tier": "EXCLUDE_MP",
       "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 60,
@@ -1510,7 +1510,7 @@
       "name": "Hacker News：AI 热帖",
       "kind": "web_list",
       "config": {},
-      "tier": "T2",
+      "tier": "EXCLUDE_MP",
       "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 60,
@@ -1577,7 +1577,7 @@
           "initialBackfillLimit": 8
         }
       },
-      "tier": "T2",
+      "tier": "EXCLUDE_MP",
       "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 60,
@@ -1650,7 +1650,7 @@
       "kind": "rss",
       "config": {},
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": false,
@@ -1668,7 +1668,7 @@
         }
       },
       "tier": "T1",
-      "first_party": false,
+      "first_party": true,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -1681,7 +1681,7 @@
       "kind": "rss",
       "config": {},
       "tier": "T1",
-      "first_party": false,
+      "first_party": true,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": false,
@@ -1705,7 +1705,7 @@
         }
       },
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -1746,7 +1746,7 @@
         }
       },
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -1786,7 +1786,7 @@
         }
       },
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -1804,7 +1804,7 @@
         }
       },
       "tier": "T2",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 60,
       "site_fulltext": true,
@@ -1845,7 +1845,7 @@
         }
       },
       "tier": "T2",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 60,
       "site_fulltext": true,
@@ -1863,7 +1863,7 @@
         }
       },
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -1883,7 +1883,7 @@
         }
       },
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -1939,7 +1939,7 @@
         }
       },
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -1998,7 +1998,7 @@
         }
       },
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -2015,7 +2015,7 @@
           "initialBackfillLimit": 8
         }
       },
-      "tier": "T2",
+      "tier": "T1",
       "first_party": true,
       "participation_mode": "editorial",
       "interval_minutes": 60,
@@ -2029,7 +2029,7 @@
       "kind": "web_list",
       "config": {},
       "tier": "T2",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 60,
       "site_fulltext": false,
@@ -2052,7 +2052,7 @@
           "publishedAtSelector": "time[datetime]"
         }
       },
-      "tier": "T2",
+      "tier": "T1",
       "first_party": true,
       "participation_mode": "editorial",
       "interval_minutes": 60,
@@ -2073,7 +2073,7 @@
         }
       },
       "tier": "T2",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 60,
       "site_fulltext": false,
@@ -2091,7 +2091,7 @@
         }
       },
       "tier": "T2",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 60,
       "site_fulltext": true,
@@ -2114,7 +2114,7 @@
         }
       },
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -2132,7 +2132,7 @@
         }
       },
       "tier": "T1",
-      "first_party": false,
+      "first_party": true,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -2206,7 +2206,7 @@
         }
       },
       "tier": "T2",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 60,
       "site_fulltext": true,
@@ -2224,7 +2224,7 @@
         }
       },
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -2387,7 +2387,7 @@
         }
       },
       "tier": "T2",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 60,
       "site_fulltext": true,
@@ -2451,7 +2451,7 @@
         }
       },
       "tier": "T2",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 60,
       "site_fulltext": true,
@@ -2498,7 +2498,7 @@
         "publishedAtSelector": "time[datetime]"
       },
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -2573,7 +2573,7 @@
         }
       },
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -2597,7 +2597,7 @@
         }
       },
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -2660,7 +2660,7 @@
         }
       },
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -2673,7 +2673,7 @@
       "kind": "web_list",
       "config": {},
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": false,
@@ -2727,7 +2727,7 @@
         }
       },
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -2747,8 +2747,8 @@
         },
         "publishedAtSelector": ".hero-date, .post-item-date"
       },
-      "tier": "T1",
-      "first_party": true,
+      "tier": "T2",
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -2846,7 +2846,7 @@
         }
       },
       "tier": "T2",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 60,
       "site_fulltext": true,
@@ -2864,7 +2864,7 @@
         }
       },
       "tier": "T1",
-      "first_party": false,
+      "first_party": true,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -2900,7 +2900,7 @@
         }
       },
       "tier": "T2",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 60,
       "site_fulltext": true,
@@ -2917,8 +2917,8 @@
           "initialBackfillLimit": 8
         }
       },
-      "tier": "T2",
-      "first_party": true,
+      "tier": "T1_5",
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 60,
       "site_fulltext": true,
@@ -2935,7 +2935,7 @@
           "initialBackfillLimit": 8
         }
       },
-      "tier": "T2",
+      "tier": "T1_5",
       "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 60,
@@ -2990,7 +2990,7 @@
         }
       },
       "tier": "T1",
-      "first_party": false,
+      "first_party": true,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -3043,8 +3043,8 @@
           "initialBackfillLimit": 8
         }
       },
-      "tier": "T2",
-      "first_party": true,
+      "tier": "T1_5",
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 60,
       "site_fulltext": true,
@@ -3115,8 +3115,8 @@
           "initialBackfillLimit": 8
         }
       },
-      "tier": "T1_5",
-      "first_party": false,
+      "tier": "T1",
+      "first_party": true,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -3133,8 +3133,8 @@
           "initialBackfillLimit": 8
         }
       },
-      "tier": "T1_5",
-      "first_party": false,
+      "tier": "T1",
+      "first_party": true,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -3152,7 +3152,7 @@
         }
       },
       "tier": "T1",
-      "first_party": false,
+      "first_party": true,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -3170,7 +3170,7 @@
         }
       },
       "tier": "T2",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 60,
       "site_fulltext": true,
@@ -3187,7 +3187,7 @@
           "initialBackfillLimit": 8
         }
       },
-      "tier": "T2",
+      "tier": "T1_5",
       "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 60,
@@ -3205,8 +3205,8 @@
           "initialBackfillLimit": 8
         }
       },
-      "tier": "T2",
-      "first_party": false,
+      "tier": "T1",
+      "first_party": true,
       "participation_mode": "editorial",
       "interval_minutes": 60,
       "site_fulltext": true,
@@ -3277,7 +3277,7 @@
           "initialBackfillLimit": 8
         }
       },
-      "tier": "T1_5",
+      "tier": "T1",
       "first_party": true,
       "participation_mode": "editorial",
       "interval_minutes": 120,
@@ -3332,7 +3332,7 @@
         }
       },
       "tier": "T1",
-      "first_party": false,
+      "first_party": true,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -3368,7 +3368,7 @@
         }
       },
       "tier": "T2",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 60,
       "site_fulltext": true,
@@ -3385,7 +3385,7 @@
           "initialBackfillLimit": 8
         }
       },
-      "tier": "T2",
+      "tier": "T1_5",
       "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 60,
@@ -3421,7 +3421,7 @@
           "initialBackfillLimit": 8
         }
       },
-      "tier": "T2",
+      "tier": "T1_5",
       "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 60,
@@ -3475,8 +3475,8 @@
           "initialBackfillLimit": 8
         }
       },
-      "tier": "T1_5",
-      "first_party": false,
+      "tier": "T1",
+      "first_party": true,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -3511,8 +3511,8 @@
           "initialBackfillLimit": 8
         }
       },
-      "tier": "T1_5",
-      "first_party": false,
+      "tier": "T1",
+      "first_party": true,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -3547,7 +3547,7 @@
           "initialBackfillLimit": 8
         }
       },
-      "tier": "T1_5",
+      "tier": "T1",
       "first_party": true,
       "participation_mode": "editorial",
       "interval_minutes": 120,
@@ -3602,7 +3602,7 @@
         }
       },
       "tier": "T2",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 60,
       "site_fulltext": true,
@@ -3620,7 +3620,7 @@
         }
       },
       "tier": "T2",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 60,
       "site_fulltext": true,
@@ -3655,7 +3655,7 @@
           "initialBackfillLimit": 8
         }
       },
-      "tier": "T2",
+      "tier": "T1_5",
       "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 60,
@@ -3691,8 +3691,8 @@
           "initialBackfillLimit": 8
         }
       },
-      "tier": "T2",
-      "first_party": true,
+      "tier": "T1_5",
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 60,
       "site_fulltext": true,
@@ -3710,7 +3710,7 @@
         }
       },
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -3728,7 +3728,7 @@
         }
       },
       "tier": "T2",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 60,
       "site_fulltext": true,
@@ -3746,7 +3746,7 @@
         }
       },
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -3835,8 +3835,8 @@
           "initialBackfillLimit": 8
         }
       },
-      "tier": "T2",
-      "first_party": true,
+      "tier": "T1_5",
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 60,
       "site_fulltext": true,
@@ -3889,8 +3889,8 @@
           "initialBackfillLimit": 8
         }
       },
-      "tier": "T2",
-      "first_party": false,
+      "tier": "T1",
+      "first_party": true,
       "participation_mode": "editorial",
       "interval_minutes": 60,
       "site_fulltext": true,
@@ -3908,7 +3908,7 @@
         }
       },
       "tier": "T2",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 60,
       "site_fulltext": true,
@@ -3926,7 +3926,7 @@
         }
       },
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -3962,7 +3962,7 @@
         }
       },
       "tier": "T2",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 60,
       "site_fulltext": true,
@@ -3980,7 +3980,7 @@
         }
       },
       "tier": "T1",
-      "first_party": false,
+      "first_party": true,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -3997,8 +3997,8 @@
           "initialBackfillLimit": 8
         }
       },
-      "tier": "T1_5",
-      "first_party": false,
+      "tier": "T1",
+      "first_party": true,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -4015,7 +4015,7 @@
           "initialBackfillLimit": 8
         }
       },
-      "tier": "T1_5",
+      "tier": "T1",
       "first_party": true,
       "participation_mode": "editorial",
       "interval_minutes": 120,
@@ -4034,7 +4034,7 @@
         }
       },
       "tier": "T2",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 60,
       "site_fulltext": true,
@@ -4051,7 +4051,7 @@
           "initialBackfillLimit": 8
         }
       },
-      "tier": "T2",
+      "tier": "T1",
       "first_party": true,
       "participation_mode": "editorial",
       "interval_minutes": 60,
@@ -4070,7 +4070,7 @@
         }
       },
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -4088,7 +4088,7 @@
         }
       },
       "tier": "T2",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 60,
       "site_fulltext": true,
@@ -4124,7 +4124,7 @@
         }
       },
       "tier": "T2",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 60,
       "site_fulltext": true,
@@ -4141,7 +4141,7 @@
           "initialBackfillLimit": 8
         }
       },
-      "tier": "T2",
+      "tier": "T1",
       "first_party": true,
       "participation_mode": "editorial",
       "interval_minutes": 60,
@@ -4214,7 +4214,7 @@
         }
       },
       "tier": "T2",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 60,
       "site_fulltext": true,
@@ -4232,7 +4232,7 @@
         }
       },
       "tier": "T2",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 60,
       "site_fulltext": true,
@@ -4250,7 +4250,7 @@
         }
       },
       "tier": "T1",
-      "first_party": false,
+      "first_party": true,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -4268,7 +4268,7 @@
         }
       },
       "tier": "T1",
-      "first_party": false,
+      "first_party": true,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -4303,8 +4303,8 @@
           "initialBackfillLimit": 8
         }
       },
-      "tier": "T1_5",
-      "first_party": false,
+      "tier": "T1",
+      "first_party": true,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -4321,8 +4321,8 @@
           "initialBackfillLimit": 8
         }
       },
-      "tier": "T1_5",
-      "first_party": false,
+      "tier": "T1",
+      "first_party": true,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -4340,7 +4340,7 @@
         }
       },
       "tier": "T2",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 60,
       "site_fulltext": true,
@@ -4393,8 +4393,8 @@
           "initialBackfillLimit": 8
         }
       },
-      "tier": "T1_5",
-      "first_party": false,
+      "tier": "T1",
+      "first_party": true,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -4448,7 +4448,7 @@
         }
       },
       "tier": "T2",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 60,
       "site_fulltext": true,
@@ -4555,8 +4555,8 @@
           "initialBackfillLimit": 8
         }
       },
-      "tier": "T1_5",
-      "first_party": false,
+      "tier": "T1",
+      "first_party": true,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -4664,7 +4664,7 @@
         }
       },
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -4681,7 +4681,7 @@
           "initialBackfillLimit": 8
         }
       },
-      "tier": "T2",
+      "tier": "T1_5",
       "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 60,
@@ -4807,8 +4807,8 @@
           "initialBackfillLimit": 8
         }
       },
-      "tier": "T2",
-      "first_party": true,
+      "tier": "T1_5",
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 60,
       "site_fulltext": true,
@@ -4898,7 +4898,7 @@
         }
       },
       "tier": "T1",
-      "first_party": false,
+      "first_party": true,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -4934,7 +4934,7 @@
         }
       },
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -4951,8 +4951,8 @@
           "initialBackfillLimit": 8
         }
       },
-      "tier": "T2",
-      "first_party": false,
+      "tier": "T1",
+      "first_party": true,
       "participation_mode": "editorial",
       "interval_minutes": 60,
       "site_fulltext": true,
@@ -4970,7 +4970,7 @@
         }
       },
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -4988,7 +4988,7 @@
         }
       },
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -5006,7 +5006,7 @@
         }
       },
       "tier": "T2",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 60,
       "site_fulltext": true,
@@ -5060,7 +5060,7 @@
         }
       },
       "tier": "T2",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 60,
       "site_fulltext": true,
@@ -5078,7 +5078,7 @@
         }
       },
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -5132,7 +5132,7 @@
         }
       },
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -5168,7 +5168,7 @@
         }
       },
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -5204,7 +5204,7 @@
         }
       },
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -5222,7 +5222,7 @@
         }
       },
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -5240,7 +5240,7 @@
         }
       },
       "tier": "T2",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 60,
       "site_fulltext": true,
@@ -5258,7 +5258,7 @@
         }
       },
       "tier": "T1",
-      "first_party": false,
+      "first_party": true,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -5276,7 +5276,7 @@
         }
       },
       "tier": "T2",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 60,
       "site_fulltext": true,
@@ -5293,8 +5293,8 @@
           "initialBackfillLimit": 8
         }
       },
-      "tier": "T1_5",
-      "first_party": false,
+      "tier": "T1",
+      "first_party": true,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -5371,7 +5371,7 @@
         }
       },
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -5389,7 +5389,7 @@
         }
       },
       "tier": "T2",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 60,
       "site_fulltext": true,
@@ -5406,7 +5406,7 @@
           "initialBackfillLimit": 8
         }
       },
-      "tier": "T2",
+      "tier": "EXCLUDE_MP",
       "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 60,
@@ -5424,7 +5424,7 @@
           "initialBackfillLimit": 8
         }
       },
-      "tier": "T2",
+      "tier": "EXCLUDE_MP",
       "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 60,
@@ -5442,7 +5442,7 @@
           "initialBackfillLimit": 8
         }
       },
-      "tier": "T2",
+      "tier": "EXCLUDE_MP",
       "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 60,
@@ -5517,7 +5517,7 @@
         }
       },
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -5577,7 +5577,7 @@
         }
       },
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -5607,7 +5607,7 @@
         "nickname": "MiniMax（稀宇科技）"
       },
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": false,
@@ -5622,7 +5622,7 @@
         "nickname": "京东JoyAI"
       },
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": false,
@@ -5742,7 +5742,7 @@
         "nickname": "智谱（GLM）"
       },
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": false,
@@ -5787,7 +5787,7 @@
         "nickname": "生数科技（Vidu·视频）"
       },
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": false,
@@ -5802,7 +5802,7 @@
         "nickname": "百度智能云（文心）"
       },
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": false,
@@ -5832,7 +5832,7 @@
         "nickname": "腾讯混元"
       },
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": false,
@@ -5877,7 +5877,7 @@
         "nickname": "通义实验室（千问）"
       },
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": false,
@@ -5922,7 +5922,7 @@
         "nickname": "龙猫LongCat（美团）"
       },
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": false,
@@ -5935,7 +5935,7 @@
       "kind": "web_list",
       "config": {},
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": false,
@@ -5948,7 +5948,7 @@
       "kind": "web_list",
       "config": {},
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": false,
@@ -5986,7 +5986,7 @@
         }
       },
       "tier": "T2",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 60,
       "site_fulltext": true,
@@ -6009,7 +6009,7 @@
         }
       },
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": true,
@@ -6050,7 +6050,7 @@
       "kind": "web_list",
       "config": {},
       "tier": "T1_5",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 120,
       "site_fulltext": false,
@@ -6219,8 +6219,8 @@
           "initialBackfillLimit": 8
         }
       },
-      "tier": "T2",
-      "first_party": false,
+      "tier": "T1",
+      "first_party": true,
       "participation_mode": "editorial",
       "interval_minutes": 60,
       "site_fulltext": true,
@@ -6237,8 +6237,8 @@
           "initialBackfillLimit": 8
         }
       },
-      "tier": "T2",
-      "first_party": false,
+      "tier": "T1",
+      "first_party": true,
       "participation_mode": "editorial",
       "interval_minutes": 60,
       "site_fulltext": true,
@@ -6358,8 +6358,8 @@
           "initialBackfillLimit": 8
         }
       },
-      "tier": "T2",
-      "first_party": false,
+      "tier": "T1",
+      "first_party": true,
       "participation_mode": "editorial",
       "interval_minutes": 60,
       "site_fulltext": true,
@@ -6372,7 +6372,7 @@
       "kind": "web_list",
       "config": {},
       "tier": "T2",
-      "first_party": true,
+      "first_party": false,
       "participation_mode": "editorial",
       "interval_minutes": 60,
       "site_fulltext": false,
@@ -6407,8 +6407,8 @@
           "initialBackfillLimit": 8
         }
       },
-      "tier": "T2",
-      "first_party": false,
+      "tier": "T1",
+      "first_party": true,
       "participation_mode": "editorial",
       "interval_minutes": 60,
       "site_fulltext": true,
@@ -6438,8 +6438,8 @@
           "initialBackfillLimit": 8
         }
       },
-      "tier": "T2",
-      "first_party": false,
+      "tier": "T1",
+      "first_party": true,
       "participation_mode": "editorial",
       "interval_minutes": 60,
       "site_fulltext": true,
@@ -7165,7 +7165,7 @@
           "initialBackfillLimit": 8
         }
       },
-      "tier": "T2",
+      "tier": "T1_5",
       "first_party": false,
       "id": "x-account-reach_vb"
     },
@@ -8080,7 +8080,7 @@
           "initialBackfillLimit": 8
         }
       },
-      "tier": "T2",
+      "tier": "T1_5",
       "first_party": false,
       "id": "x-account-rauchg"
     },
@@ -8116,8 +8116,8 @@
           "initialBackfillLimit": 8
         }
       },
-      "tier": "T2",
-      "first_party": false,
+      "tier": "T1",
+      "first_party": true,
       "id": "x-account-nvidiartxspark"
     },
     {
@@ -8272,6 +8272,564 @@
       "tier": "T2",
       "first_party": false,
       "id": "x-account-daveshapi"
+    },
+    {
+      "id": "x-account-huggingface",
+      "name": "X：Hugging Face (@huggingface)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:huggingface -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T1",
+      "first_party": true,
+      "participation_mode": "editorial",
+      "interval_minutes": 30,
+      "site_fulltext": true,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-amasad",
+      "name": "X：Amjad Masad (@amasad)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:amasad -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T1_5",
+      "first_party": false,
+      "participation_mode": "editorial",
+      "interval_minutes": 30,
+      "site_fulltext": true,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-mikeyk",
+      "name": "X：Mike Krieger (@mikeyk)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:mikeyk -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T1_5",
+      "first_party": false,
+      "participation_mode": "editorial",
+      "interval_minutes": 30,
+      "site_fulltext": true,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-goodfellow_ian",
+      "name": "X：Ian Goodfellow (@goodfellow_ian)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:goodfellow_ian -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T1_5",
+      "first_party": false,
+      "participation_mode": "editorial",
+      "interval_minutes": 30,
+      "site_fulltext": true,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-deeplearningai",
+      "name": "X：DeepLearning.AI (@DeepLearningAI)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:DeepLearningAI -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T1",
+      "first_party": true,
+      "participation_mode": "editorial",
+      "interval_minutes": 30,
+      "site_fulltext": true,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-mistralai",
+      "name": "X：Mistral AI (@MistralAI)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:MistralAI -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T1",
+      "first_party": true,
+      "participation_mode": "editorial",
+      "interval_minutes": 30,
+      "site_fulltext": true,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-oran_ge",
+      "name": "X：orange.ai (@oran_ge)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:oran_ge -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T1_5",
+      "first_party": false,
+      "participation_mode": "editorial",
+      "interval_minutes": 30,
+      "site_fulltext": true,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-richardsocher",
+      "name": "X：Richard Socher (@RichardSocher)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:RichardSocher -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T1_5",
+      "first_party": false,
+      "participation_mode": "editorial",
+      "interval_minutes": 30,
+      "site_fulltext": true,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-_philschmid",
+      "name": "X：Philipp Schmid (@_philschmid)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:_philschmid -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T1_5",
+      "first_party": false,
+      "participation_mode": "editorial",
+      "interval_minutes": 30,
+      "site_fulltext": true,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-boltdotnew",
+      "name": "X：bolt.new (@boltdotnew)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:boltdotnew -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T1",
+      "first_party": true,
+      "participation_mode": "editorial",
+      "interval_minutes": 30,
+      "site_fulltext": true,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-adamdangelo",
+      "name": "X：Adam D'Angelo (@adamdangelo)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:adamdangelo -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T1_5",
+      "first_party": false,
+      "participation_mode": "editorial",
+      "interval_minutes": 30,
+      "site_fulltext": true,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-julien_c",
+      "name": "X：Julien Chaumond (@julien_c)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:julien_c -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T1_5",
+      "first_party": false,
+      "participation_mode": "editorial",
+      "interval_minutes": 30,
+      "site_fulltext": true,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-jerryjliu0",
+      "name": "X：Jerry Liu (@jerryjliu0)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:jerryjliu0 -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T1_5",
+      "first_party": false,
+      "participation_mode": "editorial",
+      "interval_minutes": 30,
+      "site_fulltext": true,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-amanrsanger",
+      "name": "X：Aman Sanger (@amanrsanger)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:amanrsanger -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T1_5",
+      "first_party": false,
+      "participation_mode": "editorial",
+      "interval_minutes": 30,
+      "site_fulltext": true,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-hidecloud",
+      "name": "X：hidecloud (@hidecloud)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:hidecloud -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T1_5",
+      "first_party": false,
+      "participation_mode": "editorial",
+      "interval_minutes": 30,
+      "site_fulltext": true,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-sualehasif996",
+      "name": "X：Sualeh Asif (@sualehasif996)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:sualehasif996 -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T1_5",
+      "first_party": false,
+      "participation_mode": "editorial",
+      "interval_minutes": 30,
+      "site_fulltext": true,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-weaviate_io",
+      "name": "X：Weaviate • vector database (@weaviate_io)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:weaviate_io -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T1",
+      "first_party": true,
+      "participation_mode": "editorial",
+      "interval_minutes": 30,
+      "site_fulltext": true,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-ericjing_ai",
+      "name": "X：Eric Jing (@ericjing_ai)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:ericjing_ai -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T1_5",
+      "first_party": false,
+      "participation_mode": "editorial",
+      "interval_minutes": 30,
+      "site_fulltext": true,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-taranjeetio",
+      "name": "X：Taranjeet (@taranjeetio)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:taranjeetio -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T1_5",
+      "first_party": false,
+      "participation_mode": "editorial",
+      "interval_minutes": 30,
+      "site_fulltext": true,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-groqinc",
+      "name": "X：Groq Inc (@GroqInc)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:GroqInc -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T1",
+      "first_party": true,
+      "participation_mode": "editorial",
+      "interval_minutes": 30,
+      "site_fulltext": true,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-lovable_dev",
+      "name": "X：Lovable (@lovable_dev)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:lovable_dev -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T1",
+      "first_party": true,
+      "participation_mode": "editorial",
+      "interval_minutes": 30,
+      "site_fulltext": true,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-heygen_official",
+      "name": "X：HeyGen (@HeyGen_Official)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:HeyGen_Official -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T1",
+      "first_party": true,
+      "participation_mode": "editorial",
+      "interval_minutes": 30,
+      "site_fulltext": true,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-langchainai",
+      "name": "X：LangChain (@LangChainAI)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:LangChainAI -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T1",
+      "first_party": true,
+      "participation_mode": "editorial",
+      "interval_minutes": 30,
+      "site_fulltext": true,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-txhunyuan",
+      "name": "X：Hunyuan (@TXhunyuan)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:TXhunyuan -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T1",
+      "first_party": true,
+      "participation_mode": "editorial",
+      "interval_minutes": 30,
+      "site_fulltext": true,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-notebooklm",
+      "name": "X：NotebookLM (@NotebookLM)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:NotebookLM -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T1",
+      "first_party": true,
+      "participation_mode": "editorial",
+      "interval_minutes": 30,
+      "site_fulltext": true,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-firecrawl_dev",
+      "name": "X：Firecrawl (@firecrawl_dev)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:firecrawl_dev -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T1",
+      "first_party": true,
+      "participation_mode": "editorial",
+      "interval_minutes": 30,
+      "site_fulltext": true,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-hey_im_monica",
+      "name": "X：Monica_IM (@hey_im_monica)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:hey_im_monica -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T1",
+      "first_party": true,
+      "participation_mode": "editorial",
+      "interval_minutes": 30,
+      "site_fulltext": true,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-lexfridman",
+      "name": "X：Lex Fridman (@lexfridman)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:lexfridman -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "editorial",
+      "interval_minutes": 30,
+      "site_fulltext": true,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-ycombinator",
+      "name": "X：Y Combinator (@ycombinator)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:ycombinator -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "editorial",
+      "interval_minutes": 30,
+      "site_fulltext": true,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-latentspacepod",
+      "name": "X：Latent.Space (@latentspacepod)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:latentspacepod -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "editorial",
+      "interval_minutes": 30,
+      "site_fulltext": true,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-_catwu",
+      "name": "X：cat (@_catwu)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:_catwu -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T1_5",
+      "first_party": false,
+      "participation_mode": "editorial",
+      "interval_minutes": 30,
+      "site_fulltext": true,
+      "syndicate_fulltext": false,
+      "enabled": true
     }
   ]
 }

@@ -842,7 +842,10 @@ const own = path.relative("packages/backend/src", file.split("/").join(path.sep)
 
 > ⚠️ **纠正文档一处**：它说 TNW 原生被 CF 拦，但服务器实测 `https://thenextweb.com/feed/` **返回 200 且有 10 条** —— 原生可用。（Wccftech 原生 403、ComputerBase 原生 404，替代通道仍是必要的。）
 
-> ⚠️ **文档里的 seed 说法已过时**：文档写"seed 只增不覆盖 `ON CONFLICT DO NOTHING`，改已存在的源要走后台/SQL"。**上游现在就是 `DO UPDATE`**，直接改 `sources.json` 再 seed 即可。
+> ⚠️ **上面这句是错的，2026-10-08 实测纠正**：`scripts/seed.ts` 至今仍是 `ON CONFLICT (id) DO NOTHING`
+> （仓库与服务器上的都是），也就是说**改 `sources.json` 再 seed 不会更新已有源**，只补新源。
+> 改已有源要么走后台、要么用一条会 UPDATE 的脚本 —— 见下面「权重重置」那节的
+> `scripts/apply-tier-mapping-2026-10-08.ts`。当天先照这句错话做过一次，发现库里 tier 没变才查出来。
 
 ## 二、站点体检 §6 P1（池被归档页灌水）—— 已基本解决
 
@@ -1901,3 +1904,91 @@ select a.id, r.purpose from receipts r
    and coalesce(btrim(a.x_post->>'text'),'') = '' and coalesce(btrim(a.x_post->'quoted'->>'text'),'') = '';
 -- 只应看到 prefilter（有时加一条关于原帖的路径）；出现 score/structure/understand/summarize 就是没生效
 ```
+
+---
+
+# 权重重置与编辑源包整合（2026-10-08）
+
+## 做了什么
+
+「权重」= `sources.tier`，它同时决定三件事：入选门槛（T1 60 / T1_5 65 / T2 76 / EXCLUDE_MP 不评分）、
+能不能推送（`PUSH_TIERS = ["T1","T1_5"]`）、以及**一手标记**（`tier='T1'` → 事件主位、日报「（一手）」与
+排序、代表作优先、公开面 firstParty 频道）。判据按「谁在说话」，不按产量：
+
+| 分级 | 判据 |
+|---|---|
+| `T1` | 当事方的**机构发布渠道**：官网 / 官方博客 / Newsroom / 官方 RSS / 官方 X 机构号 / 产品官方号 / 官方 Release 页 |
+| `T1_5` | 当事方的**人**（CEO / 创始人 / 首席科学家 / 研究员 / 工程）与准一手创作者 |
+| `T2` | **转述方**：媒体、聚合、社区、独立作者与记者 |
+| `EXCLUDE_MP` | 全量分类火车型，不评分、只进「全部动态」 |
+
+落地：**改档 48 个源 + 新建 31 个源（AIHOT 编辑源包 79 条里库里没有的那部分）+ `first_party` 全表归一**。
+
+| 项 | 值 |
+|---|---|
+| 启用中的 editorial 源 | 250 → **281**（含新建 31） |
+| 分级分布 | T1 34→**72**、T1_5 81→**95**、T2 135→**110**、EXCLUDE_MP 0→**4** |
+| 源总数 | 450 → **481** |
+| `sources.first_party` 归一 | 109 行（列值与 tier 不一致的清零） |
+| `publications.first_party` 归一 | 1210 行 |
+| 入队重发 | 48 个源，全部 completed |
+
+几处主要改动：`Tomer Tunguz 博客` T1→T2（30 天 1885 条、入选 68 条、占全站入选第一，却是 VC 分析的转述方）；
+`Meta/NVIDIA Newsroom`、`Cloudflare Blog`、`@NVIDIAAI`、`@ElevenLabs`、`@cohere` 等 14 个 T2→T1；
+`@ChatGPT`、`@claudeai`、`@GoogleDeepMind` 等 13 个 T1_5→T1；`@JeffDean`、`@karpathy`、`@Simon Willison` 等
+14 个 T2→T1_5；arXiv cs.LG/cs.AI/cs.CL 与 HF Daily Papers 四个火车型 → EXCLUDE_MP（30 天 3778 条、入选 0，
+每天省约 250 次付费评分）。
+
+## 怎么做的（可复跑）
+
+```bash
+# 1. 仓库侧：industry/sources.json 记录同一份改动（新部署 seed 时就是了）
+# 2. 线上应用（scripts/ 是挂载目录，不用重建镜像）
+gcloud compute scp scripts/apply-tier-mapping-2026-10-08.ts scripts/tier-mapping-2026-10-08.json \
+  weijianlin@aihot:/home/weijianlin/aihot/scripts/ --zone=asia-east2-c
+gcloud compute ssh weijianlin@aihot --zone=asia-east2-c \
+  --command="cd aihot && sudo docker exec aihot-worker-1 node scripts/apply-tier-mapping-2026-10-08.ts --dry-run"
+# 去掉 --dry-run 即真正写库（先 dry-run 看计划）
+```
+
+脚本会：更新改档源（tier + first_party）→ 全表归一 `first_party = (tier='T1')` → 新建 31 个 X 源
+（`config.query = from:<handle> -filter:replies`、`interval_minutes=30`、`enabled=true`）→ 对每个改档源入队
+`QUEUES.republishSource`（后台改源走的就是这条路径），让 `publications` 跟着重算。全程不调模型。
+
+## ⚠️ 两个必须记住的点
+
+1. **`scripts/seed.ts` 只插不改**（`ON CONFLICT (id) DO NOTHING`，仓库与服务器一致）。所以
+   「改 `sources.json` 再 seed」对**已存在**的源无效 —— 本文档旧版说「上游现在是 DO UPDATE」是错的，
+   已在上文纠正。要改已有源必须走后台或会 UPDATE 的脚本。
+2. **改 tier 只改 `sources` 不会刷新公开投影**。`publications.first_party` 是发布时按 tier 写下的；本次
+   48 个源的重发任务跑完（全部 completed）后，全库仍有 1210 条与之不一致（1081 条来自**更早**改过级、
+   从未重发的源，129 条是 T1 源里发布时还不是 T1 的旧条目）。最后用一条单列 UPDATE 归一：
+   ```sql
+   UPDATE publications p SET first_party = (s.tier = 'T1')
+     FROM sources s WHERE s.id = p.source_id AND p.first_party <> (s.tier = 'T1');
+   ```
+   这一列是纯派生值，不涉及模型与内容，可随时按同一句重算。
+
+## 验证
+
+| 检查 | 结果 |
+|---|---|
+| 分级分布 | T1 72 / T1_5 95 / T2 110 / EXCLUDE_MP 4（启用中的 editorial） |
+| `sources.first_party` 与 tier 不一致 | 0 |
+| `publications.first_party` 与 tier 不一致 | 0 |
+| 重发任务 | 48/48 completed |
+| 抽查 | `rss-tomtunguz` 一手 0/1885、`x-account-openai` 13/13、`@elonmusk` 111/111、`rss-arxiv-3` = EXCLUDE_MP |
+| 新源开始采集 | `@amasad` 5 条、`@huggingface` 1 条、`@MistralAI` 1 条（应用后几分钟内） |
+| worker 报错 | 0 |
+
+## 回滚
+
+改档表在 `scripts/tier-mapping-2026-10-08.json`（只有新值），旧值在
+`E:\cs\hot\2026-10-08\tier-mapping-2026-10-08.csv` 的 `current_tier` 列。按旧值重跑一次同样的 UPDATE +
+重发即可；`industry/sources.json` 的旧副本在 `E:\cs\hot\2026-10-08\sources.json.bak`。新建的 31 个源可以
+`enabled=false` 或直接删除（它们还没有历史判断价值）。
+
+## 还没做的一条
+
+T1 名单里还有 5 个**个人源**（`@elonmusk`、`@mntruell`、Lilian Weng、Dwarkesh Patel、Nathan Lambert）——
+它们本来就是 T1，本次沿用；按「T1 只给官方渠道」的判据应落 T1_5，等确认后再改。
