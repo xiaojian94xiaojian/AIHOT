@@ -11,6 +11,25 @@ const ALLOWED_TAGS = [
   "sup", "sub", "mark", "span", "dl", "dt", "dd", "picture", "video", "source",
 ];
 
+/** The schemes an address may use, per tag: only an inline picture of ours may be a data: address. */
+const SCHEMES = ["http", "https"] as const;
+const IMG_SCHEMES = [...SCHEMES, "data"] as const;
+/** An inline address that is not a picture is a document a browser may render as one: never keep it. */
+const IMAGE_DATA = /^data:image\/[a-z0-9.+-]+[;,]?/i;
+
+/**
+ * Every attribute that holds an address, and the schemes its tag accepts. sanitize-html checks the
+ * attributes a page wrote *before* transformTags runs, so a transform's own value (a lazy data-src
+ * promoted into src, a resolved href) escapes its scheme check; this policy is applied to the finished
+ * markup instead, which is the only place the final address exists.
+ */
+const ADDRESS_ATTRIBUTES = {
+  a: { href: SCHEMES },
+  img: { src: IMG_SCHEMES },
+  video: { src: SCHEMES, poster: SCHEMES },
+  source: { src: SCHEMES },
+} as const;
+
 /** A class naming a promotion block (msr-promo, promo-box …), not text such as "promotion". */
 const PROMO_CLASS = /(?:^|[-_])promo(?:$|[-_])/i;
 
@@ -57,9 +76,9 @@ export function sanitizeBody(html: string, baseUrl?: string): string {
       span: [],
     },
     allowedClasses: { code: [/^language-[\w-]+$/], pre: [/^language-[\w-]+$/] },
-    allowedSchemes: ["http", "https"],
+    allowedSchemes: [...SCHEMES],
     allowedSchemesAppliedToAttributes: ["href", "src", "poster"],
-    allowedSchemesByTag: { img: ["http", "https", "data"] },
+    allowedSchemesByTag: { img: [...IMG_SCHEMES] },
     allowProtocolRelative: true,
     transformTags: {
       h1: "h2",
@@ -92,7 +111,7 @@ export function sanitizeBody(html: string, baseUrl?: string): string {
       (frame.tag === "img" && (!frame.attribs.src || isNonArticleImage(frame.attribs.src, frame.attribs.width, frame.attribs.height))) ||
       (frame.tag === "a" && !frame.text.trim() && !frame.mediaChildren?.length),
   });
-  return normalizeBlocks(cleaned);
+  return normalizeBlocks(dropUnallowedAddresses(cleaned));
 }
 
 const BLOCK_TAGS = new Set(["p", "h2", "h3", "h4", "h5", "ul", "ol", "li", "blockquote", "pre", "table", "figure", "hr", "dl", "picture", "video"]);
@@ -180,6 +199,44 @@ function resolveUrl(href: string, base?: string): string {
   } catch {
     return href;
   }
+}
+
+/**
+ * Drops every address attribute whose scheme its tag does not accept (ADDRESS_ATTRIBUTES). Runs on the
+ * sanitised markup, because that is where the value a transform produced — not the one the page wrote —
+ * is what a browser will open. An <img> left without an address has nothing to show and goes with it, so
+ * a second cleaning of the result changes nothing.
+ */
+function dropUnallowedAddresses(html: string): string {
+  const $ = cheerio.load(html, null, false);
+  for (const [tag, attributes] of Object.entries(ADDRESS_ATTRIBUTES)) {
+    for (const [attribute, schemes] of Object.entries(attributes)) {
+      $(`${tag}[${attribute}]`).each((_, el) => {
+        const value = $(el).attr(attribute);
+        // An empty address is not an instruction to open anything; leave the empty <a> to the filters.
+        if (value && !value.trim()) return;
+        if (value !== undefined && keptAddress(value, schemes) === null) $(el).removeAttr(attribute);
+      });
+    }
+  }
+  $("img:not([src])").remove();
+  return $.html();
+}
+
+/**
+ * The address when its scheme is one the tag allows, otherwise null.
+ */
+function keptAddress(value: string, schemes: readonly string[]): string | null {
+  // Browsers ignore leading C0 controls and spaces before a scheme; match that before judging it.
+  const address = value.replace(/^[\u0000-\u0020]+/, "");
+  const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(address)?.[1]?.toLowerCase();
+  // No scheme: a relative address (`/a.png`, `#x`) or a protocol-relative `//host/a.png`, which
+  // allowProtocolRelative accepts and the browser opens with the page's own https scheme.
+  if (!scheme) return value;
+  if (!schemes.includes(scheme)) return null;
+  // The tag allows data: for inline pictures; a `data:text/html` document is not one.
+  if (scheme === "data" && !IMAGE_DATA.test(address)) return null;
+  return value;
 }
 
 const escHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
