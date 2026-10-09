@@ -2331,3 +2331,56 @@ group by 1 order by 2 asc limit 10;
 写回固定节奏（editorial 30、hot_signal 60）—— 我 10-08 设的 60/120 就是这么被覆盖回去的，
 这是引擎的设计，不是 bug。真要压成本只有两条路：**降预算**（超了排队、不会超支）或**停掉没产出的源**
 （第 1 节已更新成这两条，并附 SQL）。
+
+---
+
+# 恢复历史归档闸门（2026-10-09）
+
+## 丢了什么
+
+`5d49267`（10-03「历史归档不再评分，只做预筛」）加的闸门在 **4.0.0 升级时丢了**：升级那一步
+（`1ca5d6d`「引擎改为从 AIHOT 线上代码直接导出」）是整体导出上游代码重建的，那个提交留在旧的 `main` 上，
+`git merge-base --is-ancestor 5d49267 HEAD` 返回 1 —— 它不在 `upgrade-4.0` 的祖先里，配套的
+`tests/history-limit.test.ts` 也一起没了。上游没有这个概念，合并时不会替我们保留。
+
+**后果（实测）**：升级后历史归档条目又被完整判定。近 3 天 305 条归档条目 → **532 次评分调用**
+（另有 305 预筛、284 结构化、226 摘要写作、54 理解写作），单 10-08 一天就有 424 次评分回执。
+另外这些条目里有 19 条被选中进了精选 —— 正是闸门当初要拦掉的那类（新源首次导入带进来的旧归档）。
+
+## 恢复的做法（`c154153`）
+
+按原样恢复，适配当前（上游 #153 之后）的流程，一共 5 个文件：
+
+| 文件 | 改动 |
+|---|---|
+| `editorial/analyze.ts` | `StepOpts` 加 `sweep`；`runAnalysis` 在「预筛 BLOCK」「无正文」两道早退之后加闸门 |
+| `editorial/input.ts` | 分析输入带回 `backfill` |
+| `content/materials.ts` | `isHistorical` 同时接受 DB 行（snake_case）与加载输入（camelCase）；未标记 `backfill` 视为非归档 |
+| `jobs/content.ts` | 自动队列传 `sweep: true`；后台点名的重评估（带 `attemptTag`）不受限 |
+| `tests/history-limit.test.ts` | 从 `5d49267` 恢复，3 条全过 |
+
+判据没变（`isHistorical`）：`backfill` 且「发布时间未知或发现时已过期 **48 小时**以上」。
+**发布后 48 小时内被发现的不算归档**，照常完整判定 —— 新源今早发的帖子仍是新闻。
+
+## 生产验证（受控实验）
+
+部署后队列里没有待处理的归档条目，所以挑一条重新入队验证
+（`jey4g15zwfb7swx5j3t3hvpbk`，发布 10-05、发现 10-09、正文 1624 字，只改 `processing_state`）：
+
+| | 恢复前（10:50 那次分析） | 恢复后（12:00 那次分析） |
+|---|---|---|
+| 判断 | `pass`，标题 26 字、摘要 192 字 | **`unknown`，无分、无标题、无摘要** |
+| 公开池 | 在池、曾被选中 | **`eligible=false`、`selected=false`** |
+| 回执 | 预筛 + 2 次评分 + 结构化 + 写作 | **无新回执**（预筛答案命中缓存，这次重跑零调用）|
+
+部署镜像 `de25abb0475d`（回滚点 `rollback-1353a8f31b78`），三个容器已换新，站点 `/`、`/hot`、`/daily` 全 200、
+worker 零报错。
+
+## 加进观察清单
+
+```sql
+-- 历史归档条目不该再有评分回执（有就是闸门又丢了）
+select r.purpose, count(*) from receipts r join articles a on r.subject = 'article:'||a.id||'@'||a.revision
+where a.backfill and r.created_at > now() - interval '1 day' group by r.purpose order by 2 desc;
+-- 期望：只有 prefilter_article；出现 score_article / structure_article 就要查 analyze.ts 的闸门还在不在
+```
