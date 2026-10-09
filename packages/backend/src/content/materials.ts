@@ -112,9 +112,18 @@ export async function fillPublicationTime(db: Db, articleId: string, claimed: Da
  * a report) whose source time is unknown or was already past the stale threshold when found. It is
  * archived and analysed like anything else, but waits behind live work and founds no event and adds
  * no heat (it stays out of the event graph). A new source's post from this morning is news.
+ * Accepts the database row (snake_case) and the loaded analysis input (camelCase).
  */
-export function isHistorical(a: { backfill: boolean; published_at: Date | null; discovered_at: Date }): boolean {
-  return a.backfill && (!a.published_at || a.discovered_at.getTime() - a.published_at.getTime() > STALE_ON_DISCOVERY_MS);
+export function isHistorical(a: {
+  backfill?: boolean;
+  published_at?: Date | null;
+  publishedAt?: Date | null;
+  discovered_at?: Date;
+  discoveredAt?: Date | null;
+}): boolean {
+  const published = a.published_at ?? a.publishedAt ?? null;
+  const discovered = a.discovered_at ?? a.discoveredAt ?? null;
+  return a.backfill === true && (!published || discovered === null || discovered.getTime() - published.getTime() > STALE_ON_DISCOVERY_MS);
 }
 
 /** Identity of stored content: the revision changes exactly when this does. */

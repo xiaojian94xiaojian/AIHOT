@@ -110,7 +110,7 @@ async function processingInput(articleId: string) {
  * retry or end in "failed" (afterFailure). attemptTag makes an explicit re-evaluation a new (paid)
  * request; the same tag reuses its receipt.
  */
-export async function processArticle(articleId: string, opts: { attemptTag?: string } = {}): Promise<{ state: string; retryAt?: Date }> {
+export async function processArticle(articleId: string, opts: { attemptTag?: string; sweep?: boolean } = {}): Promise<{ state: string; retryAt?: Date }> {
   const row = await processingInput(articleId);
   if (!row) return { state: "missing" };
   try {
@@ -120,7 +120,7 @@ export async function processArticle(articleId: string, opts: { attemptTag?: str
   }
 }
 
-async function processRevision(articleId: string, row: NonNullable<Awaited<ReturnType<typeof processingInput>>>, opts: { attemptTag?: string }): Promise<{ state: string }> {
+async function processRevision(articleId: string, row: NonNullable<Awaited<ReturnType<typeof processingInput>>>, opts: { attemptTag?: string; sweep?: boolean }): Promise<{ state: string }> {
   if (row.participation_mode !== "editorial") {
     // Normally queued straight for grouping (queueProcessing); an explicit re-evaluation lands here.
     const { group } = await settleNonEditorial(articleId);
@@ -128,7 +128,7 @@ async function processRevision(articleId: string, row: NonNullable<Awaited<Retur
     return { state: "skipped" };
   }
   try {
-    const result = await analyzeArticle(articleId, { attemptTag: opts.attemptTag });
+    const result = await analyzeArticle(articleId, { attemptTag: opts.attemptTag, sweep: opts.sweep });
     if (!result) return { state: "missing" };
     // Only a title or a feed summary: the article page first; extraction queues the analysis again.
     if (result.needsBody || !result.output) {
@@ -185,7 +185,9 @@ async function afterFailure(articleId: string, revision: number, error: unknown)
 }
 
 export async function registerContentJobs(boss: PgBoss) {
-  await work(boss, QUEUES.analyze, { localConcurrency: 6, pollingIntervalSeconds: 2 }, ({ articleId, attemptTag }) => processArticle(articleId, { attemptTag }));
+  await work(boss, QUEUES.analyze, { localConcurrency: 6, pollingIntervalSeconds: 2 }, ({ articleId, attemptTag }) =>
+    // sweep: this is the automatic run, not an explicit re-evaluation, so the history time limit applies.
+    processArticle(articleId, { attemptTag, sweep: true }));
 }
 
 /**
