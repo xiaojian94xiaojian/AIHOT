@@ -2195,7 +2195,7 @@ Gary Marcus 的边界说明一致。转氛围的 3 个已入队重发，它们�
 |---|---|
 | 源总数 | **626**（editorial 375 / hot_signal 251）|
 | 启用中的 editorial 分级 | T1 69 / T1_5 100 / T2 107 / EXCLUDE_MP 4 |
-| X 源 | **346**（editorial 183 个 @60 分钟、氛围 163 个 @120 分钟）→ 需求 **265 次/小时** |
+| X 源 | **346**（editorial 183 / 氛围 163）—— 按分片读取，约 15 个分片/轮（见第 1 节）|
 | `socialdata` 预算 | 30 / 300 / **7000**（今天下午从 10/100/1000 调高）|
 | 今天 socialdata 调用 | **610 次**（大部分时间还压在旧预算上）|
 | 本轮新建源 | **176 个**（31 编辑 + 145 氛围），其中 **148 个已抓到内容**（84%）|
@@ -2207,19 +2207,28 @@ Gary Marcus 的边界说明一致。转氛围的 3 个已入队重发，它们�
 
 ```sql
 -- 每天实际花了多少次 X 抓取
-select created_at::date as day, count(*) from receipts where service='socialdata' group by 1 order by 1 desc limit 3;
+select created_at::date as "day", count(*) from receipts where service='socialdata' group by 1 order by 1 desc limit 3;
 ```
 
-- **期望**：约 **4 000–6 400 次/天**（需求 265/小时跑满）。接近 7 000 说明日上限成了瓶颈；
-  远低于 2 000 则说明有别的瓶颈（看下一条）。
+- **期望**：约 **1 000–1 500 次/天**（见下面的「分片」说明 —— X 抓取的请求数远小于源数）。
+  接近 7 000 才说明日上限成了瓶颈；低于 500 说明有别的瓶颈（看下一条）。
+- **注意 X 是分片读取的**：一个 SocialData 请求可以覆盖最多 **24 个账号**
+  （`x.ts` 的 `SHARD_MAX_ACCOUNTS`，查询形如 `from:(a OR b OR …)`），所以
+  **346 个 X 源并不等于 346 次请求/轮**，而是约 15 个分片。每轮分片的节奏由参与方式决定
+  （`collect.ts` 的 `X_SHARD_MINUTES`：editorial 30 分钟、hot_signal 60 分钟），
+  而且 `adaptIntervals`（每天跑一次）会**按这个节奏把每源的 `interval_minutes` 写回去** ——
+  所以手动改 X 源的间隔会被覆盖，那不是 bug，别跟它较劲。
 - **看还有没有被挡的源**：
   ```sql
   select left(last_error,46) as err, count(*) from sources where last_error is not null group by 1 order by 2 desc limit 5;
   ```
-- **撑不住就回落**（日调用降到约 2 200 次）：
+- **真要压成本**，有效的是这两条（改 X 源间隔无效）：
   ```sql
-  UPDATE sources SET interval_minutes=120 WHERE kind='x_search' AND enabled AND participation_mode='editorial';
-  UPDATE budgets SET per_minute=10, per_hour=150, per_day=3000 WHERE service='socialdata';
+  -- ① 降预算（超了就先排队，不会超支）
+  UPDATE budgets SET per_minute=10, per_hour=100, per_day=1200 WHERE service='socialdata';
+  -- ② 停掉长期没产出的 X 源（这是真正减少请求的办法）
+  UPDATE sources SET enabled=false WHERE kind='x_search' AND enabled
+    AND NOT EXISTS (SELECT 1 FROM articles a WHERE a.source_id=sources.id AND a.discovered_at > now() - interval '30 days');
   ```
 
 ## 2. 新源是否真的在工作
@@ -2268,8 +2277,17 @@ where s.kind='x_search' and s.participation_mode='editorial' and s.tier in ('T1'
 group by 1 order by 2 asc limit 10;
 ```
 
-- **期望**：主力源的最新条目停在 1–2 小时内。若普遍超过 4 小时，说明配额仍不够，
-  要么调预算、要么只把 T1/T1_5 的间隔收回 30 分钟（约 +60 次/小时）。
+- **期望**：主力源的最新条目停在 1–2 小时内。若普遍超过 4 小时，说明配额仍不够 —— 先查第 1 节。
+  **注意别把长期不发的账号当成「不新鲜」**：下面这条加了「近 7 天有产出」的过滤，否则排在最前面的
+  全是 @ylecun、@GroqInc 这类本来就很少发推的账号（10-09 实跑时就踩了这个）。
+  ```sql
+  select s.name, max(p.timeline_at) as latest
+  from publications p join sources s on s.id = p.source_id
+  where s.kind='x_search' and s.participation_mode='editorial' and s.tier in ('T1','T1_5') and s.enabled
+    and exists (select 1 from articles a where a.source_id = s.id
+                and a.discovered_at > now() - interval '7 days' and not a.backfill)
+  group by 1 order by 2 asc limit 10;
+  ```
 
 ## 5. 站点与出刊
 
@@ -2282,3 +2300,34 @@ group by 1 order by 2 asc limit 10;
 - 83 个待判里仍有 2 个探不到 feed（CTech、Impress Watch），3 个缺 handle 的已放弃 1 个（AppSail 注销）。
 - 那 46 个个人源已经补完（45 个入库），没有遗留。
 - `roster-x-gap`（60 个 X 缺口）如果之后拿到文件，按同一套脚本跑一遍即可。
+
+## 10-09 实跑基线表：两处更正 + 实测结果
+
+清单写完当天（10-09 11:34 UTC）跑了一遍，结果如下，其中**两条要更正**（我原先的分析错在把「源数 × 间隔」
+当成了请求数）：
+
+| 检查 | 实测 | 判断 |
+|---|---|---|
+| 源 / 分级 | 626 个；T1 69 / T1_5 100 / T2 107 / EXCLUDE_MP 4 | ✅ 与基线一致 |
+| 预算挡下的源 | **0 个**（改前 144）| ✅ 配额调整生效 |
+| 新建源是否工作 | 176 个里 **166 个已抓到内容**（94%，早上是 84%）| ✅ 在收敛 |
+| 火车型评分回执（24h）| **0 次** | ✅ 省钱目标达成 |
+| 转氛围的 3 个源在池条目 | **0/27、0/8、0/75** | ✅ 已退出公开池 |
+| 升 T1 的源一手标记 | meta-newsroom 15/15、googleaidevs 8/8、openrouter 40/40、runwayml 23/23 | ✅ 全部到位 |
+| 精选构成（24h）| 19 条：T1 11 / T1_5 6 / T2 2 → **T1 占 58%**（改动前基线 37%）| ✅ 权重在起作用 |
+| `rss-tomtunguz` | 24 小时 0 条、0 入选 | ✅（它本身产出就慢）|
+| 站点 / worker | 四个页面 200、level 50/60 = 0 | ✅ |
+
+**更正 1：X 抓取是分片读取的，不能拿「源数 × 间隔」估请求量。**
+`x.ts` 的 `SHARD_MAX_ACCOUNTS = 24`：一个请求形如 `from:(a OR b OR …)` 覆盖最多 24 个账号，
+346 个 X 源 ≈ **15 个分片/轮**（editorial 30 分钟、hot_signal 60 分钟，见 `X_SHARD_MINUTES`）。
+实测今天（10-09，11.5 小时）522 次调用 ≈ **45 次/小时 ≈ 1 100 次/天**，
+所以第 1 节的期望值已从「4 000–6 400」改成「1 000–1 500」。
+反过来说：**旧预算（100 次/小时、1 000/天）确实卡住了**（10-08 那天正好用满 610 次后开始挡源），
+调到 30/300/7000 是必要的，但成本涨幅是大约 **2 倍**（1 100–1 500/天 vs 之前 1 000/天上限），
+不是我先前说的 6–12 倍。
+
+**更正 2：手动改 X 源的间隔没用。** `adaptIntervals`（每天跑一次）会把可分享搜索的账号按参与方式
+写回固定节奏（editorial 30、hot_signal 60）—— 我 10-08 设的 60/120 就是这么被覆盖回去的，
+这是引擎的设计，不是 bug。真要压成本只有两条路：**降预算**（超了排队、不会超支）或**停掉没产出的源**
+（第 1 节已更新成这两条，并附 SQL）。
