@@ -171,7 +171,24 @@ gcloud compute firewall-rules list --project project-79671177-5fb1-4881-a7c
 - 若发现属于**上游框架**的通用问题：按 `AGENTS.md` 的 PR 规则先在 `KKKKhazix/AIHOT` 开 Issue 讲清场景（新开关/行为变更要先讨论），不要直接提 PR。
 - 建议顺带补一份 `docs/security.md`（本仓库当前没有威胁模型文档）：信任边界、数据流、密钥与留存口径。
 
-## 10. 已知坑（别踩）
+## 10. 新增面：知识库模块（分支 `feat/kb-module`，已实现未合并）
+
+`modules/kb/`（事件卡/报告卡/精选卡落成 Markdown + 读取出口）是审查范围内**最新的一块面**，
+注意它可能还没随镜像上线（先确认生产有没有它：`curl -sS -o /dev/null -w '%{http_code}' https://hot.jian.ing/api/v1/agent/kb/recent`）。
+
+| 要查的 | 位置 | 为什么 |
+|---|---|---|
+| **公开可读性（先确认是否有意）** | `modules/kb/server.ts:134-200` 注册了 `agent.abilities`（`get_kb_recent`/`search_kb`/`get_kb_topics`）| agent/MCP 出口是**公开**的，等于把知识库内容开放给任何调用者；模块注释却写“知识库是站内与 agent 侧资产，不进公开出口”。要么这是有意的（就要评估泄露面），要么是疏漏（要收口）|
+| **绕过唯一读取层** | 同上，答案直接读文件，不经过 `packages/backend/src/publication/` | 仓库硬规则是“所有公开出口都从 `publication/` 这一个读取层读”；派生数据也要遵守同样的撤回/许可口径。核对：撤回的内容会不会仍从 KB 出口读到；`ai_access`/许可口径是否一致 |
+| **路径穿越（读）** | `GET /api/modules/kb/note?id=…` → `modules/kb/backend/layout.ts:90` `path.join(kbRoot(), ...relPath.split("/"))` | 若 `id` 未严格校验，`../` 可读到任意 `.md`（含服务器上其它挂载目录）；测：`..%2f`、`..\`、绝对路径、UNC、符号链接 |
+| **路径穿越（写）** | `modules/kb/backend/export.ts`、`prune.ts` 的目标路径推导 | 写出去比读出去更糟；确认写入目标只能落在 `kb/` 下，且都用 `inbox/` 临时文件 + 原子改名 |
+| **答案里的内部字段** | `modules/kb/backend/answer.ts:31-60` | agent 答案是否带内部 id、文件路径、绝对路径、来源内部标记 |
+| **资源放大** | `read.ts` 的列表/搜索（遍历目录树 + 读文件）| MCP 出口无鉴权时，大库下的重复调用是 CPU/IO 放大面；核对缓存头与容量闸 |
+| **后台页面渲染** | `modules/kb/web/Kb.tsx`（228 行）| 卡片正文来自采集内容（不可信）；若用 `dangerouslySetInnerHTML` 渲染 Markdown，管理员会话就成了靶子 |
+| **落盘内容本身** | `/data/kb/**` 权限与属主 | 卡片会长期留在数据卷里；确认不会落进密钥、内部提示词、PII，且能被保留作业清理 |
+| **下游信任边界** | 卡片将被别的工具消费（将来导入 Nodus）| 卡片是“落盘后的不可信数据”，消费方必须当作不可信输入（这条要写进 KB-PLAN 的下游约定）|
+
+## 11. 已知坑（别踩）
 
 - 本机 `npm audit` 不可用（npmmirror 无 advisories 接口）→ 用 §5.2 的替代命令。
 - 工作目录里的 `aihot-db-*.sql.gz`（4 个，共 545 MB）与 `aihot-upload.zip`：**可能含真实反馈邮箱**，别提交、别外传；查 git 历史时用 `git log -p -- . ` 而不是把文件读进上下文。
