@@ -2436,3 +2436,22 @@ where a.backfill and r.created_at > now() - interval '1 day' group by r.purpose 
 
 **仍未做**：`deploy/Caddyfile` 的响应头未部署（生产上 `deploy/` 是挂载目录，同步后 `caddy reload`）；
 代码修复需要重建镜像并重新部署才在生产生效。CSP、提示词加固、知识库公开面三项待决策。
+
+## 安全修复已部署（2026-10-09 晚）
+
+- 镜像 `93e05c10da45` 已构建推送并部署，三个容器换新（回滚点 `app:rollback-de25abb0475d`）。
+- **容器里核对**：清洗器的地址校验在（`dropUnallowedAddresses`）、`blockedHostname` 已归一化结尾点；
+  用容器里的真实函数实测四组名字：`localhost` / `localhost.` / `metadata.google.internal.` / `anything.internal.`
+  **全部被拒**（修复前带点的三个会被名列表绕过）。
+- **安全响应头已生效**：`deploy/Caddyfile` 同步到服务器并 `caddy reload`，从服务器侧取响应头，
+  HSTS / X-Frame-Options / X-Content-Type-Options / Referrer-Policy / Permissions-Policy 五个都在；
+  图片代理仍保留自己的 CSP（发无效签名得 400，行为正确）。
+- 站点 `/`、`/hot`、`/daily`、`/api/v1/items` 全 200，worker 零报错，近 10 分钟 144 条回执（采集与判定照常）。
+- 服务器 `.env` 权限从 `0644` 收到 `0600`（原为同机任意用户可读，内含全部 API 密钥）。
+
+**知识库收口**（`feat/kb-module` 的 `1edce5f`）：按站主决定摘掉三条公开的 agent/MCP 出口，
+连带删除只服务于它们的 `backend/answer.ts` 与死 import，测试与 `docs/deploy.md` 同步更新；
+容器内 KB 测试 40/40 通过。该分支仍未随镜像上线（生产镜像来自 `upgrade-4.0`）。
+
+**仍未做**：CSP（需先数真实 HTML 里的内联脚本再定 hash/nonce）、`summarize-*`/`translate-*` 提示词加固
+与摘要一致性校验。
