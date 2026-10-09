@@ -2481,3 +2481,10 @@ where a.backfill and r.created_at > now() - interval '1 day' group by r.purpose 
 
 **还没发的**（按之前的评估，等你决定）：上游五份提示词缺「不可信数据」条款（3）、`agent.abilities` 的公开性文档（4）、
 默认 Caddyfile 无安全头（5）、`grounded()` 对中文论断的漏洞（6）。
+
+## 私密报告提交结果（2026-10-10 00:45）
+
+[2026-10-10 00:45:01] gh：C:\Users\weijianlin\AppData\Roaming\npm\gh.cmd（存在：True）
+[2026-10-10 00:45:01] 开始：本地 00:45:01 / UTC 16:45
+[2026-10-10 00:45:02] 提交失败（限流未解除则等下次开机再跑）：advisory-3-prompts.md → gh: You have exceeded a secondary rate limit and have been temporarily blocked from content creation. Please retry your request again later. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service) If you reach out to GitHub Support for help, please include the request ID B8B8:1D57F0:1BE323:1FD2A8:6AC91A0E and timestamp 2026-10-09 16:45:02 UTC. (HTTP 403)
+
