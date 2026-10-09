@@ -2455,3 +2455,29 @@ where a.backfill and r.created_at > now() - interval '1 day' group by r.purpose 
 
 **仍未做**：CSP（需先数真实 HTML 里的内联脚本再定 hash/nonce）、`summarize-*`/`translate-*` 提示词加固
 与摘要一致性校验。
+
+## 两个框架级安全缺陷已按 SECURITY.md 走私密报告（2026-10-09）
+
+`CONTRIBUTING.md` 与议题模板都写明「安全漏洞走私密入口」，所以没有开公开 issue，走
+[私密漏洞报告](https://github.com/KKKKhazix/AIHOT/security/advisories/new)（该仓库已开启此功能，当前无已公开的 advisory）：
+
+| 报告 | 内容 |
+|---|---|
+| `GHSA-727h-m5jh-46mj` | 清洗器惰性属性绕过（`content/sanitize.ts`）：`transformTags` 写入的地址从不经过 scheme 白名单；含本机复现、浏览器验证（**不是**存储型 XSS）、以及我们生产库的只读核查结果 |
+| `GHSA-596c-jrmp-xhm6` | SSRF 名列表结尾点绕过（`lib/url.ts`）：`http://localhost./` 等；含复现与「地址层仍有效」的影响收窄说明 |
+
+两份都在 `triage`，且都写明「修复已在本地实现（含测试），需要就提 PR」。
+
+**生产侧核查（回答「到底在我们服务器上验证过没有」）**：
+
+- **漏洞未被触发**：已发布正文里 `src`/`poster` 带 `data:` 的 42 篇（43116 篇中）**全是合法的内联图片**
+  （28 篇 raster + 14 篇 svg，属清洗器有意放行的范围）；`data:text`/`data:application` **0 篇**；
+  原始载荷里出现 `data-src`/`data-original`/`data-poster` 的 **0 篇**（那条绕过路径从未被走到）；
+  源配置或报错里出现内网名的 **0 条**。
+- **修复已验证**：容器内用真实函数实测四组带结尾点的名字全被拒；五个安全响应头实测在线；部署后新增 0 例。
+
+顺带：我探测私密报告端点时误建了一份内容为 `probe` 的空报告（`GHSA-2ffm-xwrw-622h`），该端点不支持改写或撤回，
+已在报告 1 里向维护者说明，请他们直接关闭。
+
+**还没发的**（按之前的评估，等你决定）：上游五份提示词缺「不可信数据」条款（3）、`agent.abilities` 的公开性文档（4）、
+默认 Caddyfile 无安全头（5）、`grounded()` 对中文论断的漏洞（6）。
