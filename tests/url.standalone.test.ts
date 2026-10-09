@@ -91,3 +91,29 @@ test("the connection guard refuses private, mixed, reserved and empty DNS answer
     mock.restoreAll(); syncBuiltinESMExports();
   }
 });
+
+// A trailing dot is the same name to a resolver but a different string to a comparison, and the WHATWG
+// parser keeps it: without normalising it here, `svc.internal.` and `localhost.` skip the name list.
+// The address check is a second layer and must not be the only one left standing.
+test("a name that only differs by an ending dot is still the blocked name", async () => {
+  const savedLookup = dns.lookup;
+  // Every name answers with a public address, so a rejection can only come from the name list.
+  mock.method(dns, "lookup", async (host: string, options: unknown) => {
+    if (["localhost.", "svc.internal.", "metadata.google.internal.", "a.localhost."].includes(host)) {
+      return (options as { all?: boolean })?.all ? [{ address: "93.184.216.34", family: 4 }] : { address: "93.184.216.34", family: 4 };
+    }
+    return savedLookup(host, options as never);
+  });
+  try {
+    for (const host of ["localhost.", "svc.internal.", "metadata.google.internal.", "a.localhost."]) {
+      await assert.rejects(assertPublicUrl(`http://${host}/`), new RegExp(`Blocked host ${host.replace(/\./g, "\\.")}`), host);
+      await assert.rejects(new Promise((resolve, reject) => guardedLookup(host, {}, (e, a) => (e ? reject(e) : resolve(a)))), /Blocked host/, host);
+      await assert.rejects(new Promise((resolve, reject) => guardedLookup(host, { all: true }, (e, a) => (e ? reject(e) : resolve(a)))), /Blocked host/, `${host} (all)`);
+    }
+    // The name without the dot was already refused, and a public name stays reachable either way.
+    await assert.rejects(assertPublicUrl("http://svc.internal/"), /Blocked host/);
+    assert.equal((await assertPublicUrl("http://public.invalid/")).hostname, "public.invalid");
+  } finally {
+    mock.restoreAll(); syncBuiltinESMExports();
+  }
+});

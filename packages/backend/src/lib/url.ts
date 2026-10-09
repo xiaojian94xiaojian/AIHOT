@@ -137,8 +137,14 @@ export function isBlockedAddress(address: string): boolean {
   return false;
 }
 
+/**
+ * The names that are never fetched. A trailing dot is the same name to a resolver but a different string
+ * to a comparison, and the WHATWG parser keeps it (`new URL("http://localhost./").hostname` is
+ * "localhost."), so it is normalised away here rather than at each comparison.
+ */
 function blockedHostname(host: string): boolean {
-  return host === "localhost" || host.endsWith(".localhost") || host.endsWith(".internal") || host === "metadata.google.internal";
+  const name = host.replace(/\.$/, "");
+  return name === "localhost" || name.endsWith(".localhost") || name.endsWith(".internal") || name === "metadata.google.internal";
 }
 
 /**
