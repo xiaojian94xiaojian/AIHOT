@@ -1,6 +1,23 @@
-# HTTPS in front of the site: Caddy gets and renews the certificate for SITE_DOMAIN and compresses
-# responses. Point the domain's DNS at this server first.
+# HTTPS in front of the site: Caddy gets and renews the certificate for SITE_DOMAIN, compresses
+# responses and applies the security headers every page needs. Point the domain's DNS at this server
+# first.
+#
+# The headers are set here rather than in the app: Caddy is the only public entry, so one place covers
+# pages, feeds, the JSON API and the image proxy alike. A body that is already framed or sandboxed by
+# its own route (the image proxy sends its own CSP) keeps it — an inner header field wins.
 {$SITE_DOMAIN} {
 	encode zstd gzip
+
+	# Two years, subdomains included, preloadable. Automatic HTTPS never serves plain HTTP, so this
+	# only tells a browser to stop trying.
+	header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+	# The site is never framed and never needs to be.
+	header X-Frame-Options "DENY"
+	header X-Content-Type-Options "nosniff"
+	# Keep the address of an admin or a search page out of a third party's Referer.
+	header Referrer-Policy "strict-origin-when-cross-origin"
+	# Nothing here uses these; denying them shrinks what an injected script could reach.
+	header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+
 	reverse_proxy web:3000
 }
