@@ -2403,3 +2403,36 @@ where a.backfill and r.created_at > now() - interval '1 day' group by r.purpose 
 `npm run test:standalone`，静态检查用 `npm run typecheck`。
 
 单文件也支持：`pwsh -File scripts/test-in-container.ps1 tests/history-limit.test.ts`。
+
+---
+
+# 安全审查（2026-10-09，依据 SECURITY-PLAN.md）
+
+**结果**：5 条发现（3 条已修、2 条待决策），10 条疑点被核实**不成立**（留档在 `SECURITY-REVIEW.md` §4，含我预判的
+「存储型 XSS」—— 浏览器实测 `data:text/html` 在 `<img>` 上下文不执行，降为 S3），方案本身被纠错两处
+（SSRF 闸的真实路径是 `lib/url.ts` / `lib/http-fetch.ts`；OG 分享图不做外部取图）。
+
+**已修并提交**（`upgrade-4.0`）：
+
+| 提交 | 内容 |
+|---|---|
+| `702cea2` | 清洗器惰性属性绕过：`data-src`/`data-original`/`data-poster` 的值从不经过 scheme 白名单就落进 `src`/`poster`（二次清洗也修不回）；改为清洗后按标签校验地址属性（`img` 只额外允许 `data:image/…`）|
+| `f9f45a6` | SSRF 名列表绕过：结尾的点让 `blockedHostname` 失配（`http://localhost./`）；比较前归一化 |
+| `f7c1f64` | `deploy/Caddyfile` 加 HSTS / `X-Frame-Options` / `nosniff` / `Referrer-Policy` / `Permissions-Policy`（不设 CSP，图片代理自己的 CSP 不受影响）|
+| `c0da905` | 修 `scripts/test-in-container.ps1` 的 CRLF 缺陷（`sh -c` 读到 `set -e\r` 直接失败）|
+| `71791a8` | 收录 `SECURITY-REVIEW.md` |
+
+独立复测：`typecheck` 通过；容器全套（`aihot_sec_verify_ci`，全新库）**626/626 通过**。
+
+**生产核对（`SECURITY-REVIEW.md` §4.9 那项，本次补齐）**：
+
+- 宿主机监听只有 `22`、`80`、`443`（另有 Ops Agent 的 `20201/20202` 与 LLMNR `5355` 监听在全接口）；
+- 从服务器 hairpin 探测自己的公网 IP：**只有 22/80/443 通**，`3000/3001/5432/9090/20202` 全被 GCE 防火墙拦住；
+  docker 只发布了 Caddy 的 80/443（db 的 5432、web/api 的 3000 没有发布到宿主）；
+- 容器：无 `privileged`、无 `docker.sock` 挂载（五个容器逐个确认）；
+- `.env`：无 `DEV_AUTH_ROLE`、无 `ALLOW_PRIVATE_NETWORK_FETCH`，`TRUST_PROXY=false` ✓；
+  **但权限是 `-rw-rw-r--`（同机任何用户可读，内含全部 API 密钥）→ 已改 `chmod 600`**，`docker compose config` 正常、站点 200；
+- GCE 防火墙规则列表缺 `compute.firewalls.list` 权限，改以上面的 hairpin 实测替代（结论等价）。
+
+**仍未做**：`deploy/Caddyfile` 的响应头未部署（生产上 `deploy/` 是挂载目录，同步后 `caddy reload`）；
+代码修复需要重建镜像并重新部署才在生产生效。CSP、提示词加固、知识库公开面三项待决策。
