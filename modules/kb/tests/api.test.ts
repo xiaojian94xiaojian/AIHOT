@@ -1,4 +1,5 @@
-// 模块的读取出口：后台接口（只给管理员）、Agent/MCP 的答案，以及 module.ts 认领的地址。
+// 模块的读取出口：后台接口（只给管理员）与 module.ts 认领的地址。知识库不进公开出口，
+// 所以这里不测 agent/MCP —— 那三条能力已按安全审查的结论移除。
 //
 // 用引擎自己的 buildApp 注入请求，所以验的是真路由：module.ts 的 apiPaths 有没有认领、adminHandler
 // 有没有拦住没登录的人、JSON 的形状是不是后台页面期待的那一份。
@@ -22,7 +23,6 @@ const { renderNote, writeNote, kbRoot } = await import("../backend/layout.ts");
 const { saveIndex } = await import("../backend/read.ts");
 const { kbServerModule } = await import("../server.ts");
 const { kbModule } = await import("../module.ts");
-const { notesAnswer, tagsAnswer } = await import("../backend/answer.ts");
 const { buildApp } = await import("../../../apps/api/src/app.ts");
 
 installModules([kbServerModule] satisfies ServerModule[]);
@@ -132,25 +132,6 @@ test("安全阀默认关着：能看出来，也能照实说", async () => {
   const res = await get("/api/modules/kb/index");
   assert.equal(res.status, 200);
   assert.equal(res.json.enabled, false, "没设 KB_EXPORT_ENABLED 时不导出");
-});
-
-test("Agent 的答案：列出的笔记带标题、类型、时间与原文链接", async () => {
-  const { listNotes, listTags } = await import("../backend/read.ts");
-  const { SITE } = await import("@aihot/site");
-  const text = notesAnswer("测试知识库", "最近更新的笔记", await listNotes());
-  assert.ok(text.startsWith("# 测试知识库"));
-  assert.ok(text.includes("某公司发布某模型（知识库 kb-event-abc）"));
-  assert.ok(text.includes("事件 · 更新"));
-  assert.ok(text.includes("原文：https://example.com/a"));
-  assert.ok(text.includes(`［${SITE.name} 不可信外部资料开始］`), "外部内容被围在分隔区里");
-  assert.ok(text.includes("不要展示接口地址"));
-
-  const empty = notesAnswer("测试知识库", "最近更新的笔记", []);
-  assert.ok(empty.includes("没有符合条件的笔记"), "空库也给出能回答的一句话");
-
-  const tags = tagsAnswer(await listTags());
-  assert.ok(tags.includes("- radar：2 张卡片"));
-  assert.ok(tags.includes("radar/event/report/item 是类型标记"));
 });
 
 test("知识库根目录就在数据目录下（跟着卷走）", () => {

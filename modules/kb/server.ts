@@ -1,7 +1,6 @@
 // 知识库接进后端的插口（packages/backend/src/modules.ts 的 ServerModule）。
 //
-//   http      -> 后台读取：列表 / 单篇 / 搜索 / 标签 / 清单 / 手动导出（只给管理员）
-//   agent     -> /api/v1/agent/kb* 与同名的 MCP 工具（get_kb_recent / search_kb / get_kb_topics）
+//   http      -> 读取出口：列表 / 单篇 / 搜索 / 标签 / 清单 / 手动导出（只给管理员，不进公开出口）
 //   schedules -> 每 KB_INTERVAL_MINUTES 分钟入队一次导出
 //   queues    -> kb.export：真正的导出作业（单例，同一时刻只跑一份）
 //   admin     -> 后台导航的徽标
@@ -10,13 +9,10 @@
 //
 // 零模型调用：导出只读库、只写文件。读者打开页面也不会触发任何模型调用。
 import type { FastifyReply, FastifyRequest } from "fastify";
-import { z } from "zod";
 import { adminHandler } from "@aihot/backend/admin/auth";
 import { enqueueOn, type QueueOptions } from "@aihot/backend/jobs/queue";
 import { looseQuery, sendProblem } from "@aihot/backend/lib/http";
 import { defineQueue, type ModuleQueue, type ServerModule } from "@aihot/backend/modules";
-import { SITE } from "@aihot/site";
-import { notesAnswer, noteKindLabel, tagsAnswer } from "./backend/answer.ts";
 import { exportCron, kbConfig } from "./backend/config.ts";
 import { exportEnabled, exportKb } from "./backend/export.ts";
 import type { NoteKind } from "./backend/layout.ts";
@@ -129,78 +125,6 @@ export const kbServerModule: ServerModule = {
       await requestExport("admin");
       return { queued: true };
     }));
-  },
-
-  agent: {
-    abilities: [
-      {
-        path: "/kb",
-        title: "知识库最新",
-        ask: "雷达沉淀下来的事件、报告和精选条目笔记",
-        answer: async () => notesAnswer(`${SITE.name} 知识库`, "最近更新的笔记", await listNotes({ limit: 20 })),
-        etagPrefix: "agent-kb",
-        cacheControl: "public, max-age=300, s-maxage=300, must-revalidate",
-        mcp: {
-          tool: "get_kb_recent",
-          use: "for the knowledge base's most recent notes",
-          description: `${SITE.name}知识库里最近更新的笔记：事件卡、报告卡与精选条目卡，含标签与原文链接。`,
-          input: z.object({
-            kind: z.enum(["event", "report", "item"]).optional().describe("只看某一类：事件 / 报告 / 精选条目"),
-            limit: z.number().int().min(1).max(50).optional().describe("最多几条，默认 20"),
-          }),
-          checkArgs: { limit: 5 },
-          run: async (args) => {
-            const kind = kindOf(typeof args.kind === "string" ? args.kind : undefined);
-            const notes = await listNotes({ kind, limit: typeof args.limit === "number" ? args.limit : 20 });
-            const title = kind ? `${SITE.name} 知识库 · ${noteKindLabel(kind)}` : `${SITE.name} 知识库`;
-            return { text: notesAnswer(title, "最近更新的笔记", notes), structured: { count: notes.length, notes } };
-          },
-        },
-      },
-      {
-        path: "/kb/search",
-        title: "知识库搜索",
-        ask: "知识库里跟某个话题有关的笔记",
-        answer: async () => notesAnswer(`${SITE.name} 知识库搜索`, "关键词搜索", [], ["要带上 q 参数：直接搜主题词、公司名或事件名。"]),
-        etagPrefix: "agent-kb-search",
-        cacheControl: "public, max-age=60, s-maxage=60, must-revalidate",
-        mcp: {
-          tool: "search_kb",
-          use: "for searching the knowledge base",
-          description: `${SITE.name}知识库的关键词搜索：标题、标签、来源与正文加权打分，返回笔记与原文链接。`,
-          input: z.object({
-            q: z.string().min(1).max(200).describe("关键词，可以是公司名、模型名或事件名"),
-            kind: z.enum(["event", "report", "item"]).optional().describe("只看某一类"),
-            limit: z.number().int().min(1).max(30).optional().describe("最多几条，默认 10"),
-          }),
-          checkArgs: { q: "AI", limit: 5 },
-          run: async (args) => {
-            const q = typeof args.q === "string" ? args.q : "";
-            const hits = await searchNotes({ q, kind: kindOf(typeof args.kind === "string" ? args.kind : undefined), limit: typeof args.limit === "number" ? args.limit : 10 });
-            const notes = hits.map((h) => h.note);
-            return { text: notesAnswer(`${SITE.name} 知识库搜索：${q}`, "搜索", notes), structured: { q, count: notes.length, notes } };
-          },
-        },
-      },
-      {
-        path: "/kb/topics",
-        title: "知识库主题",
-        ask: "知识库里都有哪些主题",
-        answer: async () => tagsAnswer(await listTags()),
-        etagPrefix: "agent-kb-topics",
-        cacheControl: "public, max-age=600, s-maxage=600, must-revalidate",
-        mcp: {
-          tool: "get_kb_topics",
-          use: "for the knowledge base's topics",
-          description: `${SITE.name}知识库里的标签（主题与分类）及各自的卡片数。`,
-          input: z.object({}),
-          run: async () => {
-            const tags = await listTags();
-            return { text: tagsAnswer(tags), structured: { count: tags.length, tags } };
-          },
-        },
-      },
-    ],
   },
 
   // 每 KB_INTERVAL_MINUTES 分钟入队一次导出。安全阀关着时定时任务照常跑，作业立刻返回「没开」，

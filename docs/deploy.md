@@ -85,7 +85,7 @@ docker compose run --rm setup && docker compose up -d
 
 `modules/kb` 把已经筛选、评判、写作好的内容落成 Markdown 卡片（事件 / 报告 / 精选），放在**数据目录**下的 `kb/`（Docker 里是 `/data/kb`，非 Docker 是 `AIHOT_DATA_DIR`，默认仓库里的 `.data`）。所以这块内容跟着数据卷走：重建镜像、`docker compose up -d` 都不会丢，但用 `docker compose down -v` 删卷、或换一个空的 `AIHOT_DATA_DIR`，卡片就要等下一次导出重新生成（它们本来就是可以从库里重建的派生数据）。要长期留存就照[备份](#备份)一节连着数据目录一起备份。
 
-导出每 `KB_INTERVAL_MINUTES` 分钟跑一次，也可以在后台「知识库」页手动触发。读取出口只给管理员（`/api/modules/kb/*`）与 Agent（`/api/v1/agent/kb*`，MCP 工具 `get_kb_recent` / `search_kb` / `get_kb_topics`），不进公开前台。撤回的报道会让对应卡片离开 `notes/` 进 `archive/`（留 7 天后真删），保留窗口外的精选卡由每天 03:30 的保留作业清掉。
+导出每 `KB_INTERVAL_MINUTES` 分钟跑一次，也可以在后台「知识库」页手动触发。读取出口只给管理员（`/api/modules/kb/*`），不进公开前台也不给 Agent/MCP：安全审查确认过 agent 出口在这套引擎里是公开面，知识库按「站内资产」收口。撤回的报道会让对应卡片离开 `notes/` 进 `archive/`（留 7 天后真删），保留窗口外的精选卡由每天 03:30 的保留作业清掉。
 
 #### 手机上不再用视图过渡（2026 年 10 月 7 日）
 
