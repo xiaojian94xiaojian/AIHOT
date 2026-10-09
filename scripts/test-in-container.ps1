@@ -19,8 +19,15 @@ $dbName = if ($env:DB_NAME) { $env:DB_NAME } else { "aihot_ci" }
 $image = if ($env:IMAGE) { $env:IMAGE } else { "aihot-app:latest" }
 $concurrency = if ($env:TEST_CONCURRENCY) { $env:TEST_CONCURRENCY } else { "6" }
 $repo = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
-$tests = if ($TestArgs) { $TestArgs -join " " } else { "tests/*.test.ts modules/*/tests/*.test.ts" }
-
+# The database suite: `tests/*.test.ts` also matches the `.standalone.test.ts` files, which have their
+# own entrypoint (tests/standalone.ts) and must not run under the database global setup.
+$tests = if ($TestArgs) {
+  $TestArgs -join " "
+} else {
+  @(Get-ChildItem "$repo/tests/*.test.ts", "$repo/modules/*/tests/*.test.ts" |
+    Where-Object { $_.Name -notlike "*.standalone.test.ts" } |
+    ForEach-Object { $_.FullName.Substring($repo.Length + 1) -replace "\\", "/" }) -join " "
+}
 docker run --rm --entrypoint pg_isready $image -h $dbHost -U aihot *> $null
 if ($LASTEXITCODE -ne 0) { throw "postgres at ${dbHost}:5432 is not reachable from the container" }
 
@@ -30,15 +37,25 @@ set -e
 tar -C /src --exclude=./node_modules --exclude=./.git --exclude=./.data -cf - . | tar -xf - -C /work
 cd /work
 echo "=== installing dependencies from the lockfile ==="
-npm ci --no-audit --no-fund >/tmp/npm.log 2>&1 || { tail -n 30 /tmp/npm.log; exit 1; }
+# The image sets NODE_ENV=production, which would skip the test-only dependencies (the MCP client).
+npm ci --include=dev --no-audit --no-fund >/tmp/npm.log 2>&1 || { tail -n 30 /tmp/npm.log; exit 1; }
 echo "=== $(uname -s) / node $(node --version) / $(pg_dump --version | cut -d" " -f1-3) ==="
+# The architecture test enumerates tracked template files with `git ls-files`: the image ships no git
+# and the staged tree is not a checkout, so the host's .git is mounted read-only at /gitdir and git is
+# pointed at the staged tree (GIT_DIR/GIT_WORK_TREE above).
+echo "=== $(uname -s) / node $(node --version) / $(pg_dump --version | cut -d" " -f1-3) ==="
+command -v git >/dev/null 2>&1 || (apt-get update -qq && apt-get install -y -qq --no-install-recommends git) >/dev/null 2>&1 || echo "(no git: the architecture env-template test will fail)"
+git ls-files -- '*.env.example' >/dev/null 2>&1 || echo "(git cannot list the staged tree: the architecture env-template test will fail)"
 node scripts/migrate.ts 2>&1 | tail -n 1
 exec node --test-global-setup=tests/databases.ts --import ./tests/databases.ts --test --test-concurrency="$TEST_CONCURRENCY" --test-timeout=120000 $TEST_ARGS
 '@
 
 docker run --rm --user root --entrypoint sh `
-  -v "${repo}:/src:ro" -w /work `
+  -v "${repo}:/src:ro" -v "${repo}/.git:/gitdir:ro" -w /work `
   -e "DATABASE_URL=postgres://aihot:aihot@${dbHost}:5432/${dbName}" `
+  -e NODE_ENV=test `
+  -e GIT_DIR=/gitdir -e GIT_WORK_TREE=/work `
+  -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0=* `
   -e LOG_LEVEL=error -e "TEST_ARGS=$tests" -e "TEST_CONCURRENCY=$concurrency" `
   -e NPM_CONFIG_FUND=false -e NPM_CONFIG_AUDIT=false `
   $image -c $inner

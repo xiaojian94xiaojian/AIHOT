@@ -2384,3 +2384,22 @@ select r.purpose, count(*) from receipts r join articles a on r.subject = 'artic
 where a.backfill and r.created_at > now() - interval '1 day' group by r.purpose order by 2 desc;
 -- 期望：只有 prefilter_article；出现 score_article / structure_article 就要查 analyze.ts 的闸门还在不在
 ```
+
+## 在容器里跑全套测试：本机终于有了 CI 环境的验证通道（10-09）
+
+找回 `scripts/test-in-container.sh`（旧线 `269a3be`）后，为了让它在**本机**真能跑起来，踩了 5 个环境缺口，
+都已修在脚本里（不改上游代码）：
+
+| 缺口 | 现象 | 处理 |
+|---|---|---|
+| 本机唯一的 bash 是 WSL，且它连不到 Docker 守护进程 | 脚本报 `postgres ... is not reachable`（其实是 docker 命令本身失败）| 补 `scripts/test-in-container.ps1`：同一个 docker run 的 PowerShell 版 |
+| 镜像设了 `NODE_ENV=production` | `npm ci` 跳过 devDependencies，测试专用包（`@modelcontextprotocol/client`）缺失 → 8 条 MCP 断言全挂 | `npm ci --include=dev` |
+| 同一个 `NODE_ENV=production` 还会让 dev-admin 通道关闭 | `admin/auth.ts:267` 要求 `environmentName !== "production"`，测试打 `/api/admin/...` 得到 **401**（期望 400）| 运行测试时传 `NODE_ENV=test` |
+| `tests/*.test.ts` 这个 glob 会连 `*.standalone.test.ts` 一起匹配 | standalone 套件在数据库 global setup 下运行 → 假失败 | 默认目标排除 `*.standalone.test.ts` |
+| `architecture.test.ts` 用 `git ls-files` 枚举模板文件 | 镜像没有 git；而且暂存树 `/work` 不是 git 仓库（`.git` 有 561 MB，不适合每次复制）| 尽力 `apt-get install git` + 只读挂载宿主的 `.git` 到 `/gitdir`，用 `GIT_DIR`/`GIT_WORK_TREE`（含 `safe.directory=*`）指向暂存树 |
+
+**结果**：`pwsh -File scripts/test-in-container.ps1` → **626/626 通过**（Linux / Node v24.21.0 / pg_dump 17.11），
+这正是上游 CI 的环境。以后「Windows 上跑不了全套」不再是借口：DB 套件走这条，standalone 套件用
+`npm run test:standalone`，静态检查用 `npm run typecheck`。
+
+单文件也支持：`pwsh -File scripts/test-in-container.ps1 tests/history-limit.test.ts`。
