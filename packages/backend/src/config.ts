@@ -55,6 +55,11 @@ export const config = {
   // External-action valve: off unless the environment turns it on, like COLLECT_ENABLED (read by the
   // worker).
   modelCallsEnabled: bool("MODEL_CALLS_ENABLED", false),
+  // A new source's first import brings its whole archive: those entries found no event and add no
+  // heat (isHistorical), so the automatic sweep stops after the cheap prefilter instead of paying for
+  // scores, structure and writing. Turn this on to judge archives in full; an admin's re-evaluation
+  // of a single article is always judged in full.
+  analyzeArchivedHistory: bool("ANALYZE_ARCHIVED_HISTORY", false),
   devAdmin: env.DEV_AUTH_ROLE === "admin" ? { displayName: env.DEV_AUTH_DISPLAY_NAME || "Dev Admin" } : null,
   /** The admin password (at least 12 characters). Feishu sign-in below is optional. */
   adminPassword: env.ADMIN_PASSWORD || null,

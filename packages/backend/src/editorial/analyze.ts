@@ -19,6 +19,8 @@ import { collapseWhitespace } from "../lib/text.ts";
 import { modelFor, modelSupportsVision } from "./models.ts";
 import { buildMaterial, firstImagePart, loadAnalyzeInput, type AnalyzeInputArticle } from "./input.ts";
 import { pageFetchable } from "../content/extract.ts";
+import { isHistorical } from "../content/materials.ts";
+import { config } from "../config.ts";
 import { shutdownSignal } from "../jobs/queue.ts";
 import {
   buildArticlePrompt, buildLongTweetPrompt, buildShortTweetPrompt, finalizeCopy, isShortTweetInput, looksZh, MAX_BODY_CHARS, missingEvidence,
@@ -218,7 +220,7 @@ export function waitsForPage(a: AnalyzeInputArticle): boolean {
   return a.bodyStatus === "pending" && !a.bodyText && !a.xPost && pageFetchable(a.url, a.source.kind);
 }
 
-type StepOpts = { attemptTag?: string; scoreModel?: string };
+type StepOpts = { attemptTag?: string; scoreModel?: string; sweep?: boolean };
 type ReceiptObserver = (receiptId: number) => void;
 export class AnalysisInterruptedError extends Error {}
 
@@ -414,6 +416,15 @@ export async function runAnalysis(a: AnalyzeInputArticle, opts: StepOpts = {}): 
   if (prefilter.label === "BLOCK") return { prefilter, scores: null, writing: null, structure: null };
   const original = originalPostCopy(a.xPost, a.url);
   if (missingEvidence(a) && !original) return { prefilter, scores: null, writing: null, structure: null };
+  // A source's first import brings its whole archive, and the prefilter has just run on all of it.
+  // The steps after it are the expensive ones and only buy material for a reader: archived history
+  // founds no event and adds no heat (isHistorical), so scoring, structuring and writing it serves
+  // nothing. Stop after the prefilter, whose verdict is still stored and reused by later runs.
+  // Only the automatic sweep is limited: an explicit re-evaluation (the admin's re-run) asks for
+  // this article by name and must still be judged.
+  if (!config.analyzeArchivedHistory && opts.sweep && !opts.attemptTag && isHistorical(a)) {
+    return { prefilter, scores: null, writing: null, structure: null };
+  }
   // The structure step needs nothing from the scores: it runs beside them.
   const structure = runStructure(a, opts).then((value) => ({ value }), (error: unknown) => ({ error }));
   try {
