@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "sideEffects": false,
-  "dependencies": { "@aihot/chronicle": "*", "@aihot/leaderboard": "*", "@aihot/monitor": "*" },
+  "dependencies": { "@aihot/chronicle": "*", "@aihot/kb": "*", "@aihot/leaderboard": "*", "@aihot/monitor": "*" },
 
   "exports": {
     ".": "./site.ts",

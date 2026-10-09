@@ -2403,3 +2403,26 @@ where a.backfill and r.created_at > now() - interval '1 day' group by r.purpose 
 `npm run test:standalone`，静态检查用 `npm run typecheck`。
 
 单文件也支持：`pwsh -File scripts/test-in-container.ps1 tests/history-limit.test.ts`。
+
+## 雷达知识库模块第一期（10-09）
+
+`KB-PLAN.md` 的第一期落地：新增 `modules/kb`，把已经筛选、评判、写作好的内容落成 Markdown 卡片。
+
+| 东西 | 位置 |
+|---|---|
+| 卡片 | 数据目录下 `kb/`（生产是卷 `aihot_data` 的 `/data/kb`）|
+| 后台 | `/admin/kb`（状态、列表、搜索、Markdown 预览、手动导出）|
+| 管理员接口 | `/api/modules/kb/{index,notes,note,search,tags,export}` |
+| Agent / MCP | `/api/v1/agent/kb{,/search,/topics}`；工具 `get_kb_recent` / `search_kb` / `get_kb_topics` |
+| 安全阀 | `KB_EXPORT_ENABLED`（默认 false）；另有 `KB_INTERVAL_MINUTES` / `KB_ITEM_RETENTION_DAYS` / `KB_REPORTS_LOOKBACK` |
+
+三个值得记住的点：
+
+- **零模型调用**：导出只读 `publication/` 的读取层、只写文件，不花钱；这也是它能放在第一期的原因。
+- **卡片格式借 Nodus 的文件语义**（顶层 `inbox/notes/archive/`、frontmatter 恰好 9 个字段、Markdown 是事实源），
+  但**不接它的运行时**（Write Gateway / Job / Preview 四件套是给「向别的事实源正式写入」付的代价，
+  这里写的是本模块自己的派生数据）。
+- **导出是快照**：事件卡与报告卡只由本次读到的内容决定，所以掉出热榜、被合并、报道撤回的事件卡会被
+  扫进 `archive/`（文件留着，不直接删）。精选卡不在此列，按保留天数过期。
+
+`modules/` 在镜像里，改了要重建镜像；卡片在卷里，重建镜像不会丢。

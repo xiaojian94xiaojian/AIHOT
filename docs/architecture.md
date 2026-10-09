@@ -76,6 +76,17 @@ flowchart LR
 
 模块通过 `agent.abilities` 提供 MCP 工具。`scripts/mcp-check.ts` 始终检查完整工具集合；模块可在 `mcp.checkArgs` 中提供能在空数据库上成功的检查参数。未提供时，只有入参 schema 接受 `{}` 的工具会用 `{}` 实际调用；其余工具只检查发现，不猜参数。模块工具的业务行为由模块自己的测试验证。
 
+本站正在跑的模块：
+
+| 模块 | 它做什么 |
+|---|---|
+| `modules/leaderboard` | 模型榜：拉评测来源、算榜、给公开页面与后台 |
+| `modules/monitor` | Codex 重置监控：识别 X 上的重置公告并推送 |
+| `modules/chronicle` | 主题页的大事记与公司编年史 |
+| `modules/kb` | 雷达知识库：把已筛选、评判、写作好的内容落成 Markdown 卡片（事件 / 报告 / 精选），并给后台与 Agent 读取出口 |
+
+`modules/kb` 的卡片写在数据目录下（`AIHOT_DATA_DIR/kb/`），不在仓库里，也不是公开出口：`inbox/` 是落盘中间态（临时文件 + 原子改名），`notes/` 按类型与月份分目录，`archive/` 放撤回或过期的卡片（留 7 天），`kb-index.json` 是最近一次导出的清单。笔记的 frontmatter 严格 9 个字段（`id/title/created_at/updated_at/tags/source_refs/status/ai_access`）且正文非空，所以将来可以原样导入兼容这套契约的笔记工具；**改动卡片格式时，`modules/kb/backend/layout.ts` 的渲染与解析是一对，要一起改**。导出只读 `publication/` 的读取层、只写文件，不调用模型；安全阀是 `KB_EXPORT_ENABLED`。
+
 ## 数据库迁移
 
 已经发布的迁移是部署历史，不能改写或删除；修正放进新的文件。引擎和模块的迁移遵循同一套约定：按完整文件名排序执行，并以完整文件名记录是否已经执行；编号相同的不同文件分别执行，同一完整文件名不能出现在两个目录中。从 `0055` 起，每个文件只放一条允许在线执行的语句，PR 会拒绝不符合约定的新增迁移，也不允许用较小编号绕过检查。这样避免前一条语句锁住表后，又在同一事务里等待别的表或扫描大量数据。

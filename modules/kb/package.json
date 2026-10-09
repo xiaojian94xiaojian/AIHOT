@@ -1,0 +1,17 @@
+{
+  "name": "@aihot/kb",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    "./module": "./module.ts",
+    "./server": "./server.ts",
+    "./backend/*": "./backend/*.ts",
+    "./web": "./web.tsx"
+  },
+  "dependencies": {
+    "@aihot/backend": "*",
+    "@aihot/contracts": "*",
+    "@aihot/site": "*"
+  }
+}

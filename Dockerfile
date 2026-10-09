@@ -18,6 +18,7 @@ COPY packages/contracts/package.json packages/contracts/
 COPY industry/package.json industry/
 COPY site/package.json site/
 COPY modules/chronicle/package.json modules/chronicle/
+COPY modules/kb/package.json modules/kb/
 COPY modules/leaderboard/package.json modules/leaderboard/
 COPY modules/monitor/package.json modules/monitor/
 RUN npm ci --no-audit --no-fund ${NPM_REGISTRY:+--registry=$NPM_REGISTRY}
