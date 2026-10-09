@@ -65,6 +65,11 @@ test("三类卡片都落盘：事件卡 / 报告卡 / 精选卡", async () => {
   assert.ok(files.some((f) => f.startsWith("notes/events/")), `事件卡在 notes/events/ 下：${files.join(", ")}`);
   assert.ok(files.some((f) => f.startsWith("notes/reports/daily/")), "报告卡在 notes/reports/daily/ 下");
   assert.ok(files.some((f) => f.startsWith("notes/items/")), "精选卡在 notes/items/ 下");
+
+  // 契约里的顶层目录都在（projects/ 是第二期的地方，先建出来）。
+  for (const dir of ["inbox", "notes", "archive", "projects"]) {
+    assert.ok((await stat(path.join(kbRoot(), dir))).isDirectory(), `${dir}/ 存在`);
+  }
 });
 
 test("每一张卡片都合契约：9 个字段、正文首行是标题、来源都是原文链接", async () => {

@@ -7,6 +7,7 @@
 // 扫进 archive/（`sweepOrphans`）。精选卡不在此列，它们按保留天数过期。
 //
 // 零模型调用：只读库、只写文件，所以不花一分钱 —— 这也是它能放在第一期的原因。
+import { mkdir } from "node:fs/promises";
 import { sql } from "@aihot/backend/db";
 import { loadItemDetail } from "@aihot/backend/publication/detail";
 import { listReports, loadReport } from "@aihot/backend/publication/reports";
@@ -15,7 +16,7 @@ import { loadHot, loadStoryDetail } from "@aihot/backend/publication/stories";
 import { loadTimeline } from "@aihot/backend/publication/timeline";
 import { cardPath, eventCard, itemCard, kindOfCardId, reportCard, type StoryCardInput } from "./cards.ts";
 import { kbConfig } from "./config.ts";
-import { NOTE_KINDS, renderNote, type Note, type NoteKind, type ReportCardKind } from "./layout.ts";
+import { archiveDir, inboxDir, NOTE_KINDS, notesDir, projectsDir, renderNote, type Note, type NoteKind, type ReportCardKind } from "./layout.ts";
 import { resetInbox, sweepOrphans, syncNote, type SyncAction } from "./prune.ts";
 import { loadIndex, saveIndex, sha256, type IndexedNote, type KbIndex } from "./read.ts";
 
@@ -110,7 +111,16 @@ export async function exportKb(now = new Date()): Promise<ExportResult> {
   const swept = await sweepOrphans(new Set([...built.values()].map((b) => b.relPath)), now);
   await saveIndex(index);
   await resetInbox();
+  await ensureDirs();
   return { actions, counts, total: index.notes.length, swept };
+}
+
+/** 把契约里的顶层目录建出来（projects/ 是第二期选题助手的地方，第一期先备着）。 */
+async function ensureDirs(): Promise<void> {
+  await mkdir(notesDir(), { recursive: true });
+  await mkdir(archiveDir(), { recursive: true });
+  await mkdir(projectsDir(), { recursive: true });
+  await mkdir(inboxDir(), { recursive: true });
 }
 
 /**
