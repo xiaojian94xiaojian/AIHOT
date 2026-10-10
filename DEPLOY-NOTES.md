@@ -2488,3 +2488,34 @@ where a.backfill and r.created_at > now() - interval '1 day' group by r.purpose 
 [2026-10-10 00:45:01] 开始：本地 00:45:01 / UTC 16:45
 [2026-10-10 00:45:02] 提交失败（限流未解除则等下次开机再跑）：advisory-3-prompts.md → gh: You have exceeded a secondary rate limit and have been temporarily blocked from content creation. Please retry your request again later. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service) If you reach out to GitHub Support for help, please include the request ID B8B8:1D57F0:1BE323:1FD2A8:6AC91A0E and timestamp 2026-10-09 16:45:02 UTC. (HTTP 403)
 
+
+## 同步上游（2026-10-10）：落后 21 → 0
+
+合并 `b23b2de`（`origin/main` 的 10 个新提交）：
+
+| 提交 | 内容 |
+|---|---|
+| `a68d525` | **新增一步模型调用「改用词」**：标题/摘要/推荐理由写完后按 `industry/wording.ts` 词表查，用了词表里的词就让模型只改这些词一次（新增 `industry/prompts/mend-wording.md`、`editorial/wording.ts`）|
+| `f087b9f` | 撤回的报告不再作为后续归组证据 |
+| `f9a6da4` | 首份日报之前的周/月不再出刊 |
+| `dd02610` | 精选评测在复制等待后重新选 |
+| `ab715bf` / `aab7e62` / `50075b4` / `18ddc7b` / `7971d92` | 网页导航与手机底栏若干（含 `site/site.ts` 的 `NAV.hidden`）|
+
+**冲突两处**，都是「两边各加了独立内容」，都保留：
+
+- `content/extract.ts`：我们的 `isSignInRedirect`（登录页重定向识别）+ 上游的 `settleStreamedContent`（React 流式边界还原）；
+- `docs/deploy.md`：上游新条目在前，我们 10 月 7 日的视图过渡条目按时间插在中间。
+
+**合并后清点（我们自己的东西一个没丢）**：归档闸门（`analyze.ts` 的 `sweep/isHistorical` 早退）+ `jobs/content.ts` 的 `sweep` 标记、
+清洗器与 SSRF 两个安全修复、Caddyfile 安全头、找回的三个工具、闸门与清洗器测试、KB-PLAN / SECURITY-REVIEW。
+上游新增的 `mend-wording.md` 与 `industry/wording.ts` 也随合并进来了。
+
+验证：`typecheck` 通过；容器内按上游 CI 环境跑完整套件 **673/673 通过**（合并前 626，多出的是上游新测试）。
+
+### 两件要记住的事
+
+1. **归档闸门是永久 fork 本地分叉**：上游在议题 #172 里明确「暂不收这个开关，也不把历史归档改成默认停在预筛」，
+   理由是归档仍可经过价值判断、成为可阅读的归档或精选，且多加一套规则要长期验证。
+   所以**每次同步上游后都要核对** `analyze.ts` 的闸门与 `tests/history-limit.test.ts` 都在 —— 4.0.0 升级时丢过一次。
+2. **「改用词」默认不会多花钱**：`industry/wording.ts` 的词表是空的 → 不查、不调用；要启用得先填词表，
+   需要单独选模型时另外设 `WORDING_MODEL`。
