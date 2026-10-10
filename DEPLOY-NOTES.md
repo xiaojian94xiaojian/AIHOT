@@ -2564,3 +2564,36 @@ where a.backfill and r.created_at > now() - interval '1 day' group by r.purpose 
 那时只列一眼可判的 2–3 个，调用量按上面比例算 ≤10 次/月。重测用的 SQL 见 `E:\cs\hot\wording-decision.md`。
 
 所以这次合并对我们**行为零变化**：词表空着，既不查也不多调用。
+
+## 部署合并后的代码（10-10）：镜像 8c320b323bf4，中途踩了挂载目录的坑
+
+**部署结果**：镜像 `8c320b323bf4` 上线（回滚点 `app:rollback-93e05c10da45`），三个容器都是新镜像，
+站点 `/`、`/hot`、`/daily`、`/api/v1/items` 全 200，五个安全响应头仍在，worker 零报错，近 10 分钟 45 条回执（18 条分析相关）。
+
+**踩的坑（`industry/` 与 `database/` 都是挂载目录，新文件没同步）**：
+
+1. 重建后 **api 与 worker 反复重启（exit 1）**，日志是
+   `ERR_MODULE_NOT_FOUND: file:///app/node_modules/@aihot/industry/wording.ts` ——
+   上游新加了 `industry/wording.ts`，而服务器上挂载的 `industry/` 还是旧的（缺这个文件）。
+   同步 4 个文件（新增的 `wording.ts`、`prompts/mend-wording.md`，改动的 `selection.ts`（只动注释）、
+   `prompts/group-batch.md`）后重启即恢复。
+2. **迁移没有执行**：`redeploy.sh` 只做「拉镜像 + 重建 api/worker/web」，**不跑迁移**；
+   而 `docker compose run --rm setup` 会先尝试构建镜像（服务器上构建失败）。
+   更隐蔽的是：`database/` 同样是挂载目录，新迁移文件 `0083_publications_selected_source_idx.sql`
+   根本没在服务器上，所以 `node scripts/migrate.ts` 会报「database is up to date」而**静默跳过**。
+   同步该文件后执行 `sudo docker exec aihot-worker-1 node scripts/migrate.ts` →
+   `applied 0083_publications_selected_source_idx.sql (72ms, index)`，索引 `publications_selected_source_idx` 已建。
+
+**流程修正（以后合并上游后必须做）**：
+
+```powershell
+# 1) 找出这次合并动了哪些挂载目录里的文件（industry/、database/、scripts/）
+git diff --name-status <合并前> <合并后> -- industry/ database/ scripts/
+# 2) 逐个 scp 到服务器对应目录，并 sed -i 's/\r$//' 去掉 CRLF
+# 3) 重启 api/worker；再跑一次迁移（这一步 redeploy.sh 不做）
+gcloud compute ssh weijianlin@aihot --zone=asia-east2-c --command="sudo docker exec aihot-worker-1 node scripts/migrate.ts"
+# 4) 核验：容器不是 Restarting、日志无 ERR_MODULE_NOT_FOUND、账本里出现新迁移、站点 200
+```
+
+判据速查：**容器 Restarting + 日志 `ERR_MODULE_NOT_FOUND` = 挂载目录缺新文件**；
+**迁移日志说「up to date」但你刚合并了新迁移 = 服务器上压根没有那个迁移文件**。
