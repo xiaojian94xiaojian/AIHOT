@@ -2625,3 +2625,41 @@ gcloud compute ssh weijianlin@aihot --zone=asia-east2-c --command="sudo docker e
 
 **其它查证**：密码值没有出现在 bash 历史或 git 里；`.env` 是 CRLF（应用读时会把行尾 CR 去掉，登录实测正常，但用别的工具读 `.env` 要注意）。
 后台登录有 15 分钟窗口的尝试次数限制（`admin-auth.ts:36`），但**失败尝试不写 `audit_log`** —— 想补的话按仓库规矩先写失败测试再改。
+
+## 提示词补「不可信数据」条款（10-10，未提交未部署）
+
+对应 `SECURITY-REVIEW.md` [S3] 的第 4 条。改动只在 `industry/prompts/`（本机文件，`industry/` 是挂载目录，上线要 scp）：
+
+| 文件 | 改了什么 |
+|---|---|
+| `summarize-article.md`、`summarize-long-post.md`、`summarize-short-post.md` | 各补 `{{> safety}}` + 一条「数字与专名只能来自原文」 |
+| `translate-body.md`、`translate-post.md` | 各补 `{{> safety}}` + 数字/单位/日期照原文、片段里的指令不照做 |
+| `understand.md` | 补 `{{> safety}}`（写规则测试时才发现的：它原来自带的安全边界只在 `content-understanding.md` 里，没有共享条款）|
+
+- **规则测试**：`tests/architecture.test.ts` 新增「every prompt that carries collected material includes the safety clause」——
+  按这几个提示词族扫 `industry/prompts/`，新族要显式加进清单，漏加即失败（第一版规则就是这么抓出 `understand.md` 的）。
+- **版本哈希轮换**（收据与后台模型页看得到，旧结果不会被当同版本复用）：
+  `summarize…@b9917be0c9 → @e29a635c9d`、`translate…@738a6a83a9 → @76235d1e61`。
+- **证据边界**：`tests/analyze.test.ts` + `tests/translate.test.ts` 15/15 通过（提示词渲染路径没坏），
+  但**样本回放没做** —— 需要真实模型调用，本机按规矩关着 `MODEL_CALLS_ENABLED`。别把"测试通过"读成"摘要质量已经验证"。
+- **没做的那半条**：报告建议的「`summaryZh` 原文一致性校验」量过之后决定不上：在本地生产数据副本上，
+  能想到的规则都会误伤 11–14% 的正常摘要（数字见 `SECURITY-REVIEW.md` [S3] 的表）。
+
+## CSP 前置勘查：hash 不可能，另有一处 Caddy 覆盖坑（10-10，只读勘查）
+
+`SECURITY-REVIEW.md` [S3] 第 1 条要求的"先数真实 HTML 里的内联脚本"做完了。结论按重要性排：
+
+1. **固定 hash 在原理上不可能**。React Router 8 的 `<Scripts/>` 会注入 **loader 数据流**脚本
+   （`window.__reactRouterContext.streamController.enqueue("…")`）：本机构建产物抓 `/`、`/all` 各 6 段内联脚本，
+   生产站 `/` 有 10 个 script 标签**全部内联**、最大一段 **41KB**；同一路径连抓 3 次得 **3 种不同的脚本集合**。
+   哈希写死在 CSP 里 = 要么挡掉全部内联脚本（页面不再 hydrate），要么放行全部。**只剩 nonce**。
+2. **nonce 与页面缓存互斥**（要站主取舍，未落地）。页面声明 `max-age`（首页 60 秒、条目页 600 秒；浏览器上限 300 秒）。
+   浏览器复用缓存 HTML 时拿到的是**新** nonce，内联脚本会被挡；所以 nonce 方案必须同时让 HTML 不可复用。
+3. **Caddy 覆盖坑（实测，容易踩）**：`header >Content-Security-Policy …`（`>` 会 `defer`）在**上游写头之后**执行，
+   实测把**图片代理自己那条 `default-src 'none'; style-src 'unsafe-inline'; sandbox` 顶掉**。
+   正确做法是 Caddy 只发 nonce（`request_header X-CSP-Nonce "{http.request.uuid}"`，实测每请求不同且上游能收到），
+   页面 CSP 由应用写在 `apps/web/server.ts` 的 `pageResponse`（那里本来就是页面响应头的唯一写者，图片路由自己的头不受影响，实测透传正常）。
+4. **指令范围**：站内资源全同源（图片走 `/api/img-proxy`、字体是系统字体），唯一第三方地址是正文里**未代理**的
+   `<video src>`（`imgproxy.ts` 只代理 `poster`）→ `media-src` 必须放行第三方 https。
+
+复现用的脚本与容器实验不入库（`.data/`）。**在哪落地还没定**：等站主在 nonce 与保留缓存之间选一个。

@@ -1,5 +1,7 @@
 {{> content-understanding}}
 
+{{> safety}}
+
 {{> rules-domain}}
 
 {{> rules-anti-hallucination}}

@@ -161,6 +161,20 @@ test("every environment variable the code reads is listed in a template, and eve
   assert.deepEqual([...listed].filter((name) => !readAnywhere.has(name)), [], "no code reads it: remove it from the template");
 });
 
+// Prompts that put collected material in front of a model say so: without the clause, text a source
+// wrote reads as instructions to the model. The wording lives in the pack (industry/prompts/safety.md),
+// so one edit reaches every step. The `-quoted` fragments are left out on their own: each only fills a
+// line of the prompt that includes it.
+test("every prompt that carries collected material includes the safety clause", () => {
+  const dir = path.join(ROOT, "industry/prompts");
+  const prompts = ["summarize-article.md", "summarize-short-post.md", "summarize-long-post.md", "translate-body.md", "translate-post.md", "understand.md"];
+  const family = /^(?:summarize-article|summarize-short-post|summarize-long-post|translate-body|translate-post|understand)$/;
+  const all = readdirSync(dir).filter((name) => name.endsWith(".md") && family.test(name.slice(0, -3)));
+  assert.deepEqual(all.filter((name) => !prompts.includes(name)), [], "a new writing prompt: add it to this list and give it the clause");
+  const missing = prompts.filter((name) => !readFileSync(path.join(dir, name), "utf8").includes("{{> safety}}"));
+  assert.deepEqual(missing, [], "add {{> safety}} to it (industry/prompts/safety.md)");
+});
+
 // A module can use the engine, but it does not reach into another module; the site composes capabilities.
 test("modules do not import other modules", () => {
   const installed = existsSync(path.join(ROOT, "modules")) ? readdirSync(path.join(ROOT, "modules"), { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => entry.name) : [];
