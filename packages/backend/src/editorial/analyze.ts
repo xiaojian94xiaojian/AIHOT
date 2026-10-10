@@ -6,12 +6,14 @@
 //   2. score: two independent scores against the source tier's threshold (industry/selection.ts) decide 精选;
 //   3. structure: category, tags, subjects and the current news fact, beside scoring;
 //   4. writing, once the structure is in: the Chinese title, summary and reason by the content
-//      understanding for selected and near-selected items, by the cheaper title/summary prompts for the rest.
+//      understanding for selected and near-selected items, by the cheaper title/summary prompts for the rest;
+//      copy that uses a word the site keeps from readers (industry/wording.ts) goes back once to change only those.
 // Material with only a title or a feed summary has its article page fetched before it is judged.
 import { z } from "zod";
 import { CATEGORY_KEYS } from "@aihot/contracts/taxonomy";
 import { CATEGORIES } from "@aihot/industry/taxonomy";
 import { SELECTION } from "@aihot/industry/selection";
+import { ITEM_COPY } from "@aihot/site";
 import { sql } from "../db.ts";
 import { chatJson, ModelOutputError, type ContentPart } from "../providers/llm.ts";
 import { completeReceipt, ProviderRejectedError, ReceiptUnknownError } from "../providers/receipts.ts";
@@ -29,6 +31,7 @@ import {
 import { CATEGORY_GUIDE, CATEGORY_TAGS, ENTITIES, ENTITY_TAGS, ITEM_TYPES, normalizeTags, TOPIC_TAGS } from "./vocabulary.ts";
 import { promptText, promptVersion } from "./prompts.ts";
 import { originalPostCopy } from "../content/posts.ts";
+import { wordingProblems } from "./wording.ts";
 
 export { buildMaterial, loadAnalyzeInput, type AnalyzeInputArticle };
 
@@ -38,6 +41,7 @@ export const PROMPT_VERSIONS = {
   understand: promptVersion("understand"),
   summarize: promptVersion("summarize-article", "summarize-article-empty", "summarize-short-post", "summarize-short-post-quoted", "summarize-long-post", "summarize-long-post-quoted", "identity-context"),
   structure: promptVersion("structure"),
+  wording: promptVersion("mend-wording"),
 } as const;
 /** Every step's prompt, as stored on each judgement. */
 export const SELECTION_PROMPT_VERSION = [PROMPT_VERSIONS.prefilter, PROMPT_VERSIONS.score].join("+");
@@ -379,6 +383,50 @@ export async function runUnderstand(a: AnalyzeInputArticle, opts: StepOpts = {})
   };
 }
 
+export const MEND_SYSTEM = promptText("mend-wording", { reasonLabel: ITEM_COPY.reasonLabel });
+const MendSchema = z.object({ titleZh: z.string().trim().min(1), summaryZh: z.string().trim().min(1), reasonZh: z.string().trim().nullable().catch(null) });
+
+/**
+ * Written copy that uses a word the site keeps from its readers (industry/wording.ts) goes back once, those words
+ * named, to change only them: a site's writing prompts can ask the same, but a model keeps drifting back to the
+ * words it uses most. The mended copy keeps the
+ * identity guard and is used only when it leaves fewer such words and the same numbers.
+ */
+async function mendWording(a: AnalyzeInputArticle, w: NonNullable<AnalysisRun["writing"]>, opts: StepOpts): Promise<NonNullable<AnalysisRun["writing"]>> {
+  // A copy missing its title or summary waits for a whole one (normalizeAnalysis): nothing to mend, and no text to
+  // let a model without the material fill in.
+  if ((w.kind !== "understand" && w.kind !== "summarize") || !w.titleZh || !w.summaryZh) return w;
+  const problems = wordingProblems(w);
+  if (!problems.length) return w;
+  const t = translateInputOf(a);
+  checkAnalysisRunning();
+  let res;
+  try {
+    res = await chatJson({
+      model: await modelFor("wording"), purpose: "mend_wording", subject: subjectOf(a), promptVersion: PROMPT_VERSIONS.wording, system: MEND_SYSTEM,
+      user: [
+        `来源：${t.sourceName ?? "（未注明）"}`, `原题：${t.title}`,
+        `中文稿：\n${JSON.stringify({ titleZh: w.titleZh, summaryZh: w.summaryZh, reasonZh: w.reasonZh })}`,
+        `问题：\n${problems.map((p) => `- ${p}`).join("\n")}`,
+      ].join("\n\n"),
+      schema: MendSchema, temperature: 0.1, maxTokens: 2048, attemptTag: tagged(opts.attemptTag, "wording"),
+    });
+  } catch (error) {
+    // An answer that is not the copy asked for, or the provider's refusal (as in writing), leaves the first copy;
+    // its receipt stays failed (seen on the runs page, and asked again the next time the item is analysed).
+    if (error instanceof ModelOutputError || isContentFilter(error)) return w;
+    throw error;
+  }
+  const copy = finalizeCopy(t, { titleZh: res.data.titleZh, summaryZh: res.data.summaryZh });
+  const mended = { titleZh: copy.titleZh, summaryZh: copy.summaryZh, reasonZh: w.reasonZh === null ? null : res.data.reasonZh || w.reasonZh };
+  const paid = { receiptIds: [...w.receiptIds, res.receiptId], reused: w.reused && res.reused };
+  // A guard that emptied the title or summary (a company the input does not name), a number changed or dropped, or
+  // no fewer such words: the first copy stands.
+  const numbers = (c: { titleZh: string; summaryZh: string; reasonZh: string | null }) => (`${c.titleZh} ${c.summaryZh} ${c.reasonZh ?? ""}`.match(/\d+(?:[.,]\d+)*/g) ?? []).sort().join(" ");
+  if (!mended.titleZh || !mended.summaryZh || numbers(mended) !== numbers(w) || wordingProblems(mended).length >= problems.length) return { ...w, ...paid };
+  return { ...w, ...mended, identityGuard: copy.identityGuard ?? w.identityGuard, ...paid };
+}
+
 /** The title/summary prompts (articles, long and short posts). */
 async function runSummarize(a: AnalyzeInputArticle, opts: StepOpts): Promise<NonNullable<AnalysisRun["writing"]>> {
   const t = translateInputOf(a);
@@ -442,7 +490,7 @@ export async function runAnalysis(a: AnalyzeInputArticle, opts: StepOpts = {}): 
     if ("error" in s) throw s.error;
     const writing: NonNullable<AnalysisRun["writing"]> = original
       ? { kind: "verbatim", model: null, titleZh: original.title, summaryZh: original.summary ?? "", reasonZh: null, receiptIds: [], reused: true }
-      : (near ? await runUnderstand(a, opts) : null) ?? (await runSummarize(a, opts));
+      : await mendWording(a, (near ? await runUnderstand(a, opts) : null) ?? (await runSummarize(a, opts)), opts);
     return { prefilter, scores, writing, structure: s.value };
   } finally {
     // A score/writing error or deploy must not let the job finish while a paid structure request

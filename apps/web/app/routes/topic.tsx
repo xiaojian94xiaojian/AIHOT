@@ -12,11 +12,12 @@ import { IconArrowLeft } from "../components/icons";
 import { beijingDate } from "@aihot/contracts/time";
 import { monthDay, monthDayTime } from "../lib/format";
 import { PhoneBar } from "../components/shell/PhoneBar";
+import { inNav } from "../components/shell/nav";
 import type { Screen } from "../components/shell/screens";
 import type { TopicPagePart } from "../modules";
 import { loadParts } from "../site-modules";
 
-export const handle: Screen = { home: "me" };
+export const handle: Screen = { home: inNav("/topics") ? "me" : "featured" };
 export { pageHeaders as headers } from "../lib/api.server";
 export const { clientLoader, shouldRevalidate } = pageReuse<typeof loader>();
 
@@ -91,9 +92,9 @@ export default function TopicRoute() {
   const last = first + items.length - 1;
   return (
     <div className="pb-6">
-      <PhoneBar back={{ to: "/topics", label: "全部主题" }} title={topic.name} />
-      <Link to="/topics" className="hidden items-center gap-1.5 py-2 text-[13px] text-ink-3 transition-colors hover:text-accent lg:inline-flex">
-        <IconArrowLeft size={14} /> 返回全部主题
+      <PhoneBar back={inNav("/topics") ? { to: "/topics", label: "全部主题" } : { to: "/", label: "精选" }} title={topic.name} />
+      <Link to={inNav("/topics") ? "/topics" : "/"} className="hidden items-center gap-1.5 py-2 text-[13px] text-ink-3 transition-colors hover:text-accent lg:inline-flex">
+        <IconArrowLeft size={14} /> {inNav("/topics") ? "返回全部主题" : "返回精选"}
       </Link>
       <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2 pb-5 pt-3 lg:pt-1">
         <div className="min-w-0 max-w-[760px]">

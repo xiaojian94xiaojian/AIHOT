@@ -91,6 +91,9 @@ function toInput(r: GoldRow): AnalyzeInputArticle {
 
 const models = await evalModels(values.models, "score");
 
+// The eval judges selection on the prefilter and the scores alone. The live pipeline also waits for the reader-facing
+// copy (normalizeAnalysis reads an item without it as unknown, never selected), which the eval does not write: take it as written.
+const COPY_WRITTEN: AnalysisRun["writing"] = { kind: "none", model: null, titleZh: "-", summaryZh: "-", reasonZh: null, receiptIds: [], reused: true };
 const report: Record<string, unknown> = {};
 for (const model of models) {
   const started = Date.now();
@@ -129,7 +132,7 @@ for (const model of models) {
 
       // Model output is independent of source tier; the decision threshold is not.
       const scores = shared.scores ? { ...shared.scores, threshold } : null;
-      const run: AnalysisRun = { prefilter, scores, writing: null, structure: null };
+      const run: AnalysisRun = { prefilter, scores, writing: COPY_WRITTEN, structure: null };
       return { r, out: normalizeAnalysis(run), receiptIds, error: null as string | null };
     } catch (error) {
       return { r, out: null, receiptIds, error: String(error).slice(0, 200) };

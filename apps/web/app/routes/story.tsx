@@ -6,7 +6,7 @@ import type { StoryDetail, StoryReportView } from "@aihot/contracts/site";
 import { SITE } from "@aihot/site";
 import { cachedPage, loadOr404 } from "../lib/api.server";
 import { pageReuse } from "../lib/page-reuse";
-import { breadcrumbLd, pageMeta, titled } from "../lib/seo";
+import { breadcrumbLd, pageMeta, storyLd, titled } from "../lib/seo";
 import { beijingDate, beijingTime } from "@aihot/contracts/time";
 import { monthDay, monthDayTime, relativeTime } from "../lib/format";
 import { HeatChart } from "../features/story/HeatChart";
@@ -17,9 +17,10 @@ import { PillTabs } from "../components/ui/Tabs";
 import { Select } from "../components/ui/Controls";
 import { IconArrowLeft, IconChevronRight, IconClock, IconDoc, IconUsers } from "../components/icons";
 import { PhoneBar } from "../components/shell/PhoneBar";
+import { inNav } from "../components/shell/nav";
 import type { Screen } from "../components/shell/screens";
 
-export const handle: Screen = { home: "hot" };
+export const handle: Screen = { home: inNav("/hot") ? "hot" : "featured" };
 export { pageHeaders as headers } from "../lib/api.server";
 export const { clientLoader, shouldRevalidate } = pageReuse<typeof loader>();
 
@@ -33,11 +34,14 @@ export function meta({ loaderData }: Route.MetaArgs) {
   const s = loaderData.story;
   return pageMeta({
     title: s.title,
-    description: (s.digest ?? s.summary)?.slice(0, 150) ?? `${s.sourceCount} 个报道来源 ${s.reportCount} 篇报道，完整时间线与最新进展。`,
+    description: (s.digest ?? s.summary ?? s.excerpt?.text)?.slice(0, 150) ?? `${s.sourceCount} 个报道来源 ${s.reportCount} 篇报道，完整时间线与最新进展。`,
     path: `/story/${s.publicId}`,
     image: `/og/stories/${s.publicId}.png`,
     type: "article",
-    jsonLd: breadcrumbLd([{ name: SITE.name, path: "/" }, { name: "热点榜", path: "/hot" }, { name: s.title, path: `/story/${s.publicId}` }]),
+    jsonLd: [
+      storyLd(s),
+      breadcrumbLd([{ name: SITE.name, path: "/" }, { name: "热点榜", path: "/hot" }, { name: s.title, path: `/story/${s.publicId}` }]),
+    ],
   });
 }
 
@@ -85,22 +89,46 @@ function RailCard({ title, right, children, className = "" }: { title: ReactNode
 /** Highlights the section nav entry whose section is under the sticky bar. */
 function useActiveSection(keys: SectionKey[]): [SectionKey, (k: SectionKey) => void] {
   const [active, setActive] = useState<SectionKey>("overview");
+  const clampedTarget = useRef<{ key: SectionKey; landed: boolean } | null>(null);
   useEffect(() => {
-    const els = keys.map((k) => document.getElementById(SECTIONS[k])).filter((e): e is HTMLElement => !!e);
+    const sections = keys.flatMap((key) => {
+      const el = document.getElementById(SECTIONS[key]);
+      return el ? [{ key, el }] : [];
+    });
     const onScroll = () => {
       let cur: SectionKey = keys[0]!;
-      for (const [i, el] of els.entries()) if (el.getBoundingClientRect().top <= 96) cur = keys[i]!;
-      // The last section may never reach the bar; at the bottom of the page it is the one being read.
-      if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4) cur = keys[keys.length - 1]!;
+      // Use the same offset as anchor scrolling; fractional positions need one pixel of tolerance.
+      for (const { key, el } of sections) {
+        const offset = parseFloat(getComputedStyle(el).scrollMarginTop) || 0;
+        if (el.getBoundingClientRect().top <= offset + 1) cur = key;
+      }
+      // Several short sections can share the bottom landing. A click disambiguates that landing;
+      // scrolling away restores the ordinary position-based highlight.
+      const bottom = window.scrollY > 0 && window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4;
+      if (bottom) {
+        cur = clampedTarget.current?.key ?? keys[keys.length - 1]!;
+        if (clampedTarget.current) clampedTarget.current.landed = true;
+      } else if (clampedTarget.current?.landed) clampedTarget.current = null;
       setActive(cur);
     };
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    window.addEventListener("resize", onScroll);
+    const resized = new ResizeObserver(onScroll);
+    resized.observe(document.body);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+      resized.disconnect();
+    };
   }, [keys.join()]);
   const go = (k: SectionKey) => {
     const el = document.getElementById(SECTIONS[k]);
     if (!el) return;
+    const max = document.documentElement.scrollHeight - window.innerHeight;
+    const destination = window.scrollY + el.getBoundingClientRect().top - (parseFloat(getComputedStyle(el).scrollMarginTop) || 0);
+    clampedTarget.current = destination >= max - 1 ? { key: k, landed: false } : null;
+    setActive(k);
     el.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
     history.replaceState(history.state, "", `#${SECTIONS[k]}`);
   };
@@ -209,10 +237,10 @@ export default function StoryPage() {
 
   return (
     <div className="mx-auto max-w-[var(--page-max-reading)] pb-10">
-      <PhoneBar back={{ to: "/hot", label: "热点" }} title={story.title} />
+      <PhoneBar back={inNav("/hot") ? { to: "/hot", label: "热点" } : { to: "/", label: "精选" }} title={story.title} />
       <nav aria-label="位置" className="hidden items-center gap-2.5 pb-5 pt-4 text-[12px] text-ink-4 lg:flex">
-        <Link to="/hot" className="inline-flex items-center gap-1.5 transition-colors hover:text-ink">
-          <IconArrowLeft size={15} /> 热点榜
+        <Link to={inNav("/hot") ? "/hot" : "/"} className="inline-flex items-center gap-1.5 transition-colors hover:text-ink">
+          <IconArrowLeft size={15} /> {inNav("/hot") ? "热点榜" : "精选"}
         </Link>
         <span className="h-3 w-px bg-line-strong" aria-hidden="true" />
         <span>事件详情</span>
@@ -398,9 +426,13 @@ export default function StoryPage() {
                 {story.whyHot.rank && (
                   <>
                     <span className="mx-1">·</span>
-                    <Link to="/hot" className="text-accent hover:underline">
-                      热点榜第 {story.whyHot.rank} 名
-                    </Link>
+                    {inNav("/hot") ? (
+                      <Link to="/hot" className="text-accent hover:underline">
+                        热点榜第 {story.whyHot.rank} 名
+                      </Link>
+                    ) : (
+                      <>热点榜第 {story.whyHot.rank} 名</>
+                    )}
                   </>
                 )}
               </p>
