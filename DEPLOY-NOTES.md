@@ -2663,3 +2663,85 @@ gcloud compute ssh weijianlin@aihot --zone=asia-east2-c --command="sudo docker e
    `<video src>`（`imgproxy.ts` 只代理 `poster`）→ `media-src` 必须放行第三方 https。
 
 复现用的脚本与容器实验不入库（`.data/`）。**在哪落地还没定**：等站主在 nonce 与保留缓存之间选一个。
+
+# 接上飞书精选推送（2026-10-10 晚）
+
+生产 `hot.jian.ing` 的「精选推送到飞书群」已接通并实测送达。只用了**内容群 webhook**这一条线
+（内部告警群、飞书登录后台两条没动）。
+
+## 配置
+
+| 位置 | 内容 |
+|---|---|
+| 服务器 `.env`（600） | 新增 `FEISHU_PUSH_WEBHOOK_URL`（81 字符）、`FEISHU_CONTENT_PUSH_ENABLED=true` |
+| 备份 | `.env.before-feishu-20261010-144937`（600，含同一凭据，要清理时记得它） |
+| 数据库 | `notify_targets.feishu-content-main`：`enabled=t`、`enabled_at=2026-10-10 14:49:55Z` |
+| 审计 | `audit_log`：`admin:1` / `notify.enable` / `notify-target:feishu-content-main` / 理由「接入飞书精选推送群」 |
+
+目标是通过**后台正规接口**打开的（`POST /api/admin/notify-targets/:key`，带会话 + CSRF），
+不是直接改库——所以有审计，`enabled_at` 也由代码写。打开时接口回的 `pushEnabledHere` 就是全局阀
+（当时还是 `false`，重建容器后才变 `true`）。
+
+**两个开关缺一不可**：全局 `FEISHU_CONTENT_PUSH_ENABLED` 与每群 `enabled`。只开一个时投递会被记成
+`skipped`（全局关）或根本不会产生（群关）。
+
+## 这条链路怎么走
+
+新的精选落到 `selected` 后，worker 的 `notifySelected` 队列（`jobs/notify.ts`）先备好分享图，
+再走 `notify/selected.ts` → `notify/deliver.ts`：按 target 去重（`selected:fact:<id>` 或
+`selected:article:<id>`）、写 `deliveries` 一行、`postWebhook` 发
+`{msg_type:"interactive", card}`，飞书回 `code:0` 才算 `sent`。
+
+- **不补历史**：`contentAt`（文章 `discovered_at`）早于 `enabled_at` 的直接跳过。
+- **自定义关键词**：机器人的安全设置选了「自定义关键词=精选」，所以卡片标题必须含这两个字
+  （测试卡标题是「精选 · 连通性测试」）。**以后改卡片标题时别把「精选」去掉**，否则飞书会回 code≠0。
+- **不做签名校验**：`postWebhook` 不签，别在机器人安全设置里改成「签名校验」。
+
+## 验证记录
+
+| 项目 | 结果 |
+|---|---|
+| worker → `open.feishu.cn` 出口 | 通，580 ms（发了个假凭据，回 `code:10003`，证明是飞书在应答） |
+| 测试卡 | HTTP 200 `{"code":0,"msg":"success"}`，群内可见 |
+| 重建后容器内开关 | `FEISHU_CONTENT_PUSH_ENABLED=true`、webhook 长度 81（api 与 worker 都是） |
+| 站点 | `/` 与 `/api/health` 均 200 |
+| worker 近 5 分钟错误 | 无；`notify.selected` 队列 109 条全部 `completed`，无卡住 |
+
+**还没验到的**：截至配置完成时 `deliveries` 仍为 0 行（近 20 分钟有 39 条新发布、0 条新精选），
+所以「真实精选推出去」这一步是等下一次精选自然发生来验的，不是当时验的。
+
+## 踩到的坑（重要）
+
+1. **别在服务器上跑 `docker compose up`（无 `-f`）**：仓库根那份 `docker-compose.yml` 的 `x-app` 带
+   `build: .`，会触发**本地构建**（跑到 `npm run build -w @aihot/web` 失败，容器没被替换、开关没生效，
+   白等几分钟）。生产要用部署脚本那份：
+   ```bash
+   cd ~/aihot && sudo docker compose -f docker-compose.server.yml up -d --no-deps api worker
+   ```
+2. **`env_file` 只在创建容器时读**：`docker restart` 不够，必须 `up -d` 重建容器（`Recreated` 才算数）。
+   只改代码不重新打包时用 `--no-deps`；改了镜像内容才走 `scripts/deploy-server.sh`（它会 `pull`）。
+3. **临时凭据用完即删**：webhook 地址通过 `/tmp/feishu-cred.txt` 上传（600），用完 `shred -u`。
+   本机那份 `E:\cs\hot\feishu.txt` ACL 已收紧到仅本人读写。
+
+## 两份私密报告提交完成（10-10 23:16 / 23:19）—— 待发清单清空
+
+配额窗口（触发后 24 小时）一开就发出去了，中间只试了两次：23:02 一次仍被挡，23:16:30 窗口到点后成功。
+
+| 报告 | GHSA | 状态 |
+|---|---|---|
+| 五份写作/翻译提示词缺「不可信数据」条款 | `GHSA-gj3j-rgpx-m32p` | triage |
+| 默认 `deploy/Caddyfile` 无任何安全响应头 | `GHSA-j954-mqhh-3pjp` | triage |
+
+加上 10-09 的两份，现在账号下的私密报告共 5 份（4 份真实 + 1 份误建的 `probe`），**全部在 triage，没有已公开的**。
+
+提交方式：`gh api --method POST repos/KKKKhazix/AIHOT/security-advisories/reports`（`pwsh -File E:\cs\hot\submit-advisories.ps1`），
+两次之间隔 180 秒。记录在 `E:\cs\hot\advisories-result.txt`。
+
+**教训（下次别再撞）**：GitHub 的「内容创建」次级限流是**账号级、约 24 小时**的窗口 —— 从创建第 3 份报告那一刻算起，
+期间 API 与网页都被挡（我们 10-10 07:57 试 API、08:19 试网页，两次都被挡）。**撞到就记时间、等满 24 小时再发一次**，
+中途反复重试只会续期。
+
+**报告 4 的一个细节**：草稿里写的「默认 Caddyfile 没有头」针对的是上游仓库，我们自己的 fork 在 `f7c1f64` 之后已经有了
+（上游那份仍然没有，报告成立）。报告里第 51 行关于 CSP 的措辞后来被我们自己的勘查更新了：真实 HTML 每次抓取的内联脚本
+集合都不同（React Router 的数据流脚本），**hash 不可行、只剩 nonce**，且 nonce 与页面缓存互斥 —— 上游若回信问 CSP，
+直接给这份结论。
