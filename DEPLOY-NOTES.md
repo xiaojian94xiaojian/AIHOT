@@ -2800,3 +2800,47 @@ sudo docker compose -f docker-compose.server.yml pull
 2. **`.dockerignore` 没排除根目录那 4 个 `.sql.gz`（546 MB）**：它们会被 `COPY . .` 拷进构建层并被最终镜像继承
    （镜像本来就 1.8 GB，所以没造成异常，只是白传）。这次构建是临时在本地 `.dockerignore` 加了 `*.sql.gz` 等几条、
    **构建后已还原**（仓库文件没改）。要不要永久加这几条，等站主定（那是共享框架文件，且属于所有站都成立的小改进）。
+
+## 本地测试环境：独立一套，不碰任何现有容器（2026-10-11）
+
+为了放心做集成测试（Artex 往站里推内容、改坏了自己重来），本地起了一套**完全隔离**的实例，
+用的是当前工作树的代码（`docker compose -p aihot-test build api` 构建的 `aihot-app:latest`）。
+
+| 资源 | 名字 | 说明 |
+|---|---|---|
+| compose 项目 | `aihot-test` | 容器都是 `aihot-test-*`；与 `aihot` 项目互不影响 |
+| 数据卷 | `aihot-test_db`、`aihot-test_data` | **与原有的 `aihot_db`/`aihot_data` 完全分开** |
+| 数据库 | 全新空库 | `setup` 跑了 **79 条迁移**（含上游新加的 0085）+ seed 灌入 **626 个示例信源** |
+| 入口 | http://localhost:3000 | 没有起 Caddy/HTTPS（本地不需要，也免掉 80/443） |
+| 后台 | http://localhost:3000/admin | 密码就是 `.env` 里的 `ADMIN_PASSWORD` |
+
+**实测状态**：`/` 与 `/api/health` 均 200，`/admin` 正确 302 到登录页；三个服务零报错；worker 正常启动。
+
+### 常用命令
+
+```powershell
+cd E:\cs\aihot
+docker compose -p aihot-test ps                      # 状态
+docker compose -p aihot-test logs -f --tail 100 worker   # 看 worker
+docker compose -p aihot-test stop                    # 停（保留数据）
+docker compose -p aihot-test start                   # 再起
+docker compose -p aihot-test down                    # 删容器（数据卷保留）
+docker compose -p aihot-test down -v                 # 连数据一起清掉，下次重新迁移+seed
+docker compose -p aihot-test up -d --build api worker web   # 改了代码后重建
+```
+
+### 安全阀默认全关（免得本地测试误触发真调用）
+
+`.env` 里 `COLLECT_ENABLED`、`MODEL_CALLS_ENABLED`、`FEISHU_CONTENT_PUSH_ENABLED`、
+`FEISHU_INTERNAL_ENABLED`、`INDEXNOW_SUBMIT_ENABLED` 全是 `false`，容器里实测一致。
+所以默认状态下 worker 不抓取、不调模型、不推送——`deliveries` 里只会出现 `skipped`。
+
+要让它真跑（会花钱），把对应的阀改 `true` 后 `docker compose -p aihot-test up -d api worker`
+（**改 .env 必须重建容器，restart 不读新值**）。注意本地 `.env` 的模型 key 是**真实凭据**，
+而 `budgets` 表有每分/时/天上限兜着。
+
+### 让外部往站里推内容（Artex 那条线）
+
+`POST /api/ingest/items` 需要 `INGEST_TOKEN`，**本地 `.env` 里没有这一项** → 该接口当前是关闭的。
+要用就在 `.env` 加一行 `INGEST_TOKEN=`（至少 16 位，别用常见占位符），重建 api 后生效；
+限流由 `INGEST_RATE_LIMIT` 控制（compose 默认 10/分）。
