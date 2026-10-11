@@ -2745,3 +2745,58 @@ gcloud compute ssh weijianlin@aihot --zone=asia-east2-c --command="sudo docker e
 （上游那份仍然没有，报告成立）。报告里第 51 行关于 CSP 的措辞后来被我们自己的勘查更新了：真实 HTML 每次抓取的内联脚本
 集合都不同（React Router 的数据流脚本），**hash 不可行、只剩 nonce**，且 nonce 与页面缓存互斥 —— 上游若回信问 CSP，
 直接给这份结论。
+
+## 合并上游 4 个提交并部署（2026-10-11）
+
+镜像 `d7c664c05db4`（标签 `merge-7ffe2ba`）已上线，回滚点 `rollback-8c320b323bf4`（= 部署前的 `latest`）。
+
+| 内容 | 说明 |
+|---|---|
+| 上游 4 个提交 | 长文章桌面目录独立滚动（`931a4eb`，今天）、改用词被拒保留初稿（`9cf2a3c`）、日报提醒停发（`efc7bdf`）、关联事件桥接经 fact（`b6c0796`）|
+| 我们的 2 个提交 | 登录失败写日志（`dcdcd45`）、六份提示词补 safety 条款（`bc27846`）|
+| 挂载目录 | `database/migrations/0085_grouping_decisions_fact_idx.sql` + 六份 `industry/prompts/*.md`（scp + `sed -i 's/\r$//'`）|
+
+**核验结果**（逐项实测，不是看日志猜的）：
+
+- 迁移账本出现 `0085_grouping_decisions_fact_idx.sql`（`2026-10-11 12:47:13Z`），setup 容器 `exited 0`；
+- 三个容器都跑新镜像 `sha256:d7c664c05db4`，`Up` 稳定、无 `Restarting`、日志无 `ERR_MODULE`；
+- 站点 `/`、`/hot`、`/api/health` 均 200；首页资源哈希换过（`root-DSVWYFDW.js`、`manifest-2f916397.js`）→ 新前端在线；
+- 提示词版本因挂载文件更新而轮换：`summarize…@9019d90f04`、`translate…@7c023ebddd`；
+- **登录失败日志实测**：往真实路由发一次错误密码 → `303 error=wrong`，api 日志出现
+  `"event":"admin_login_refused","method":"password","reason":"wrong","attempt":1,"client":"127.0.0.1"`；
+- **飞书实测**：走 `postWebhook` 同一条路径发卡 → `{"code":0,"msg":"success"}`。
+
+## ⚠️ 这次踩到的坑：服务器上 `docker compose pull` 认证失败
+
+第一次部署脚本跑到第 2 步就报：
+
+```
+Image ...aihot/app:latest Error error from registry: authentication failed
+```
+
+原因：`deploy-server.sh` 的第 3 步会**先从 GCE 元数据服务取服务账号 token 再 `docker login`**，
+而只跑 `docker compose pull` 是拿不到这个登录态的（服务器的 `~/.docker/config.json` 里没有长期凭据）。
+后果很微妙：**pull 失败但 `up -d` 照样"成功"** —— 容器被重建了、跑的还是本地那份旧 `latest`（`8c320b323bf4`），
+输出里只看到 `Started`，看起来像部署成功。
+
+```bash
+# 服务器上手动拉镜像前，先补这一步（deploy-server.sh 第 3 步的等价命令）
+REGION_HOST="$(grep -E '^AIHOT_IMAGE=' .env | cut -d= -f2- | cut -d/ -f1)"
+ACCESS_TOKEN="$(curl -sS -H 'Metadata-Flavor: Google' \
+  'http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token' \
+  | sed -E 's/.*"access_token"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/')"
+echo "$ACCESS_TOKEN" | sudo docker login -u oauth2accesstoken --password-stdin "https://${REGION_HOST}"
+sudo docker compose -f docker-compose.server.yml pull
+```
+
+**判据（以后必看）**：部署完核 `docker inspect <容器> --format '{{.Image}}'`，必须等于你刚推的镜像 ID；
+只看 `docker compose up -d` 的 `Started` 不算数（`pull` 失败时它照样重建，只是用旧镜像）。
+
+## 其它两条
+
+1. **迁移不会自己跑**：`deploy-server.sh` 不跑迁移，靠 `setup` 容器（`docker compose up -d` 会带起它）。
+   这次 setup 正常应用了 0085。若单独重建 api/worker（`--no-deps`）就没跑 setup —— 那种情况下要手动
+   `docker exec aihot-worker-1 node scripts/migrate.ts`。
+2. **`.dockerignore` 没排除根目录那 4 个 `.sql.gz`（546 MB）**：它们会被 `COPY . .` 拷进构建层并被最终镜像继承
+   （镜像本来就 1.8 GB，所以没造成异常，只是白传）。这次构建是临时在本地 `.dockerignore` 加了 `*.sql.gz` 等几条、
+   **构建后已还原**（仓库文件没改）。要不要永久加这几条，等站主定（那是共享框架文件，且属于所有站都成立的小改进）。

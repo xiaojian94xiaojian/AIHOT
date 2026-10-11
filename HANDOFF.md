@@ -1,19 +1,19 @@
-# 交接：当前状态与未结事项（2026-10-10 23:30 更新）
+# 交接：当前状态与未结事项（2026-10-11 更新）
 
-> 新会话从这里开始。更细的内容按需查：`DEPLOY-NOTES.md`（全站运行日志，2500+ 行，几乎所有历史事实都在里面）、
+> 新会话从这里开始。更细的内容按需查：`DEPLOY-NOTES.md`（全站运行日志，2600+ 行，几乎所有历史事实都在里面）、
 > `KB-PLAN.md`（知识库模块方案）、`SECURITY-PLAN.md` / `SECURITY-REVIEW.md`（安全审查）、
 > `UPGRADE-HANDOFF.md`（4.0 升级的旧交接）。工作目录 `E:\cs\hot\` 里是方案草稿、待提交的报告与密码文件（不在 git 里）。
 
 ## 0. 一分钟版本
 
-- **生产**：https://hot.jian.ing 跑镜像 `8c320b323bf4`（含上游 10-10 合并 + 我们的安全修复），
-  回滚点 `app:rollback-93e05c10da45`（更早的回滚标签也都在）。站点三页 200、worker 零报错。
-- **代码**：工作树在 `upgrade-4.0`（`bc27846`），**落后上游 0 个提交**，已推 `fork/upgrade-4.0`。
-- **今晚新增（两个提交，已提交未部署）**：① 后台登录失败写进程日志（`dcdcd45`）
-  ② 写作提示词补「不可信数据」条款（`bc27846`，含规则测试）。容器全套 **677 通过 / 0 失败**。
-- **飞书精选推送已接通**（生产 `.env` + `notify_targets`，测试卡实测送达，见 `DEPLOY-NOTES.md`）。
+- **生产**：https://hot.jian.ing 跑镜像 `d7c664c05db4`（`merge-7ffe2ba`：上游 4 个提交 + 我们的登录日志与提示词加固），
+  回滚点 `rollback-8c320b323bf4`（更早的 `app:rollback-*` 标签也都在）。三页 200、容器稳定、日志零报错。
+- **代码**：工作树在 `upgrade-4.0`（`7ffe2ba` 合并提交），**落后上游 0 个提交**，工作树干净。
+- **发布状态**：本地与生产一致，**没有未部署的提交**。
+- **飞书精选推送已接通**（生产 `.env` + `notify_targets`，两次测试卡实测送达，见 `DEPLOY-NOTES.md`）。
 - **未结一件**：知识库模块，活在 `feat/kb-module`（已推），未合并未部署（站主试用后认为形态太粗）。
 - **安全审查剩余**：CSP 未做（站主选了「先不管 CSP」；勘查结论是 hash 不可行、nonce 与页面缓存互斥）。
+- **私密报告**：4 份真实报告全部提交、全部在 triage，待发清单已清空。
 
 ## 1. 未结事项
 
@@ -81,12 +81,19 @@
 **挂载目录 vs 镜像**：`industry/`、`database/`、`scripts/` 是**挂载**（改了要 scp 上去）；其它（`modules/`、`site/`、
 `packages/`、`apps/`）在**镜像**里 → 必须重建镜像并重新部署。
 
-**部署与重启（10-10 新增的坑）**：
+**部署与重启（10-10 / 10-11 踩出来的坑）**：
 - 生产用**部署脚本那份 compose**：`cd ~/aihot && sudo docker compose -f docker-compose.server.yml up -d --no-deps api worker`。
   仓库根那份 `docker-compose.yml` 带 `build: .`，在服务器上跑会触发**本地构建**（已踩：跑到 `npm run build -w @aihot/web` 失败，
   容器没换、白等几分钟）。
+- ⚠️ **服务器上单独跑 `docker compose pull` 会认证失败**：仓库是私有 Artifact Registry，`deploy-server.sh` 第 3 步先从 GCE
+  元数据服务取服务账号 token 再 `docker login`，单独 pull 没有这个登录态。**更坑的是 pull 失败后 `up -d` 照样"成功"**
+  （容器被重建、跑的却是本地旧 `latest`），输出里只看到 `Started`。补登录的命令与判据在 `DEPLOY-NOTES.md` 那一节；
+  **部署完必须核 `docker inspect <容器> --format '{{.Image}}'` 等于刚推的镜像 ID**。
 - **`env_file` 只在创建容器时读**：`docker restart` 不够，要 `up -d` 重建（输出里出现 `Recreated` 才算数）。
-- 只改 `.env` 不换镜像 → 用上面的 `--no-deps`；换了镜像内容才走 `scripts/deploy-server.sh`（它会 `pull` 仓库镜像）。
+- **迁移靠 `setup` 容器**：`docker compose up -d`（不带 `--no-deps`）会带起 `setup`，它跑迁移；
+  只重建 api/worker 时**不跑迁移**，要手动 `docker exec aihot-worker-1 node scripts/migrate.ts`。
+- **`.dockerignore` 没排除根目录的 `*.sql.gz`**（546 MB 转储）：会被 `COPY . .` 带进构建层与最终镜像。
+  本地构建时可临时加几条、构建后还原（10-11 就这么做的，仓库文件没改）。
 
 **合并上游后的固定动作**（10-10 那次踩坑得来）：
 
