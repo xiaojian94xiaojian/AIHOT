@@ -2844,3 +2844,68 @@ docker compose -p aihot-test up -d --build api worker web   # 改了代码后重
 `POST /api/ingest/items` 需要 `INGEST_TOKEN`，**本地 `.env` 里没有这一项** → 该接口当前是关闭的。
 要用就在 `.env` 加一行 `INGEST_TOKEN=`（至少 16 位，别用常见占位符），重建 api 后生效；
 限流由 `INGEST_RATE_LIMIT` 控制（compose 默认 10/分）。
+
+## 事故：磁盘写满导致数据库恢复循环、站点 503（2026-10-12）——已恢复
+
+### 症状与处置
+
+10-12 站点全部 503（`/`、`/api/health`、`/hot`、`/daily` 都是）。**根因是根分区 100% 满**，
+PostgreSQL 因此在恢复循环里反复重启（`the database system is in recovery mode` → `all server processes
+terminated; reinitializing`），api 拿不到库就一律 503。
+
+处置（都只读或只删可再生的东西，**没有动数据卷**）：
+
+| 动作 | 释放 |
+|---|---|
+| `docker image prune -a`（未使用的旧镜像，保留在用的 3 个） | 22.9 GB |
+| 删掉失败的本地备份 dump（保留最新两个可恢复） | 12 GB |
+| `docker builder prune` | 0.87 GB |
+| `journalctl --vacuum-size=200M` | 0.69 GB |
+
+磁盘 100% → 35%（31 GB 可用）。**数据库自行恢复**（约 5 秒），没有数据丢失：
+`publications` 49142 条，站点与全部接口复测 200。
+
+### 根因链（一条链，不是单点）
+
+1. **10-03 的 4.0.0 同步把 `DB_BACKUP_STORE_PATH_STYLE` 覆盖掉了**（`1ca5d6d` 把引擎改成从线上
+   代码直接导出，我们本地那个补丁只活在 DEPLOY-NOTES 的文字里，代码与 `.env.example` 里都没了）。
+   服务器 `.env` 里的 `DB_BACKUP_STORE_PATH_STYLE=true` 还在，**但没人读**。
+2. 于是备份端点回落到虚拟主机风格：`https://<桶名>.94053f….r2.cloudflarestorage.com/…`。
+   **R2 只认路径风格**，每天的备份都回 `403 AccessDenied`。
+3. 备份失败，但 `pg_dump` 已经跑完、dump 留在 `/data/backups`。**每天两份，9 天堆到 12 GB**。
+4. 10-12 磁盘写满 → 数据库恢复循环 → 503。
+
+`backup.ts` 的本地保留（`KEEP_LOCAL = 3`）在**上传之后**才执行，上传一抛错就永远走不到，
+所以失败期间的垃圾没人清 —— 这是失败路径漏了清理。
+
+### 修复与验证
+
+- 提交 `970b8da`：端点从字符串改成 `(key) => url` 的函数，桶名进主机名还是进路径只在一处决定；
+  恢复 `DB_BACKUP_STORE_PATH_STYLE`（默认 false，其它存储行为不变）；桶名不是合法 DNS 标签时
+  只能走路径风格。`.env.example` 补回该项并修正「访问域名要带桶名」的旧说法。
+- 回归：`tests/backup-store-url.test.ts`（先失败后通过），`tests/backup.test.ts` 把
+  「默认虚拟主机风格」显式断言。容器全套 **681 通过 / 0 失败**。
+- 镜像 `a759d61b00b7` 已部署（回滚点 `rollback-d7c664c05db4`… 见 registry 里的 `backup-fix` 标签），
+  部署后手动跑了一次真实备份：**`uploaded = true`**，远端 HEAD `daily/aihot-202610121324.dump`
+  966776946 字节、与本地一致。这是 **10-03 以来第一次成功上传**。
+- 成功一次之后本地保留随即生效：`/data/backups` 只剩最新 3 对 dump/tar。
+
+### 判据（下次必看）
+
+- **`backup.last` 的 `at` 字段**：超过一天没更新就是备份在失败（不要只看磁盘）。
+- **`job_runs` 里 `ops.backup` 的 status**、以及 `pgboss.job` 里同名任务。
+- **`/data/backups` 的文件数**：正常应 ≤ 3 对；只涨不降说明上传成功不了。
+- 备份是 UTC `10 4 * * *`（**北京 12:10**），不是凌晨。
+
+### 仍未解决的两件事（都要站主决定）
+
+1. **告警没有收件人**：`alerts.ts:122` 本来就有「备份超过一天没成功」的告警
+   （`backup.stale`），但 `FEISHU_INTERNAL_ENABLED=false` —— 内部飞书群从来没配过
+   （我们只接了内容群推送）。**这是这次 9 天无人察觉的真正原因。** 需要 `FEISHU_APP_ID` /
+   `FEISHU_APP_SECRET` / `FEISHU_INTERNAL_CHAT_ID`。
+2. **磁盘没有闸**：满了才有征兆。可复用告警框架加一条「剩余空间低于 15%」。
+
+### 顺带查到（与本次无关）
+
+- `/var/log` 2.4 GB（journal 已清到 200 MB；`google-cloud-ops-agent` 占 780 MB）。
+- 数据库里 `receipts` 表 951 MB（**每行存原始模型请求/响应**），是库内最大对象；`articles` 298 MB。
