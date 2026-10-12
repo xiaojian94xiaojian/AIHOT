@@ -2895,7 +2895,9 @@ terminated; reinitializing`），api 拿不到库就一律 503。
 - **`backup.last` 的 `at` 字段**：超过一天没更新就是备份在失败（不要只看磁盘）。
 - **`job_runs` 里 `ops.backup` 的 status**、以及 `pgboss.job` 里同名任务。
 - **`/data/backups` 的文件数**：正常应 ≤ 3 对；只涨不降说明上传成功不了。
-- 备份是 UTC `10 4 * * *`（**北京 12:10**），不是凌晨。
+- 备份是 `10 4 * * *`，**时区 Asia/Shanghai，即北京 04:10**（不是凌晨 UTC，也不是中午；
+  我先前写成 12:10 是误把它当 UTC，实测 `pgboss.schedule.timezone` 为 Asia/Shanghai）。
+  其余定时任务同样在 Asia/Shanghai：系统日报 `0 9 * * *`（北京 09:00）、告警 `*/10 * * * *`、留存 03:30、出刊每半小时。
 
 ### 仍未解决的两件事（都要站主决定）
 
@@ -2909,3 +2911,71 @@ terminated; reinitializing`），api 拿不到库就一律 503。
 
 - `/var/log` 2.4 GB（journal 已清到 200 MB；`google-cloud-ops-agent` 占 780 MB）。
 - 数据库里 `receipts` 表 951 MB（**每行存原始模型请求/响应**），是库内最大对象；`articles` 298 MB。
+
+## 接上飞书内部告警（2026-10-12）
+
+内容群推送之外的第二条线：**自建应用**（不是自定义机器人 webhook），告警与读者反馈都进**同一个群**
+（站主选「只想要一个群」）。
+
+| 位置 | 内容 |
+|---|---|
+| 服务器 `.env`（600） | 新增 `FEISHU_APP_ID`(21)、`FEISHU_APP_SECRET`(32)、`FEISHU_INTERNAL_CHAT_ID`(35)，`FEISHU_INTERNAL_ENABLED=true` |
+| 备份 | `.env.before-feishu-internal-20261012-140031` |
+| 群 | **AI信息**（`oc_835f97f1eea70847a0a08b20e46506f5`，只有 1 个成员、非外部群）；只填 `FEISHU_INTERNAL_CHAT_ID`，没填 `FEISHU_ALERT_CHAT_ID`，所以告警与反馈同群 |
+| 应用 | `cli_aa836258bbf8dbd6`；凭据也在本机 `E:\cs\hot\feishu.txt`（与内容群 webhook 同文件） |
+
+### 验证（都走真实代码路径）
+
+| 项目 | 结果 |
+|---|---|
+| `sendAlert()`（worker 容器内） | 返回 **sent** |
+| `checkAlerts()`（就是每 10 分钟那个任务） | 本轮发出 `deliveries.failed` 与 `monitor.review:recovered` |
+| 图片上传 `im/v1/images` | `code=0`，拿到 image_key → **反馈截图能发** |
+| `screenshotsForwarded()` | true（转发成功即删本地文件，备份的文件包因此不再含截图） |
+| worker 容器出口 IP | `34.96.136.13`（= 预留静态地址 `aihot`，不会变） |
+| 站点 | `/`、`/api/health` 均 200 |
+
+### ⚠️ 内容群推送被我上次的「关键词」建议坑了（待站主改一处设置）
+
+3 条投递失败，原因**不是**磁盘故障：
+
+```
+{"code":19024,"msg":"Key Words Not Found"}
+```
+
+我先前让站主把自定义机器人的安全设置选「自定义关键词 = 精选」，但**卡片里根本没有「精选」这个词**：
+
+| 投递 | 内容 | 含「精选」 | 含「MyHOT」 |
+|---|---|---|---|
+| #1 codex_reset | Codex 额度重置：Tibo 已宣布 | ❌ | ✅ |
+| #2 codex_reset | Codex 额度重置已完成（Tibo 确认） | ❌ | ❌ |
+| #3 selected | GPT-6.1 Sol …上下文长度提升至 500k | ❌ | ✅ |
+
+卡片由不同模块各自拼装，**没有任何字符串会出现在所有卡片里**，所以「换一个关键词」解决不了。
+
+**修法（站主在飞书里改，不需要改代码）**：把该机器人的安全设置从「自定义关键词」改成
+**「IP 白名单」**，填 `34.96.136.13`（已从 worker 容器内实测确认出口 IP 就是这个）。
+
+改完之后我可以把 3 条失败的投递重发（`resendDelivery`）。`postWebhook` 不做签名，所以
+**不要选「签名校验」**，否则同样会失败。
+
+### 一个框架小缺陷（有真实证据，可考虑报上游）
+
+`checkAlerts` 在 `sendAlert` 返回 `disabled`（通道没开）时**照样把状态写成已发送**
+（`alerts.ts:330-331`），于是：
+
+- 通道关闭期间算出来的告警被静默吞掉，而且在重复间隔内**不会重发**
+  （本次实测：`deliveries.failed` 在 13:10Z 被记成已发，当时 `FEISHU_INTERNAL_ENABLED=false`）；
+- 我把这一条的状态抹掉并跑了一次 `checkAlerts`，它才真正发出去。
+
+合理的修法是：`sendAlert` 返回 `disabled` 时不写状态。这条有我们部署里的真实证据。
+
+### 站主现在会收到什么
+
+- **每 10 分钟**（`cron.ops.alerts`）：只有 `now`/`today` 级——站点挂了、内容群推送失败、
+  服务商故障/额度、备份超一天没成功、日报缺期、Codex 重置待确认。同类在 1 小时（now）/ 24 小时（today）内不重复。
+- **每天北京 09:00**（`cron.ops.digest`）：一条系统日报，汇总 `later` 级事项（当前 8 条：
+  61 个信源 7 天没新内容、7 个待核实质量、10 个热度信号反复失败、4 个付费请求结果未确认等）。
+
+**注意时区**：所有定时任务都在 `Asia/Shanghai`（实测 `pgboss.schedule.timezone`），
+不是 UTC —— 备份是**北京 04:10**，出刊每半小时、留存 03:30。
