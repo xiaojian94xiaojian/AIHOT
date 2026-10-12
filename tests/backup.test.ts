@@ -38,7 +38,8 @@ const stem = sql.options.database.toLowerCase().replace(/[^a-z0-9]+/g, "-");
 
 globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
   const url = new URL(input instanceof Request ? input.url : String(input));
-  assert.equal(url.origin, "https://backup.invalid", "the backup fixture must not contact any real service");
+  // Virtual-host style (the default): the bucket is the first label of the host, so the path is the key.
+  assert.equal(url.origin, `https://${env.DB_BACKUP_STORE_BUCKET}.backup.invalid`, "the backup fixture must not contact any real service, and without DB_BACKUP_STORE_PATH_STYLE the bucket stays in the host");
   const chunks: Buffer[] = [];
   for await (const chunk of init!.body as unknown as AsyncIterable<Uint8Array>) chunks.push(Buffer.from(chunk));
   objects.set(url.pathname.slice(1), Buffer.concat(chunks));
