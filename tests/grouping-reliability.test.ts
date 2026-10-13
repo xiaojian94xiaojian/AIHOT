@@ -219,3 +219,31 @@ for (const change of ["revision", "regroup"] as const) test(`${change} withdraws
   const [current] = await sql`SELECT a.grouping_status,p.selected FROM articles a JOIN publications p ON p.article_id=a.id WHERE a.id=${id}`;
   assert.deepEqual({ ...current }, { grouping_status: "pending", selected: false });
 });
+
+// A spent provider budget is a wait, not a failure: the error carries `retryAfterSeconds`, and the
+// source-health report excludes budget waits from failure counts. A report that stopped on one has to
+// stay repairable by the sweep; recording it as terminal abandons it for good. A deployment that did
+// exactly that lost 18 reader-visible reports for eleven days.
+test("a report stopped by a spent budget stays repairable instead of being abandoned", async () => {
+  const id = await report("spent-budget");
+  const saved = await sql<{ service: string; per_minute: number; per_hour: number; per_day: number }[]>`
+    SELECT service, per_minute, per_hour, per_day FROM budgets`;
+  assert.ok(saved.length > 0, "the budgets fixture must exist");
+  await sql`UPDATE budgets SET per_minute = 0, per_hour = 0, per_day = 0`;
+  try {
+    await assert.rejects(() => groupArticle(id), /Budget for .* exhausted/);
+    const [row] = await sql<{ grouping_status: string; grouping_error: string | null }[]>`
+      SELECT grouping_status, grouping_error FROM articles WHERE id = ${id}`;
+    assert.match(String(row!.grouping_error), /Budget for .* exhausted/);
+    assert.equal(row!.grouping_status, "pending", "a spent budget is a wait: the sweep must be able to repair it");
+  } finally {
+    for (const b of saved) {
+      await sql`UPDATE budgets SET per_minute = ${b.per_minute}, per_hour = ${b.per_hour}, per_day = ${b.per_day} WHERE service = ${b.service}`;
+    }
+  }
+  // With the budget back, the sweep queues it again; only its own three-minute threshold delays it.
+  await sql`UPDATE articles SET created_at = now() - interval '5 minutes' WHERE id = ${id}`;
+  await sweepUngrouped();
+  const queued = await sql`SELECT 1 FROM pgboss.job WHERE name = ${QUEUES.group} AND data->>'articleId' = ${id} AND state IN ('created', 'active', 'retry')`;
+  assert.equal(queued.length, 1, "the sweep queues the report again");
+});
