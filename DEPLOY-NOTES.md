@@ -3043,3 +3043,65 @@ terminated; reinitializing`），api 拿不到库就一律 503。
   **17 个是源站本来就没更新**；X 账号那 135 个更彻底——直接调 SocialData API 验证，LeCun 的最新
   **原创**帖是 08-16（10-13 的全是回复别人的争论，被查询里 `-filter:replies` 按设计排除）、
   吴恩达 09-29、DeepSeek 10-02。**不是采集失效。**
+
+## 额度用尽让归组永久停摆：修好并报上游（2026-10-13）
+
+### 症状与真实死因
+
+飞书 🔴 告警「有精选新闻卡在去重确认，暂未发布（已持续 10 天）」，18 条。告警的 `action` 文案把
+人指向「未知回执需核对计费」，但**这 18 条根本没有回执**（`grouping_receipt_id IS NULL`），错误是
+`Budget for deepseek exhausted (hour)`。
+
+链条：10-02～10-09 采集高峰（每天 6000+ 篇）打满 deepseek 额度 → `groupArticle` 抛
+`BudgetExceededError` → `events/group.ts:255` 把它写成 `grouping_status='failed'`（终态）→
+`jobs/events.ts:29` 的 `sweepUngrouped` 只扫 `pending` → 再没人重试 → 卡 11 天。
+
+### 缺陷（已确认是上游代码）
+
+四个相关文件与 `origin/main` **逐字一致**，作者是 Khazix：
+
+- `events/group.ts:251-257`：catch 里只有 `shutdownSignal.signal.aborted` 算可恢复，其它一律终态。
+- `providers/receipts.ts:16-23`：`BudgetExceededError` **自带 `retryAfterSeconds`** —— 它被定义为
+  「过一会儿可以再来」的错误。
+- `sources/health.ts:27,36-40`：明确把额度等待**排除在失败计数之外**。
+
+**同一个错误，在健康统计里不算失败，在归组里却是永久放弃。**
+
+### 修复与验证
+
+- 提交 `cd9b397`：catch 里 `const repairable = shutdownSignal.signal.aborted || error instanceof BudgetExceededError`，
+  留 `pending` 交给扫描器。
+- 回归测试（`tests/grouping-reliability.test.ts` 新增一项）：把所有预算置 0 触发额度错误，断言留在
+  `pending` 且扫描器会重新入队。**去掉修复时失败**（`actual: 'failed'` / `expected: 'pending'`），
+  加上后全套 **682 通过 / 0 失败**。
+- 镜像 `bf8ba6060e97` 已部署，容器内确认第 23、257 行就是修复。
+
+### 那 18 条已救回，**733 篇积压仍在**（不要搞混）
+
+18 条是用后台那条正路救的：`admin/content.ts` 的 `rerun(id, "group", …)` → `requestRegroup`
+（即「重跑 → 归组」），18 条全部 `complete` + `selected=true` + `public` → `waitingSelectedNews` 归零 → 告警清除。
+它们的入库时间是 10-02 22:49，属**补回历史位置**，不是当新闻发。
+
+⚠️ **修复不追溯**：它只让将来的额度中断留在 `pending`。已写成 `failed` 的 **733 篇**（`sweepUngrouped`
+仍只扫 `pending`）不受影响 —— 我先前说「部署后扫描器会自动重试那 800 篇」是错的。
+
+**建议先不动这 733 篇**，理由有两条：
+
+1. 它们的 `selection_candidate` **全是 false**，不进精选，只影响事件页与时间线的历史补全；
+2. 归组队列是**串行**的（`localConcurrency: 1`），一次灌 733 个任务会把**当天新文章的归组推迟约一小时**
+   —— 用读者的新鲜度换历史补全，不划算。
+
+要补的话按需要**选择性重跑**（例如只挑最近 3 天的），用同一个 `rerun(id, "group", …)`。
+
+### 已报上游
+
+- **#195** 信源健康的「静默」判据按各源自身节奏判断（减少低频源每日误报）
+- **#196** 额度用尽会把手写归组变成永久终态失败（本条，附确定性复现与最小修法）
+
+两条都只写场景与方案，不含本站的阈值、信源 ID 与 industry 包内容。
+
+### 仍未处理
+
+4 条结果未知的付费请求（3 条 `score_article` 自 10-07、1 条 `embedding` 自 10-02）。它们与上面这 18 条
+**无关**（只有 1 篇文章关联到其中 1 条，且它不在那 18 条里）。放行需要人工判断「供应商是否已计费」，
+涉及付费记录，留给站主在后台核对。
