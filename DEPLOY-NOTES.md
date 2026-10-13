@@ -3004,3 +3004,42 @@ terminated; reinitializing`），api 拿不到库就一律 503。
 
 **注意时区**：所有定时任务都在 `Asia/Shanghai`（实测 `pgboss.schedule.timezone`），
 不是 UTC —— 备份是**北京 04:10**，出刊每半小时、留存 03:30。
+
+## 删掉 6 个坏信源（2026-10-13）
+
+10-13 的系统日报报了 8 条，逐条查完后删掉这 6 个（其余是阈值噪声，见下）：
+
+| 信源 | 删除理由（实测） |
+|---|---|
+| `rss-developers` OpenAI Developers | `developers.openai.com/rss.xml` 对**默认 UA 和浏览器 UA 都 403**，已连续失败 48 次（12 天）。而 `openai.com/news/rss.xml` **已由 `rss-openai-news` 覆盖**，所以删掉不丢内容 |
+| `src-cbf787802c` Golem.de | **从未采集成功过一次**（45 连败）：`Connect Timeout Error (77.247.84.129:443, timeout 10000ms)`；用 20 秒超时的普通请求能抓到，说明是连接超时太短 |
+| `src-cc96d787d7` Techmeme | 每次抓取都超时（20 秒探测也超时） |
+| `src-d45942267e` 新浪科技 | feed **自 2018-09-23 未变过**（`last-modified` 就是那天），源已死 |
+| `src-362baa923a` Big Technology | 近 7 天 0 入库，源站最新 10-06 站上没有；每次抓取 `found=100, new=0`（采集器认为都已知），根因未查明 |
+| `src-nikkei-asia` Nikkei Asia | 5 天采了 **160 篇全部 `skipped`**，一篇都进不了站点：`backfill_reason = unknown-publication-time`，发布行 `eligible=false / indexable=false / selected=false` |
+
+**做法（两处都要，缺一不可）**：
+
+1. 从 `industry/sources.json` 移除这 6 条（626 → 620）。`scripts/seed.ts` 是
+   `ON CONFLICT (id) DO NOTHING`（「已有的永不覆盖」），所以移出包就不会再被种回来。
+2. 生产库 `update sources set enabled = false, next_fetch_at = null`（启用中 531 → 525）。
+   **行必须保留**：`articles.source_id` 引用它，删行会连带毁掉文章。
+   `sources/health.ts:63` 的 `sourceHealth` 过滤 `s.enabled`，所以停用后日报里那几条也一起消失。
+
+**没有做撤回**：`scripts/withdraw-source.ts` 是给「这个源的内容不该公开」用的
+（写 `visibility='withdrawn'`）。这 6 个是「源坏了」而不是「内容不对」，撤回会把合法文章从站点拿掉
+——`rss-developers` 有 10 条精选、`src-362baa923a` 103 条、`src-cc96d787d7` 60 条、`src-d45942267e` 15 条，
+全部原样保留。
+
+**要撤销**：把条目加回 `sources.json` 并 `update sources set enabled = true, next_fetch_at = now()`。
+
+### 查这些时的两个教训
+
+- **别把 feed 的 `<updated>` 当成文章日期。** 第一轮审计用「所有日期取最大」，把 Atom feed 顶层的
+  `<updated>`（每次都刷新成当前时间）当成了最新文章，于是误报 Sam Altman 博客漏收 185 天、
+  Claude YouTube 漏收 14 天。**只取 `<item>`/`<entry>` 内部的日期**后，这两个都变成「源站最新一条
+  与我们存的完全一致」。纠正后 19 个 RSS 源里真漏收从 5 个降到 2 个。
+- **「7 天 0 新增」绝大多数是噪声。** 判据是拿源站最新一条与库里的比对。查过的结果：19 个 RSS 源里
+  **17 个是源站本来就没更新**；X 账号那 135 个更彻底——直接调 SocialData API 验证，LeCun 的最新
+  **原创**帖是 08-16（10-13 的全是回复别人的争论，被查询里 `-filter:replies` 按设计排除）、
+  吴恩达 09-29、DeepSeek 10-02。**不是采集失效。**
