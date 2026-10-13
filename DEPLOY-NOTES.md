@@ -3134,3 +3134,38 @@ terminated; reinitializing`），api 拿不到库就一律 503。
 措辞上守住 `SECURITY.md` 的规矩：**零技术细节，只请他去 Security → Advisories 看**。
 
 **注意**：这是单次观察到的相关性，不能证明因果；但「只走 GHSA = 4 天无人看」这一半是确定的。
+
+## 合并上游 5 个提交（2026-10-13，含维护者的安全修复）
+
+上游这次带进 **`ea96060`「补齐地址、图片与材料的安全边界」**——就是我们那 4 份报告的修复：
+Caddyfile 五个安全头、5 份提示词加 `{{> safety}}`、`url.ts` 的结尾点归一化、`image-url.ts` 拒非图片
+`data:` 地址，并各配了回归测试。另外两份（清洗器惰性属性、SSRF 结尾点）他**接受成了草稿公告**
+（`state=draft` + `submission.accepted=true`），两份加固类（提示词、安全头）**静默修掉、没接受**。
+
+### 冲突与取舍（按站主「他的修法可以就放弃我们的」）
+
+只有 3 个冲突：`deploy/Caddyfile`、`industry/prompts/translate-body.md`、`translate-post.md`。
+
+⚠️ **自动合并有个坑**：另外 3 个提示词里 `{{> safety}}` 被**合成了两份**（两边都加了同一行）。
+已把这 6 个文件**一律取上游版本**，现在各恰好 1 次。
+
+**放弃的**：Caddyfile 我们那版头（改用他的 `?` 前缀版本，意为「已设置就不覆盖」；值是
+`SAMEORIGIN` / `max-age=31536000`，与我们的 `DENY` / `63072000` 等效）、5 份提示词里我们那行
+「数字/单位/日期/价格照原文」的保真要求。
+
+**保留的**（上游没覆盖）：
+- `industry/prompts/understand.md` 的 `{{> safety}}`——他的提交没动这个文件，而
+  `tests/architecture.test.ts` 要求 6 份都有；少一份测试就红。
+- `content/sanitize.ts` 的 scheme 白名单（+63 行，在 `transformTags` **之后**统一校验）。
+  **他的 `image-url.ts` 只拒非图片的 `data:`，范围比我们窄**，而那份草稿公告还开着——等公告落地
+  或发布后再比较，确认覆盖得上才谈放弃。
+- 归档门、备份 `PATH_STYLE`、登录失败日志、额度可恢复（`events/group.ts`）。
+
+### 状态
+
+- 合并提交 `0eba7db`，**落后上游 0 个提交**；worktree 已清，临时分支已删。
+- 正常树全套 **684 通过 / 0 失败**（+2 是上游带的 url/image-url 测试）。
+  （在 worktree 里跑会有 1 项假失败：`.git` 是指向外层的文件，容器内 `git ls-files` 解析不到仓库。）
+- 镜像 `34b6b14b0c24`（回滚标签 `merge-0eba7db`；上一个好版本是 `bf8ba6060e97`）已部署：
+  上游的四处改动与我们的四条分叉在容器内逐项确认都在。
+- 站点 `/`、`/api/health`、`/hot`、`/daily`、`/codex-reset` 全 200；近 10 分钟抓取 83 成功 / 0 失败。
