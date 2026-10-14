@@ -3304,3 +3304,44 @@ ssh -i $env:USERPROFILE\.ssh\google_compute_engine weijianlin@34.96.136.13
 `%APPDATA%\gcloud\logs\*.log` 里那行 `plink … weijianlin@34.96.136.13` 找到的。）
 脚本一律写成 `.sh` 本地文件 → `scp` 到 `/tmp` → `sed -i 's/\r$//'` → `sh` 执行，
 中间产物放 `E:\cs\aihot\.cache\hot\`（已 gitignore）。
+
+## #195 的 PR：静默判据改成按信源自己的节奏（2026-10-14）
+
+上游在 #195 里要的：用已有、去重后的发现历史判断是否超出该源自身节奏；不新增配置、不引入付费调用；
+历史不足、从未发现内容的源仍需可见；采集失败与实际漏收的证据保留；`interval_minutes` 不能当发布节奏；
+先给证据（窗口、倍数、排序），回归覆盖正常低频/高频/漏收/历史不足，拿真实订阅做前后对照，并给有界查询与性能依据。
+
+**已提 PR #202**（<https://github.com/KKKKhazix/AIHOT/pull/202>），分支 `fix/source-silence-rhythm`
+从 `origin/main` 的 `e57da5a` 开出，单个提交 `65731da`，已推 `fork`。改动只有四处：
+
+| 文件 | 改了什么 |
+|---|---|
+| `packages/backend/src/sources/health.ts` | 判据本体：产出日、节奏、超出倍数、历史不足 |
+| `packages/backend/src/operations/alerts.ts` | 日报条目拆成「超出自身更新节奏」和「7 天没有新内容（历史不足）」 |
+| `packages/backend/src/operations/reports.ts` | 周报同样拆开，头部计数跟着改 |
+| `tests/source-health.test.ts` + `docs/sources.md` | 四类回归 + 判据说明 |
+
+**判据**：产出日 = 最近 90 天收到的内容（它自己的条目 + 它带来的别人的条目）按各自日期
+（有发布时间用它，没有用发现那天）去重到「天」；节奏 = 相邻产出日间隔的**中位数**；
+至少 **4** 个产出日才算有节奏，静默超过中位间隔的 **4 倍**才算超出；历史不足或从未收到内容的**仍然列出**；
+7 天 0 发现仍是触发条件；`interval_minutes` 不参与。
+
+**生产库实测（524 个在用源、建站 14 天）**：现行判据列出 **55** 个 → 新判据 **14 个超出 + 2 个历史不足（仍列出）
++ 39 个回到自身节奏内**。倍数 2/3/4/5/6 分别列出 31/22/14/10/6 个（构成：4 倍下 10 个 X、1 个 HuggingFace JSON、
+1 个 RSS、2 个网页）。窗口 60/90/120 在本部署结果完全一致（全部数据都在 60 天内），90 天是为老站定的默认。
+
+**逐个核对**（抓源站、不用付费接口）：能核对的 3 个都是源站自己没更新——`rss-answer`（源站 08-18 / 我们 08-19）、
+`web-tensorzero`（05-12 / 05-11）、`src-huggingface`（HuggingFace API `createdAt` 最新 07-31 / 我们 07-31）；
+剩下 10 个是 X 账号，核对要用采集同款付费接口所以没核。**结论：这个判据是排序与减噪，不是故障判定**——
+真正的采集故障仍由「连续失败 / 反复失败」两条兜住，措辞里也写明要对照原站。
+
+**开销**：节奏 CTE 在 6.3 万篇文章 / 6.5 万条发现上 **176 ms**（同样口径下 `OR published_at` 是 515 ms，
+而且逐源天数完全一致——发布不会早于发现，所以只按 `discovered_at` 设界，正好用上 `articles_discovered_idx`）。
+没有新增索引与迁移：`article_discoveries` 上本来就没有 `discovered_at` 索引，现有 7 天查询一直在扫它。
+
+**验证**：`npm run typecheck` ✓；容器全套 **581 通过 / 0 失败**（在干净库上跑：`DB_NAME=aihot_clean_ci`，
+用 `aihot_ci` 会因里面留着本仓库模块的表而让 `tests/architecture.test.ts` 报「多出 lb_*/monitor_* 表」，
+那是旧库的残留、不是代码问题）；GitHub CI `docker` 通过、`check` 当时还在跑。
+
+**推送注意**：`fork` 的 pre-push 钩子（ECC）会跑本地 `npm test`，而本地没设 `DATABASE_URL` 时它必然失败
+（测试库要求 `*_test`/`*_ci` 结尾）。这次先用容器套件自验，再用 `$env:ECC_SKIP_PREPUSH="1"` 推。
