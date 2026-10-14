@@ -1,151 +1,122 @@
-# 交接：当前状态与未结事项（2026-10-11 更新）
+# 交接：当前状态与未结事项（2026-10-14 更新）
 
-> 新会话从这里开始。更细的内容按需查：`DEPLOY-NOTES.md`（全站运行日志，2600+ 行，几乎所有历史事实都在里面）、
-> `KB-PLAN.md`（知识库模块方案）、`SECURITY-PLAN.md` / `SECURITY-REVIEW.md`（安全审查）、
-> `UPGRADE-HANDOFF.md`（4.0 升级的旧交接）。工作目录 `E:\cs\hot\` 里是方案草稿、待提交的报告与密码文件（不在 git 里）。
+> 新会话从这里开始。更细的内容按需查：`DEPLOY-NOTES.md`（全站运行日志，3000+ 行，几乎所有历史事实都在里面）、
+> `KB-PLAN.md`（知识库模块方案）、`SECURITY-PLAN.md` / `SECURITY-REVIEW.md`（安全审查）。
+> 草稿与脚本在 `E:\cs\hot\`（不在 git 里）。
 
 ## 0. 一分钟版本
 
-- **生产**：https://hot.jian.ing 跑镜像 `d7c664c05db4`（`merge-7ffe2ba`：上游 4 个提交 + 我们的登录日志与提示词加固），
-  回滚点 `rollback-8c320b323bf4`（更早的 `app:rollback-*` 标签也都在）。三页 200、容器稳定、日志零报错。
-- **代码**：工作树在 `upgrade-4.0`（`7ffe2ba` 合并提交），**落后上游 0 个提交**，工作树干净。
-- **发布状态**：本地与生产一致，**没有未部署的提交**。
-- **飞书精选推送已接通**（生产 `.env` + `notify_targets`，两次测试卡实测送达，见 `DEPLOY-NOTES.md`）。
-- **未结一件**：知识库模块，活在 `feat/kb-module`（已推），未合并未部署（站主试用后认为形态太粗）。
-- **安全审查剩余**：CSP 未做（站主选了「先不管 CSP」；勘查结论是 hash 不可行、nonce 与页面缓存互斥）。
-- **私密报告**：4 份真实报告全部提交、全部在 triage，待发清单已清空。
+- **生产**：https://hot.jian.ing 跑镜像 `34b6b14b0c24`（标签 `merge-0eba7db`），回滚点 `bf8ba6060e97`。
+  三页 200、容器稳定、抓取正常（近 10 分钟 83 成功 / 0 失败）。
+- **代码**：工作树在 `upgrade-4.0`，HEAD `d9ee498`（第二次合并上游），**落后上游 0 个提交**，已推 `fork`。
+- **测试**：容器全套 **694 通过 / 0 失败**（`pwsh scripts/test-in-container.ps1`，需 `aihot-testdb` 在跑）。
+- **未部署的提交**：合并 `d9ee498` 尚未部署。**可以不急**——它与线上跑的行为一致（上游那份修复就是我们那份），
+  另两个提交只影响 SelectBench 评测与后台校验。
+- **最要紧的未结事项**：**5 个网页源在静默漏收**（详见 §1），站上正在丢内容。
 
-## 1. 未结事项
+## 1. 未结事项（按优先级）
 
-### ① 私密报告：全部提交完成 ✅（10-10 23:16 / 23:19）
+### ① 修 5 个静默漏收的网页源（最紧急，站上在丢内容）
 
-| 报告 | GHSA | 状态 |
-|---|---|---|
-| 清洗器惰性属性绕过 | `GHSA-727h-m5jh-46mj` | ✅ 已提交，triage（上游未修 `sanitize.ts`）|
-| SSRF 结尾点绕过 | `GHSA-596c-jrmp-xhm6` | ✅ 已提交，triage（上游未修 `blockedHostname`）|
-| 五份提示词缺「不可信数据」条款 | `GHSA-gj3j-rgpx-m32p` | ✅ **10-10 23:16 提交**，triage |
-| 默认 Caddyfile 无安全响应头 | `GHSA-j954-mqhh-3pjp` | ✅ **10-10 23:19 提交**，triage |
-| 误建的 `probe` 空报告 | `GHSA-2ffm-xwrw-622h` | 无法撤回，已在报告 1 里说明请维护者关闭 |
+判据：**抓它自己的列表页，看有没有比我们库里更新**（只读脚本 `E:\cs\hot\audit-web.sh`）。
 
-- **待发清单已清空**，不用再等配额。状态存在 `E:\cs\hot\advisories-state.json`（从 API 取的实况）、
-  提交记录在 `E:\cs\hot\advisories-result.txt`。
-- **教训**：GitHub 的「内容创建」次级限流是**账号级约 24 小时**窗口，从创建第 3 份那一刻算起；期间 API 与网页都挡
-  （10-10 07:57 试 API、08:19 试网页都被挡）。**撞到就记时间、等满 24 小时再发一次**，中途重试只会续期。
+| 信源 | 页面最新 | 我们最新 | 落后 | 诊断 |
+|---|---|---|---|---|
+| `web-blog` CMU ML Blog | 2026-10-14 | 2026-08-09 | **65 天** | `itemSelector: h3`，**页面里已无 `<h3>`** → 选择器彻底失效 |
+| `web-bfl` Black Forest Labs | 2026-09-23 | 2026-08-20 | 33 天 | 选择器能匹配，但**只匹配到已有的 12 条**（每小时 `found=12/new=0`） |
+| `web-cursor` Cursor Blog | 2026-10-13 | 2026-09-23 | 20 天 | 同上 |
+| `web-sarvam` Sarvam AI | 2026-10-13 | 2026-09-23 | 19 天 | 同上 |
+| `web-blogs` NVIDIA AI Blog | 2026-10-13 | 2026-10-01 | 11 天 | 同上 |
 
-### ② 归档闸门是永久 fork 本地分叉（上游已拒）
+**关键事实**：这 5 个源最后一次入库都在 **2026-09-30 23:27**（三个时间戳相差几秒），且多数文章标着 `backfill`
+→ 那是**建站时的首次回填**，也就是说它们**从建站起就没再收进过任何东西**，不是「后来页面改版」。
 
-议题 **#172 结论**（维护者原话要点）：历史归档不进今天/不推送/不建事件，但**仍有阅读与精选价值**；
-加开关会**多一套要长期验证的规则** → 「暂不收这个开关，也不把历史归档改成默认停在预筛」。
+**下一步**：一次只修一个站，从 CMU 开始（选择器是死的，最容易确认）。每个站的流程：
+抓页面 → 定位**最新那批条目**的容器结构（注意最新的通常在顶部 hero/特稿区，与列表区结构不同）→
+改 `industry/sources.json` 里的 `itemSelector`（必要时加 `titleSelector`）→
+在容器里手动跑一次该源抓取 → 确认 `new_count > 0` 且文章有日期。
+**判据：`fetch_runs` 里 `new_count > 0`，且 `max(published_at)` 追上页面最新。**
 
-我们的处置：**保留闸门**（省约 180 次评分调用/天，站主决定），代价是放弃约 6% 的归档条目可能进精选。
-**每次同步上游后必须核对**：`analyze.ts` 里的 `opts.sweep && !opts.attemptTag && isHistorical(...)` 与 `tests/history-limit.test.ts`
-（4.0.0 升级时丢过一次）。`feat/archive-analysis-switch` 分支已无用。
+### ② #195 的 PR（上游明确要，范围已划好）
 
-### ③ 安全审查：只剩 CSP（站主已明确「先不管」）
+上游回复原文要点：**按收窄范围提 PR** —— 用**已有、去重后的发现历史**判断是否超出该源自身节奏；
+**不新增配置、不引入外部付费调用**；历史不足、从未发现内容的源**仍需可见**；采集失败与实际漏收的证据要保留；
+**`interval_minutes` 是抓取频率，不能当发布节奏**（我提的备选被否了）。
+还要**先给证据**：历史窗口、倍数、排序都要有依据；回归覆盖正常低频/高频/漏收/历史不足四类；
+拿一批真实订阅做前后对照，并**提供有界查询与性能依据**。
 
-1. ~~提示词加固~~ —— **已做**（六份提示词，规则测试在 `tests/architecture.test.ts`）。报告建议的「`summaryZh` 一致性校验」
-   **量过之后没有上**：任何「数字必须在正文里找到」的硬闸都会误伤 11–14% 的正常摘要（数据见 `SECURITY-REVIEW.md` [S3]）。
-   **样本回放仍未做**（需要真实模型调用）。
-2. ~~后台登录失败不审计~~ —— **已做**（`dcdcd45`）：记进程日志不记 `audit_log`（后者可被未认证者灌）。
-3. **CSP**：勘查完成 —— 真实 HTML 每页 6 段内联脚本，含 41KB 的 loader 数据流，**同一路径连抓 3 次得 3 种不同集合**
-   → 固定 hash 不可能；nonce 唯一可行但与页面 `max-age` 互斥；另实测到 `header >Content-Security-Policy` 会**覆盖**
-   图片代理自己的 CSP。**站主选了先不做**，要做时按 `SECURITY-REVIEW.md` [S3] 的落地位置改。
+**下一步**：先出证据表（只读生产库）：各源去重后的发现间隔中位数；现行的 60 个静默源里**哪些会被新规则排除**；
+窗口 60/90/120 天 × 倍数 2×/3×/4× 的对照；有界查询方案。
+**做法**：从 `origin/main` 开干净分支（**不能**用我们这条带 80 个本地提交的分支），只放 `sources/health.ts`
+（+`operations/alerts.ts` 措辞）+ 测试。
 
-### ④ 知识库模块搁置在 `feat/kb-module`
+### ③ 5 条未确认的付费请求（**要站主本人**）
 
-模块 + 5 个测试 + 后台页面都写完、容器内通过、公开的 agent/MCP 出口已按安全结论摘掉（`1edce5f`）。
-站主试用后认为形态太粗，**暂不合并**。要拿起来看 `KB-PLAN.md`；注意它改过
-`docs/architecture.md`、`docs/deploy.md`、`Dockerfile`、`.env.example`，合并时这几处要和上游的改动一起看。
+`deepseek/score_article`（3 条自 10-07）+ `embedding`（自 10-02/10-13）。要在后台「运行」页核对
+「供应商是否已计费」后放行。涉及付费记录，不要替站主判断。它们卡着对应文章的评分。
 
-### ⑤ 飞书：只接通了「精选推送」一条线
+### ④ 归组积压 733 篇（建议不动）
 
-- 已接：内容群 webhook（`FEISHU_PUSH_WEBHOOK_URL` + `FEISHU_CONTENT_PUSH_ENABLED=true` + 目标 `feishu-content-main` 已 enable）。
-- **没接**：内部告警群/反馈转发（需自建应用 + `FEISHU_APP_ID`/`SECRET` + chat_id）、飞书账号登录后台（需另一个应用 + 白名单）。
-- 细节与踩坑（**别在服务器上跑裸 `docker compose up`**，会触发本地构建）见 `DEPLOY-NOTES.md`。
+`grouping_status='failed'`、`selection_candidate` **全是 false** → 不进精选，只影响事件页/时间线的历史补全。
+归组队列是**串行**的（`localConcurrency: 1`），一次灌 733 个任务会把当天新文章的归组推迟约一小时。
+要补就**选择性重跑**（`rerun(id, "group", …)`），别一次全灌。
 
-## 2. 分支清单（哪些是活的、哪些是死的）
+### ⑤ 知识库模块（搁置）
 
-| 分支 | 状态 |
+活在 `feat/kb-module`（已推），未合并未部署，站主认为形态太粗。
+
+## 2. 本轮做了什么（2026-10-11 ~ 10-14）
+
+| 提交 | 内容 |
 |---|---|
-| `upgrade-4.0` | **主线**，生产从这里构建；落后上游 0 个提交 |
-| `feat/kb-module` | 知识库模块（搁置），已推 |
-| `main` | 4.0 之前的旧线（含升级时丢掉的那些提交），留档用 |
-| `feat/archive-analysis-switch` | 死（上游 #172 已拒）|
-| `fix/architecture-test-windows-paths` | 死（上游已自行修好，本机架构测试 8/8 通过）|
-| `fix/fill-published-at-on-later-report` | 死（主线里的 `fillPublicationTime` 已覆盖且更完整）|
-| `fix/media-test-queue-creation` | 死（容器全套 673/673 通过）|
-| `feat/module-static-assets` | 待判：上游现在建议模块用 `apps/api/src/routes/static.ts` 的 `sendFile` 发自己的文件，这个 `staticAssets` 插口可能已被替代 |
+| `970b8da` | **修回 `DB_BACKUP_STORE_PATH_STYLE`** —— 备份从 10-03 起在 R2 上一直 403（这个开关被 4.0.0 同步覆盖掉了），失败的 dump 堆 9 天到 12 GB 把磁盘写满，导致 10-12 数据库恢复循环、站点 503 |
+| `2a7518e` | 503 事故记录（处置、判据、仍未解决的告警收件人问题） |
+| `6fe7cee` `bfe1472` | 接上**飞书内部告警**（自建应用，一个群）；内容群机器人关键词改 IP 白名单并重发 3 条积压卡片 |
+| `de2a130` | **删掉 6 个坏信源**（`rss-developers` 403、Golem.de 从不成功、Techmeme 超时、新浪科技 feed 停在 2018、Big Technology 7 天 0 入库、Nikkei 160 篇全 skipped）；包 + 库两处 |
+| `cd9b397` | **额度用尽不再让归组永久停摆**（`BudgetExceededError` → 留 `pending`）；已报上游 #196 |
+| `09c8f9f` | 联系上游维护者的有效渠道（只走 GHSA 4 天无人看，站点反馈表单几分钟见效） |
+| `0eba7db` `d9ee498` | 两次合并上游（含维护者对我们 4 份报告的安全修复、以及他实现的我们那条修法） |
+| `4a0aed6` | SocialData 花费排查（真因见 §3 的坑） |
 
-## 3. 环境与操作要点（都是踩过的坑）
+**安全报告结局**：清洗器惰性属性绕过、SSRF 结尾点绕过 → **已 published**（报告人是我们）；
+提示词缺条款、Caddyfile 缺安全头 → closed（上游静默修掉）；那份误提交的 probe → closed。
 
-**挂载目录 vs 镜像**：`industry/`、`database/`、`scripts/` 是**挂载**（改了要 scp 上去）；其它（`modules/`、`site/`、
-`packages/`、`apps/`）在**镜像**里 → 必须重建镜像并重新部署。
+## 3. 判据与坑（别再踩）
 
-**部署与重启（10-10 / 10-11 踩出来的坑）**：
-- 生产用**部署脚本那份 compose**：`cd ~/aihot && sudo docker compose -f docker-compose.server.yml up -d --no-deps api worker`。
-  仓库根那份 `docker-compose.yml` 带 `build: .`，在服务器上跑会触发**本地构建**（已踩：跑到 `npm run build -w @aihot/web` 失败，
-  容器没换、白等几分钟）。
-- ⚠️ **服务器上单独跑 `docker compose pull` 会认证失败**：仓库是私有 Artifact Registry，`deploy-server.sh` 第 3 步先从 GCE
-  元数据服务取服务账号 token 再 `docker login`，单独 pull 没有这个登录态。**更坑的是 pull 失败后 `up -d` 照样"成功"**
-  （容器被重建、跑的却是本地旧 `latest`），输出里只看到 `Started`。补登录的命令与判据在 `DEPLOY-NOTES.md` 那一节；
-  **部署完必须核 `docker inspect <容器> --format '{{.Image}}'` 等于刚推的镜像 ID**。
-- **`env_file` 只在创建容器时读**：`docker restart` 不够，要 `up -d` 重建（输出里出现 `Recreated` 才算数）。
-- **迁移靠 `setup` 容器**：`docker compose up -d`（不带 `--no-deps`）会带起 `setup`，它跑迁移；
-  只重建 api/worker 时**不跑迁移**，要手动 `docker exec aihot-worker-1 node scripts/migrate.ts`。
-- **`.dockerignore` 没排除根目录的 `*.sql.gz`**（546 MB 转储）：会被 `COPY . .` 带进构建层与最终镜像。
-  本地构建时可临时加几条、构建后还原（10-11 就这么做的，仓库文件没改）。
+- **定时任务全在 `Asia/Shanghai`**（实测 `pgboss.schedule.timezone`）：备份**北京 04:10**、系统日报**北京 09:00**、
+  告警每 10 分钟、留存 03:30。别按 UTC 算。
+- **备份判据**：看 `settings.backup.last` 的 `at` 是否超过一天没更新、`/data/backups` 的文件数是否只涨不降
+  （正常 ≤3 对）。不看磁盘等于没看。
+- **`DB_BACKUP_STORE_PATH_STYLE` 是我们的补丁，上游没有**（`.env.example` 里也要留着）。
+  每次合并后必须确认它还在——丢了就会静默停备。
+- **归档门是我们的永久分叉**：`packages/backend/src/editorial/analyze.ts` + `tests/history-limit.test.ts`。
+  **每次合并后必须重验**（跑整套测试即可覆盖）。
+- **别把 feed 顶层的 `<updated>` 当文章日期**（Atom 每次请求都刷新它）。只取 `<item>`/`<entry>` 内部的日期。
+  用错会把「源站没更新」误判成「我们漏收」（我误报过 185 天）。
+- **「7 天 0 新增」必须拿源站最新一条与库里比对**才算数；X 账号要用服务商 API 验证（LeCun 最新原创是 08-16、
+  吴恩达 09-29、DeepSeek 10-02——都是真安静，不是漏收）。
+- **非生产栈绝不用生产的付费密钥。** 本地测试栈（compose 项目 `aihot-test`）曾用生产的 SocialData key，
+  10-11 一天花掉 $1.81、把余额压到 $0.25，而**生产的预算与账本完全看不见**（两套库）。
+  该栈已删除、本地 `.env` 的 key 已移除、`COLLECT_ENABLED`/`MODEL_CALLS_ENABLED` 已改回 `false`。
+  **key 从未进过 git**（`.env.*` 被忽略），所以轮换是可选的。
+- **Docker Desktop 在这台机器上一天挂四次**：本地测试前先确认守护进程在跑、`aihot-testdb` 已启动
+  （`test-in-container.ps1` 里写死了 `172.17.0.2`，Docker 重启后 IP 可能变，必要时先重启该容器）。
+- **pre-push 钩子（ECC）会在 Docker 挂掉时误报失败**：先用容器套件自己验一遍，再用 `ECC_SKIP_PREPUSH=1` 推。
+- **PowerShell 引号**：别写嵌套引号的内联命令（这一天踩了四五次），一律写成 `.sh`/`.py` 文件再 `scp`/执行。
+- **上游 `SECURITY.md` 明说不承诺响应时间**；只走 GHSA 报告可能几天没人看（GitHub 只在维护者 watch 成
+  All Activity/Security alerts 且开邮件通知时才发信）。**要另走一条能推送到人的渠道**。
 
-**合并上游后的固定动作**（10-10 那次踩坑得来）：
+## 4. 上游状态
 
-```powershell
-git fetch origin; git merge origin/main
-git diff --name-status <合并前> HEAD -- industry/ database/ scripts/   # 找出挂载目录里的改动
-# 逐个 scp 到服务器对应目录，并 sed -i 's/\r$//'
-# 重启 api/worker（上面的 compose 命令），然后单独跑迁移（deploy-server.sh 不跑迁移！）
-gcloud compute ssh weijianlin@aihot --zone=asia-east2-c --command="sudo docker exec aihot-worker-1 node scripts/migrate.ts"
-# 核验：容器不是 Restarting、日志无 ERR_MODULE_NOT_FOUND、账本出现新迁移、站点 200
-```
+- **落后 0 个提交**（`d9ee498`）。
+- **#195**（信源静默判据）：open，**上游要求我们提 PR**（范围见 §1②）。
+- **#196**（额度导致的归组终态）：closed，已在 **#198** 按我们的最小改法修好，**提交里记了我们的共同作者**。
+- 安全公告：2 published、3 closed（详见 §2）。
+- 上游这三天没再提交（最后一个是 10-14 04:07 的 SelectBench 修复）。
 
-判据速查：**容器 `Restarting` + 日志 `ERR_MODULE_NOT_FOUND` = 挂载目录缺新文件**；
-**迁移说「up to date」但你刚合并了新迁移 = 服务器上压根没有那个迁移文件**。
+## 5. 新会话开局建议
 
-**测试**：本机唯一能全绿的是 `pwsh -File scripts/test-in-container.ps1`（Linux/Node 24/pg_dump）。
-**10-10 晚实测这个脚本已经能用**（它自己把 here-string 的 CRLF 换成 LF，并在容器里补 git）。
-用全新库名（`$env:DB_NAME='aihot_verify_ci'`）——本机 `aihot_ci` 有 4.0.0 删掉的 13 张残留表，会让架构测试失败。
-本机裸跑 `npm test` 有约 28 条环境性失败（shutdown 超时、uv assertion、文件级 DB 争用），
-**与改动无关**：同一套在干净基线上也失败 31–32 条，且两次失败集合不同。
-网页测试本机有 2 条已知无关失败（上游 #151 的 WebKit 视频、`deep reading` 夹具）。
-
-**提交与推送**：中文 commit message 用文件（`git commit -F`）；预推钩子在本机必挂 → `$env:ECC_SKIP_PREPUSH='1'`；
-**预提交钩子也会误报密钥**（10-10 新增：`tests/admin-login-logging.test.ts` 里的 `"test-admin-password-…"` 被拦），
-确认没有真密钥后用 `$env:ECC_SKIP_PRECOMMIT='1'`。
-构建镜像时把 `E:\cs\aihot\*.sql.gz`（4 个共 545 MB 转储）移出构建上下文。
-
-**密钥**：服务器 `.env`（600）；管理员密码 10-10 已轮换，新值在
-`/home/weijianlin/admin-password-2026-10-10.txt`（600）与 `E:\cs\hot\admin-password-2026-10-10.txt`（存进密码管理器后可删）。
-飞书 webhook 只在服务器 `.env`（600），本机副本 `E:\cs\hot\feishu.txt` 的 ACL 已收紧到仅本人。
-旧 `.env` 备份已删；`.env` 是 CRLF（应用会去掉行尾 CR，用别的工具读要留意）。
-
-**写文档的坑（10-10 新增）**：`DEPLOY-NOTES.md` 是**混合换行**（2467 CRLF + 160 裸 LF）。用工具编辑会整体转成 CRLF，
-diff 会炸成 2500 行；要追加内容就用 Python 按字节拼接并把新内容写成 CRLF，改完 `git diff --stat` 核一下
-（只该多出你加的那几十行）。
-
-**GitHub**：内容创建类接口（issue/评论/advisory）有独立配额，**别连发**；我们因为连发三份报告被挡过一次（24 小时窗口）。
-
-## 4. 上游的取向（省得重复试错）
-
-- 近 40 个提交里只有 **1 个 `feat`**，其余是 fix/文档/测试/依赖 → 他在**加固期**，不是加功能期；
-- 拒绝理由几乎都是「**多一个来源 / 多一套要长期验证的规则**」（#77 与我们的 #172 都是这个死法）；
-  要提功能先写清「场景 + 现有配置为何不够 + 对所有站都成立」；
-- 他习惯**自己实现并把报告者记为共同作者**（#152→#153、#163→#164、#177→#179）→
-  最好的贡献形态是「**可复现缺陷 + 最小复现**」，这也正是我们四份安全报告的形状；
-- 每个修复他都要求：**先有会失败的回归**、范围收敛（不改定义/Prompt/门槛）、真实环境核验（真实路由 + 系统 Chrome）、
-  诚实标注证据边界（「回归通过 ≠ 已证明生产事故」）。
-
-## 5. 建议的第一步
-
-1. `git log --oneline -5`、`git status`，确认工作树在 `upgrade-4.0` 且干净；
-2. **要不要把今晚这两个提交部署上去**：登录日志在镜像里（要重建），提示词在 `industry/`（scp 就生效）；
-3. 想做功能 → §1④ 知识库模块，或站内新需求（先读 `CONTRIBUTING`/`AGENTS.md` 的口径）；
-4. 想继续加固 → §1③ 只剩 CSP，且站主已明确先不做。
-
+1. `git log --oneline -3` 确认 HEAD = `d9ee498`，`git fetch origin && git rev-list --count HEAD..origin/main` 看有没有新提交。
+2. 若要跑测试：先确认 Docker 在跑 + `aihot-testdb` 已启动，再 `pwsh scripts/test-in-container.ps1`。
+3. **建议第一件事**：按 §1① 修 CMU 那个源（`web-blog`）——它的选择器已经死了，修法最确定，
+   修完能立刻用 `new_count > 0` 验证整条流程。
