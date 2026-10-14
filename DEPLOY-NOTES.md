@@ -3350,3 +3350,75 @@ ssh -i $env:USERPROFILE\.ssh\google_compute_engine weijianlin@34.96.136.13
 
 PR #202 的两个 CI 任务都通过（`check` 4m06s、`docker` 47s），PR 状态 `CLEAN`（MERGEABLE）。
 本仓库自己的验证是在干净库上跑容器全套：581 通过 / 0 失败。
+
+## 从两份源清单里补源（2026-10-14）
+
+输入是 `E:\cs\hot\2026-10-14\` 里的 6 个文件：**大黑AI速报**的全量源普查（2016 期、4878 个来源、29 个域名）
++ 那份准备好的接入包，以及本站**最近四天抓源汇总**（66 个新名字）。按「先去重 → 补地址 → 判精选/氛围 → 精选再定权重 → 入库」走了一遍。
+
+### 一、去重结果：清单里绝大多数本站已经有了
+
+- 四天汇总的 66 个名字里 **48 个本站已有**（其中不少是按名字/域名能直接对上的：同花顺、The Guardian、创业邦、
+  蓝点网、ServeTheHome、手机中国、爱范儿、Semafor、Fortune Tech、小众软件、BleepingComputer、Silicon Republic、
+  Nikkei Asia（已停用）、Numerama、极客公园、CNET、Tech.eu、Computerworld、CNBC Technology、智东西、量子位…
+  X 账号那侧 40 个里 34 个已有，连 `@levelsio`、`@CuiMao` 都在）。那份台账自己也写了原因：
+  **10-04 起原站 `/hot` 载荷不再给头像**，扫描判不出「是不是 X 账号」，于是把已有源误标成「需补地址」。
+- 大黑AI 的 29 个域名里，`blog.google` 我们有（`rss-blog` = Google Blog：AI）、`simonwillison.net` 有、
+  `mp.weixin.qq.com`/`github.com`/AWS/Google Cloud/Databricks/HF/掘金/宝玉都有；`stackoverflow.blog`、
+  `blog.cloudflare.com`（`web-blog-2`）、`blog.bytebytego.com`、`lastweekin.ai` 也都在清单里。
+  **真缺口只有 reddit、linux.do、blog.google 之外的两三个**——与那份报告的结论一致。
+- 结论：**这次要补的不是几十个，而是 29 个**（22 个精选 + 7 个氛围）。
+
+### 二、地址逐个实测（用采集器同一条网络路径，2026-10-14 22:0x–22:5x UTC）
+
+| 源 | 用的地址 | 实测 |
+|---|---|---|
+| Epoch AI | `https://epoch.ai/atom.xml` | 200、50 条 |
+| PyTorch Blog | `https://pytorch.org/blog/feed/` | 200、10 条（旧地址 /feed.xml 也 200） |
+| Redwood Research | `https://blog.redwoodresearch.org/feed` | 200、20 条 |
+| Understanding AI | `https://www.understandingai.org/feed` | 200、20 条 |
+| Exponential View | `https://www.exponentialview.co/feed` | 200、20 条 |
+| ChinaTalk | `https://www.chinatalk.media/feed` | 200、20 条 |
+| Recode China AI | `https://www.recodechinaai.com/feed` | 200、20 条（Substack 的 reco…substack.com 会 302 到这里） |
+| Amazon Science | `https://www.amazon.science/index.rss` | 200、25 条 |
+| ElevenLabs Blog | `https://elevenlabs.io/blog/rss.xml` | 200、50 条 |
+| Turing Post | `https://turingpost.substack.com/feed` | 200、20 条（官网 /feed 是 404） |
+| Cursor Changelog | `https://cursor.com/changelog/rss.xml` | 200、50 条 |
+| **Impress Watch** | `https://www.watch.impress.co.jp/data/rss/1.0/ipw/feed.rdf` | 200、20 条 —— **HANDOFF §6 里「探不到 feed」的那个，找到了** |
+| Reddit r/LocalLLaMA | `https://www.reddit.com/r/LocalLLaMA/.rss` | 200、25 条（连发会 429） |
+| Reddit r/ClaudeAI | `https://www.reddit.com/r/ClaudeAI/.rss` | 200、25 条 |
+| Matthew Berman / Matt Wolfe | YouTube `channel_id=UCawZsQWqfGSbCI5yjkdVkTA` / `UChpleBmo18P08aKCIgti38g` | 200、15 条（频道 id 从频道页的 `videos.xml` 链接里取） |
+| 8 个 X 账号 | `from:<handle> -filter:replies` | 都用 fxtwitter 实证过 handle 存在与粉丝数（Tongyi Lab 2.6 万、Cline 8.1 万、LM Studio 6.6 万、Zara Zhang 9.1 万、KwaiKAT 3.7 千、黑 6.5 千、Cerebras 7.9 万、Amanda Askell 11.4 万、gggerganov 7.3 万、Figure 22.6 万、Lisa Su 32.9 万、Waymo 14.3 万） |
+
+**没补的与原因**：`linux.do`（直连 403；`rsshub.rssforever.com` 的路由缺失、`rsshub.ktachibana.party` 404、
+官方 `rsshub.app` 已公告限制公共访问）、`deeplearning.ai` The Batch（官网已无 feed，且 `@DeepLearningAI` 在库）、
+Gemini API 更新日志（没有 feed，要写 `web_list` 选择器，留作后续）、OpenClaw 博客（`@openclaw` 在库）、
+`@gp_pulipaka`（11.4 万推的长尾互动号，报告自己也只是「备查」）、`Generalist`（身份不清，先不加）。
+
+### 三、判型与权重
+
+判据沿用本站的分级口径（`docs/sources.md` + `industry/selection.ts` 的门槛 T1 60 / T1_5 65 / T2 76）：
+
+- **精选（editorial）22 个**：官方一手/机构博客给 T1 或 T1_5（PyTorch T1、ElevenLabs T1、Cursor Changelog T1、
+  Epoch AI T1_5、Amazon Science T1_5、Redwood Research T1_5），分析型媒体与个人给 T2（Understanding AI、
+  Exponential View、ChinaTalk、Recode China AI、Turing Post、Zara Zhang）；X 账号里官方产品/机构/官方人物
+  给 T1_5（Tongyi Lab、Cline、LM Studio、Cerebras、Figure、Waymo、KwaiKAT、Lisa Su、Amanda Askell、ggerganov）。
+- **氛围（hot_signal）7 个**：社区与聚合（Reddit r/LocalLLaMA、r/ClaudeAI、X：黑）、宽口径科技媒体
+  （Impress Watch）、AI 视频博主（Matthew Berman、Matt Wolfe），以及**准备好但按原样未启用**的
+  `rss-daheiai-news`（那份接入包自己写着 `enabled: false`——它是别家速报，会引用上游演示站 aihot.news，留着等站主决定）。
+- `site_fulltext`：精选源开、氛围源关（与库里 248/251 个 hot_signal 一致）。
+
+### 四、入库与验证
+
+包（`industry/sources.json`，620 → **649**）与库两处一起改：把包 scp 到主机（`industry/` 是挂进容器的），
+跑框架自己的 `node scripts/seed.ts` → **29 added, 620 already there**。现在全站 **启用 552 / 合计 655**。
+
+第一次抓取（手动一轮 + 调度器自己跑）：**21 个源 ok、各按 `initialBackfillLimit` 收进 8 条**；两个特殊情况：
+
+- `rss-reddit-localllama` **HTTP 429**：reddit 按 IP 频控（r/ClaudeAI 同一时刻是 200）。两条 reddit 源都设了
+  120 分钟，让它自己重试；持续 429 再说。
+- **5 个 X 账号首读超时**（Ali_TongyiLab、Cline、LM Studio、Cerebras、Figure_robot）：新账号没有水位，
+  第一次是**单独读**（`shardHandle` 要求已有 `lastTweetId` 才进分片），窗口大就容易超时，并留下未确认回执。
+  按设计 `ops.recover` 会在 30 分钟后自动放行一次，约 00:55 的重试会再发一次；**别在放行前手动重跑**
+  （回执未确认时会被拒绝，我试过一次，只会多记一次失败）。
+- `x-account-hx1u0`（黑）收进来的 8 条最新是 2026-04-14：这个号本身已经几个月没发帖，不是采集问题。
