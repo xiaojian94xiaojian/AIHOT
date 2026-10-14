@@ -7,35 +7,47 @@
 ## 0. 一分钟版本
 
 - **生产**：https://hot.jian.ing 跑镜像 `34b6b14b0c24`（标签 `merge-0eba7db`），回滚点 `bf8ba6060e97`。
-  三页 200、容器稳定、抓取正常（近 10 分钟 83 成功 / 0 失败）。
-- **代码**：工作树在 `upgrade-4.0`，HEAD `d9ee498`（第二次合并上游），**落后上游 0 个提交**，已推 `fork`。
-- **测试**：容器全套 **694 通过 / 0 失败**（`pwsh scripts/test-in-container.ps1`，需 `aihot-testdb` 在跑）。
-- **未部署的提交**：合并 `d9ee498` 尚未部署。**可以不急**——它与线上跑的行为一致（上游那份修复就是我们那份），
-  另两个提交只影响 SelectBench 评测与后台校验。
-- **最要紧的未结事项**：**5 个网页源在静默漏收**（详见 §1），站上正在丢内容。
+  三页 200、容器稳定、抓取正常。
+- **代码**：工作树在 `upgrade-4.0`，HEAD = 合并 `d9ee498` + 本轮一个只改 `industry/sources.json` 的提交，
+  **落后上游 0 个提交**，已推 `fork`。
+- **测试**：容器全套 **694 通过 / 0 失败**（`pwsh scripts/test-in-container.ps1`，需 `aihot-testdb` 在跑）；
+  本轮没改代码，未重跑。
+- **未部署的提交**：合并 `d9ee498` + 本轮的源修复。**都可以不急**——源配置的运行时真身在库里（已直接改库改到位），
+  镜像里那份 `industry/sources.json` 只影响全新部署的种子。
+- **本轮已结**：§1① 的 5 个网页源已全部处置并逐条验证（4 个改选择器、1 个停用）。
+- **最要紧的未结事项**：**#195 的 PR**（§1②，上游明确要，范围已划定）。
+
 
 ## 1. 未结事项（按优先级）
 
-### ① 修 5 个静默漏收的网页源（最紧急，站上在丢内容）
+### ① 5 个网页源静默漏收 —— **已修完（2026-10-14）**
 
-判据：**抓它自己的列表页，看有没有比我们库里更新**（只读脚本 `E:\cs\hot\audit-web.sh`）。
+逐个抓它自己的列表页、用采集器的真实解析（`fromHtml`）核对，再逐个改 `industry/sources.json` → 改生产库 →
+容器内手动跑一次抓取验证。全部达成 `new_count > 0` 且新条目有日期。完整记录见
+`DEPLOY-NOTES.md` 的「五个网页源『静默漏收』的排查与修复（2026-10-14）」。
 
-| 信源 | 页面最新 | 我们最新 | 落后 | 诊断 |
-|---|---|---|---|---|
-| `web-blog` CMU ML Blog | 2026-10-14 | 2026-08-09 | **65 天** | `itemSelector: h3`，**页面里已无 `<h3>`** → 选择器彻底失效 |
-| `web-bfl` Black Forest Labs | 2026-09-23 | 2026-08-20 | 33 天 | 选择器能匹配，但**只匹配到已有的 12 条**（每小时 `found=12/new=0`） |
-| `web-cursor` Cursor Blog | 2026-10-13 | 2026-09-23 | 20 天 | 同上 |
-| `web-sarvam` Sarvam AI | 2026-10-13 | 2026-09-23 | 19 天 | 同上 |
-| `web-blogs` NVIDIA AI Blog | 2026-10-13 | 2026-10-01 | 11 天 | 同上 |
+| 源 | 真因 | 处置 | 验证（生产库实测） |
+|---|---|---|---|
+| `web-blog` CMU | 最新的在特稿位（`aside.default-post-style` + `h2`），旧选择器只有 `h3` | `aside.type-post` + `h2,h3` + `.date`；**重新武装**（漏的 08-10 低于 48h 门槛） | found 9→10、**new 1**（Forking-Sequences Part II，08-10） |
+| `web-bfl` | hero 是裸 `<a>`，旧选择器只认 `a.group`；还误收 3 个导航链接 | `a[href^="/blog/"]` + `h2` 标题；**重新武装** | found 12→10、**new 1**（FLUX 3 Action，09-24） |
+| `web-cursor` | directory 其实没漏；漏的是「客户案例」4 篇（`a.card--feature`） | 选择器加 `a.card--feature:has(time)` + `p` 标题 + `initialBackfillLimit` 8→16；**重新武装** | found 12→16、**new 4**（Grab/Basis/Nokia/IMDEX） |
+| `web-sarvam` | hero（`a.block > h2`）就是页面最新那条，且 hero 不带日期 | `a.group, a:has(h2)` + `h2,h3` + `div.type-supporting span`；日期走 `detail` 的 JSON-LD 兜底 | found 21、**new 1**（Bulbul V4 Flash，10-13） |
+| `web-blogs` NVIDIA | **不是漏收，是重复源**：页面 15 条里 13 条已在 `rss-nvidia-blog` 名下（按 URL 去重 → 永远 new=0） | 站主决定**停用**（与 `web-blogs-2` 一致），内容一篇没动 | — |
 
-**关键事实**：这 5 个源最后一次入库都在 **2026-09-30 23:27**（三个时间戳相差几秒），且多数文章标着 `backfill`
-→ 那是**建站时的首次回填**，也就是说它们**从建站起就没再收进过任何东西**，不是「后来页面改版」。
+**三条判据教训（下次别再踩）**：
 
-**下一步**：一次只修一个站，从 CMU 开始（选择器是死的，最容易确认）。每个站的流程：
-抓页面 → 定位**最新那批条目**的容器结构（注意最新的通常在顶部 hero/特稿区，与列表区结构不同）→
-改 `industry/sources.json` 里的 `itemSelector`（必要时加 `titleSelector`）→
-在容器里手动跑一次该源抓取 → 确认 `new_count > 0` 且文章有日期。
-**判据：`fetch_runs` 里 `new_count > 0`，且 `max(published_at)` 追上页面最新。**
+1. **审计扫日期前先去掉 HTML 注释**：CMU 页面上的「2026-10-14」是 W3 Total Cache 的页脚注释
+   （`Served from: … @ 2026-10-14 08:29:36`），CMU 博客真实最新是 08-10（它自己的 `/feed/` 也只有这一条）。
+   `web-cursor` 的「10-13」同样是页面底部「更新日志」区的卡片，不是博客文章。
+2. **比对要按 URL 看全库**：`identity_key` 是全站按 URL 去重的，同一条内容可能挂在别的源名下
+   （NVIDIA 就整页都在 RSS 源名下）。只看「这个源自己的 `max(published_at)`」会误报漏收。
+3. **修好选择器 ≠ 收得进来**：`collect.ts` 的后续抓取有 48h 发现门槛
+   （`publishedAt < cursor.initializedAt − STALE_ON_DISCOVERY_MS(48h)` 的新身份直接丢），补漏条目通常都在门槛下。
+   走框架自己的机制：删掉 `cursor.initializedAt` → 下一次按有界首导（`initialBackfillLimit` + 12 个月）
+   收进来，并按 `backfill` 归档（不进事件、不推送、站上不当时效新闻）。
+4. **列表页最新的那条常常在 hero/特稿位**，标记与列表区不同（CMU 用 `h2`、bfl 是裸 `<a>`、sarvam 是 `a.block`）。
+   选择器不认特稿位，就等于**每个新帖在它当特稿的那段时间里永远看不到**——这是这类「静默漏收」的共同形态。
+
 
 ### ② #195 的 PR（上游明确要，范围已划好）
 
@@ -77,6 +89,8 @@
 | `09c8f9f` | 联系上游维护者的有效渠道（只走 GHSA 4 天无人看，站点反馈表单几分钟见效） |
 | `0eba7db` `d9ee498` | 两次合并上游（含维护者对我们 4 份报告的安全修复、以及他实现的我们那条修法） |
 | `4a0aed6` | SocialData 花费排查（真因见 §3 的坑） |
+| （本轮） | **修 5 个网页源**：4 个改选择器（CMU / bfl / cursor / sarvam，共补回 6 条、39 条标题被改正）+ 停用重复源 `web-blogs`；包 + 库两处，逐条在生产容器里手动抓取验证。详见 §1① 与 `DEPLOY-NOTES.md` |
+
 
 **安全报告结局**：清洗器惰性属性绕过、SSRF 结尾点绕过 → **已 published**（报告人是我们）；
 提示词缺条款、Caddyfile 缺安全头 → closed（上游静默修掉）；那份误提交的 probe → closed。
@@ -103,20 +117,24 @@
   （`test-in-container.ps1` 里写死了 `172.17.0.2`，Docker 重启后 IP 可能变，必要时先重启该容器）。
 - **pre-push 钩子（ECC）会在 Docker 挂掉时误报失败**：先用容器套件自己验一遍，再用 `ECC_SKIP_PREPUSH=1` 推。
 - **PowerShell 引号**：别写嵌套引号的内联命令（这一天踩了四五次），一律写成 `.sh`/`.py` 文件再 `scp`/执行。
+- **连生产不用 gcloud**（本地 Docker 没跑时 `gcloud compute ssh` 会因写 `%APPDATA%\gcloud\credentials.db` 被拒）：
+  `ssh -i $env:USERPROFILE\.ssh\google_compute_engine weijianlin@34.96.136.13`
+  （实例 `aihot`、zone `asia-east2-c`；IP 在 `%APPDATA%\gcloud\logs\*.log` 里那行 `plink … weijianlin@<ip>`）。
+  一次一个脚本：本地写 `.sh` → `scp` 到 `/tmp` → `sed -i 's/\r$//'` → `sh` 跑；中间产物放 `E:\cs\aihot\.cache\hot\`。
 - **上游 `SECURITY.md` 明说不承诺响应时间**；只走 GHSA 报告可能几天没人看（GitHub 只在维护者 watch 成
   All Activity/Security alerts 且开邮件通知时才发信）。**要另走一条能推送到人的渠道**。
 
 ## 4. 上游状态
 
-- **落后 0 个提交**（`d9ee498`）。
+- **落后 0 个提交**（`d9ee498`）；本轮只在本地加了一个只改 `industry/sources.json` 的提交。
 - **#195**（信源静默判据）：open，**上游要求我们提 PR**（范围见 §1②）。
 - **#196**（额度导致的归组终态）：closed，已在 **#198** 按我们的最小改法修好，**提交里记了我们的共同作者**。
 - 安全公告：2 published、3 closed（详见 §2）。
-- 上游这三天没再提交（最后一个是 10-14 04:07 的 SelectBench 修复）。
+- 上游最后一个是 10-14 04:07 的 SelectBench 修复。
 
 ## 5. 新会话开局建议
 
-1. `git log --oneline -3` 确认 HEAD = `d9ee498`，`git fetch origin && git rev-list --count HEAD..origin/main` 看有没有新提交。
+1. `git log --oneline -3` 看 HEAD（应是本轮的源修复提交压在 `d9ee498` 上），
+   `git fetch origin && git rev-list --count HEAD..origin/main` 看有没有新提交。
 2. 若要跑测试：先确认 Docker 在跑 + `aihot-testdb` 已启动，再 `pwsh scripts/test-in-container.ps1`。
-3. **建议第一件事**：按 §1① 修 CMU 那个源（`web-blog`）——它的选择器已经死了，修法最确定，
-   修完能立刻用 `new_count > 0` 验证整条流程。
+3. **建议第一件事**：§1② 的 **#195 PR**——上游明确要，范围已划好，从 `origin/main` 开干净分支。

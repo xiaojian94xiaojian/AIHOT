@@ -801,8 +801,9 @@
       "kind": "web_list",
       "config": {
         "url": "https://bfl.ai/blog",
-        "itemSelector": "a.group",
+        "itemSelector": "a[href^=\"/blog/\"]",
         "linkSelector": "a[href]",
+        "titleSelector": "h2",
         "_aihot": {
           "initialBackfillLimit": 8
         },
@@ -840,8 +841,10 @@
       "kind": "web_list",
       "config": {
         "url": "https://blog.ml.cmu.edu/",
-        "itemSelector": "h3",
-        "linkSelector": "a[href]",
+        "itemSelector": "aside.type-post",
+        "linkSelector": "h2 a[href], h3 a[href]",
+        "titleSelector": "h2, h3",
+        "publishedAtSelector": ".date",
         "_aihot": {
           "initialBackfillLimit": 8
         },
@@ -1068,10 +1071,11 @@
       "kind": "web_list",
       "config": {
         "url": "https://cursor.com/blog",
-        "itemSelector": "a.blog-directory__row",
+        "itemSelector": "a.blog-directory__row, a.card--feature:has(time)",
         "linkSelector": "a[href]",
+        "titleSelector": "p",
         "_aihot": {
-          "initialBackfillLimit": 8
+          "initialBackfillLimit": 16
         },
         "publishedAtSelector": "time[datetime]"
       },
@@ -2058,7 +2062,7 @@
       "interval_minutes": 60,
       "site_fulltext": true,
       "syndicate_fulltext": false,
-      "enabled": true
+      "enabled": false
     },
     {
       "id": "web-blogs-2",
@@ -2511,12 +2515,16 @@
       "kind": "web_list",
       "config": {
         "url": "https://www.sarvam.ai/blogs",
-        "itemSelector": "a.group",
+        "itemSelector": "a.group, a:has(h2)",
         "linkSelector": "a[href]",
+        "titleSelector": "h2, h3",
         "_aihot": {
           "initialBackfillLimit": 8
         },
-        "publishedAtSelector": "span:contains(20)"
+        "publishedAtSelector": "div.type-supporting span",
+        "detail": {
+          "maxFetches": 12
+        }
       },
       "tier": "T1_5",
       "first_party": false,

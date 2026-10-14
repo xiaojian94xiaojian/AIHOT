@@ -3201,3 +3201,106 @@ Users/Spaces/Lists 全是 0），估算误差只有约 10%；也不是计费异�
   加网络，另删掉 9 天前的孤儿容器 `aihot-test-db`；卷 `aihot-test_db`、`aihot-test_data` 暂留。
 - 保留 `aihot-testdb`（跑 `scripts/test-in-container.ps1` 用的 Postgres，与花钱无关）。
 - **SocialData key 仍需轮换**（本地 `.env` 里还是生产那把；换新的只填生产）。
+
+## 五个网页源「静默漏收」的排查与修复（2026-10-14）
+
+HANDOFF §1① 的五个源，逐个抓它自己的列表页 + 跑采集器的真实解析（`fromHtml`）逐条核对。结论是：
+**四个源确实漏，一个源不是漏；三个「页面最新」是审计脚本的假警报。** 已全部处置并验证。
+
+### 先修判据：三个「页面最新」是假的
+
+`E:\cs\hot\audit-web.sh` 的 `newestDate()` 把整页里所有日期字符串取最大值，于是：
+
+| 源 | 审计说的「页面最新」 | 实际是什么 | 真实最新 |
+|---|---|---|---|
+| `web-blog` CMU | 2026-10-14 | **W3 Total Cache 的页脚注释**：`Served from: blog.ml.cmu.edu @ 2026-10-14 08:29:36` | **2026-08-10**（博客自己的 `/feed/` 也只有这一条：`Mon, 10 Aug 2026`） |
+| `web-cursor` | 2026-10-13 | 页面底部「更新日志」区的一张卡片 `/changelog/origin-app-marketplace` | **2026-09-23**（blog directory 的第一条，我们本来就有） |
+| `web-blogs` NVIDIA | 2026-10-13 | 真内容，但**早已在库里**（见下） | — |
+| `web-sarvam` | 2026-10-13 | 真漏（hero 位，见下） | **2026-10-13** |
+
+**判据要改两处**：① 扫日期前先去掉 HTML 注释（`<!--[\s\S]*?-->`）；② 比对不能只看「这个源名下的最新」——
+身份（`identity_key`）是**全站按 URL 去重**的，同一条内容可能挂在别的源名下（NVIDIA 就是）。
+
+### 真因：最新的那条在「特稿位」，结构跟列表不一样
+
+四个源同一个形态：列表区之外还有一个 hero/特稿位，标记完全不同，选择器只认列表区，所以**每个新帖
+在它当特稿的那段时间里永远看不到**（等下一篇出来、它落回列表，才会被收进来）。
+
+| 源 | 特稿位 | 列表区 | 旧选择器 |
+|---|---|---|---|
+| `web-blog` | `aside.default-post-style` + `h2` | `aside.list-post-content` + `h3` | `h3` → 特稿永远不匹配 |
+| `web-bfl` | 裸 `<a>`（无 `.group`） | `a.group` 卡片 | `a.group` |
+| `web-cursor` | `a.card--feature`（客户案例） | `a.blog-directory__row` | `a.blog-directory__row` |
+| `web-sarvam` | `a.block > h2` | `a.group` 卡片 + `h3` | `a.group` |
+
+`web-sarvam` 的特稿位连日期元素都没有（页面只在 hero 显示标题），日期藏在文章页 JSON-LD
+（`BlogPosting.datePublished`）里 → 走 `detail`（不写 `publishedAtSelector`，用兜底的 JSON-LD 读取）。
+
+### 第二道坎：48 小时发现门槛会把「补漏」挡掉
+
+`collect.ts` 的后续抓取只收「发布时间 ≥ `cursor.initializedAt` − 48h（`STALE_ON_DISCOVERY_MS`）」的新身份，
+或已存在的身份。所以**修好选择器也未必进得来**：CMU 漏的那条是 08-10、bfl 是 09-23、cursor 是 08-25~09-15，
+都在门槛之下 → `new_count` 仍然是 0。
+
+按框架自己的机制办：**删掉 `cursor.initializedAt`**（等于把这个源重新当作首次导入），下一次抓取走
+有界首导路径 —— `_aihot.initialBackfillLimit`（条数）+ `initialBackfillMonths`（12 个月），
+并且这些条目按 `backfill` 归档（不进事件、不进推送、`stale-on-discovery`）。cursor 的页面一共 16 条、
+漏的 4 条在末尾，所以把它的 `initialBackfillLimit` 从 8 调到 **16**。
+`web-sarvam` 不用重新武装：它漏的是 10-13，本来就在门槛之上。
+
+### 第三件事：标题是整张卡的文字
+
+bfl / cursor / sarvam 都没有 `titleSelector`，标题取的是整张卡片的文本，站上显示成
+`ProductsModelsFLUX Video Upscale: 2K and 4KAug`、`Sep 23, 2026·研究提升长时间智能体运行的 token 效率Jediah…`。
+补上 `titleSelector` 后，已知条目的标题被改写 → 触发正常的**材料修订**（重新分析 + 重新归组）：
+bfl 7 条、cursor 12 条、sarvam 20 条，共 39 条重跑分析（都是便宜的打分/写作调用，不是付费抓取）。
+
+### 处置与验证（生产库实测）
+
+| 源 | 新配置要点 | 抓取前 | 抓取后 | 新条目 |
+|---|---|---|---|---|
+| `web-blog` | `aside.type-post` + `h2,h3` + `.date` | found 9 / new 0 | **found 10 / new 1** | Forking-Sequences Part II（08-10，backfill） |
+| `web-bfl` | `a[href^="/blog/"]` + `h2` 标题 | found 12 / new 0 | **found 10 / new 1** | Introducing FLUX 3 Action（09-24 02:11） |
+| `web-cursor` | `a.blog-directory__row, a.card--feature:has(time)` + `p` 标题 | found 12 / new 0 | **found 16 / new 4** | Grab / Basis / Nokia / IMDEX 客户案例 |
+| `web-sarvam` | `a.group, a:has(h2)` + `h2,h3` + `div.type-supporting span` | found 21 / new 0 | **found 21 / new 1** | Introducing Bulbul V4 Flash（10-13，走 detail 取 JSON-LD 日期） |
+| `web-blogs` | **停用** | found 10 / new 0 | — | — |
+
+六个新条目全部 `analyzed`，Bulbul 那条 10-13 是当天的真新闻（`backfill=f`，已进精选候选），
+其余五条按 backfill 归档。五个源 `health=ok`、`fail_count=0`、下次抓取时间正常。
+
+### `web-blogs` 不是漏收，是重复源
+
+页面 15 条（特稿 4 + 热门 4 + 最新 10，去重后）的归属：
+
+- **13 条在 `rss-nvidia-blog` 名下**（NVIDIA 自家 feed，每小时跑，最新 10-14 14:04）；
+- 1 条在 `rss-nvidia-newsroom` 名下；
+- 只剩 1 条（`gpus-openai-gpt-6-astra-ultrafast`）是 `web-blogs` 自己收的。
+
+`upsertMaterial` 对「同 URL、不同源」只记一次发现、不修订（`existing.source_id !== m.sourceId` 直接返回），
+所以这个网页源**永远 new=0**。站主决定停用（与已停用的 `web-blogs-2` 一致）：
+库里 `enabled=false` + `next_fetch_at=null`，包内 `industry/sources.json` 同步；它名下 8 篇内容一篇没动
+（8 条读者可见、1 条精选）。**以后审计要按 URL 看全库，不能只看源自己的 max(published_at)。**
+
+### 留下的东西
+
+- 旧选择器误收的 4 条非文章：`bfl.ai/enterprise`、`/pricing`、`/research`（导航链接）和
+  `indus.sarvam.ai/`（「Get Started」按钮）。它们 `eligible=false`（公开读取层 `pool_search` 只取 eligible），
+  读者看不到；站主决定先不删。新选择器不会再收这类链接。
+- `web-cursor` 名下有一条 `https://x.ai/news/grok-4-7`：那是 Cursor 博客页自己挂的 Grok 公告卡片，
+  属于该源的列表内容，保留。
+- `https://www.sarvam.ai/rss.xml` 存在且完整（28 条、带日期）。这次仍按「修选择器」办，
+  没把 `web-sarvam` 换成 RSS 源；要换是另一件事。
+
+### 现场操作方法（这台机器上怎么连生产）
+
+本地 Docker 守护进程没在跑，`gcloud compute ssh` 又因写 `%APPDATA%\gcloud\credentials.db` 被拒而失败；
+这次直接用 OpenSSH 连实例：
+
+```powershell
+ssh -i $env:USERPROFILE\.ssh\google_compute_engine weijianlin@34.96.136.13
+```
+
+（实例 `aihot`、zone `asia-east2-c`、project `project-79671177-5fb1-4881-a7c`；IP 从
+`%APPDATA%\gcloud\logs\*.log` 里那行 `plink … weijianlin@34.96.136.13` 找到的。）
+脚本一律写成 `.sh` 本地文件 → `scp` 到 `/tmp` → `sed -i 's/\r$//'` → `sh` 执行，
+中间产物放 `E:\cs\aihot\.cache\hot\`（已 gitignore）。
