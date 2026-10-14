@@ -71,10 +71,26 @@
 GitHub CI 两个任务（`check` / `docker`）**都通过**、PR 状态 `CLEAN`（可合并）。
 发布公告、GitHub 通知都还没动（等上游反应）。
 
-### ③ 5 条未确认的付费请求（**要站主本人**）
+### ③ 4 条未确认的付费请求（**要站主本人**）
 
-`deepseek/score_article`（3 条自 10-07）+ `embedding`（自 10-02/10-13）。要在后台「运行」页核对
-「供应商是否已计费」后放行。涉及付费记录，不要替站主判断。它们卡着对应文章的评分。
+**现在只剩 4 条**（原来记的 5 条里，10-13 那条 embedding 已经不是 unknown 了）。都在「自动放行过一次、
+再放行时要人工核对」的状态（`attempts=2`；`recover.ts` 的设计如此），历史 730 次放行**全是自动**（`ops.recover`），
+人工放行一次都没有过：
+
+| 回执 | 服务 / 模型 / 用途 | 时间（北京） | 卡着谁 | 影响 |
+|---|---|---|---|---|
+| `59261` | `embedding` / text-embedding-v4 / 向量 | 10-02 23:47（`TypeError: fetch failed`） | `x-account-arena` 的《How to design rewards for post-training…》 | 文章**已分析、已发布、读者可见**；只差向量（相关推荐/归组的相似度） |
+| `118453` | `deepseek` / score_article | 10-07 14:49（超时） | `rss-arxiv`《Recommender system in X inadvertently profiles…》 | `processing_state=failed`、0 条分析、从未进公开面 |
+| `119163` | `deepseek` / score_article | 10-07 15:17（超时） | `rss-arxiv-2`《Even Small Reasoners Should Quote Their Sources…》 | 同上 |
+| `119327` | `deepseek` / score_article | 10-07 15:25（超时） | `rss-arxiv-2`《Inductive Claims Extraction at Scale》 | 同上 |
+
+**要做的两步**：① 到供应商控制台看那几个时间点有没有计费（DeepSeek 开放平台；那条 embedding 走
+`EMBEDDING_BASE_URL` 那个自填端点）；② 后台「运行」页 →「N 个付费请求的结果尚未确认」→ 逐条选
+「已计费 / 未计费」+ 备注 →「记录并放行」。放行后回执标 `failed`、请求可重发，3 篇 arXiv 文章回到处理队列
+（分析后才谈公开与精选），那条 embedding 补上向量。
+
+**费用可忽略**：这 4 条在账本里 `cost` 都是 0（DeepSeek 应答没有计费字段），10-07 全天 14,227 条请求合计
+$0.289 ——这是「账要记准」的决定，不是钱的决定。涉及付费记录，不要替站主判断。
 
 ### ④ 归组积压 733 篇（建议不动）
 
