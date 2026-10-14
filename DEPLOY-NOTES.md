@@ -3345,3 +3345,8 @@ ssh -i $env:USERPROFILE\.ssh\google_compute_engine weijianlin@34.96.136.13
 
 **推送注意**：`fork` 的 pre-push 钩子（ECC）会跑本地 `npm test`，而本地没设 `DATABASE_URL` 时它必然失败
 （测试库要求 `*_test`/`*_ci` 结尾）。这次先用容器套件自验，再用 `$env:ECC_SKIP_PREPUSH="1"` 推。
+
+## #195 的 PR：CI 结果（补记）
+
+PR #202 的两个 CI 任务都通过（`check` 4m06s、`docker` 47s），PR 状态 `CLEAN`（MERGEABLE）。
+本仓库自己的验证是在干净库上跑容器全套：581 通过 / 0 失败。

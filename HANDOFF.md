@@ -67,7 +67,8 @@
 **生产库实测**（524 个在用源、建站 14 天）：现行判据 55 个 → 新判据 **14 个超出 + 2 个历史不足（仍列出）+ 39 个回到节奏内**；
 倍数 2/3/4/5/6 分别列出 31/22/14/10/6 个；能核对的 3 个（`rss-answer`、`web-tensorzero`、`src-huggingface`）
 都是源站自己没更新；节奏 CTE 在 6.3 万篇文章上 176 ms（用 `discovered_at` 设界，比 `OR published_at` 快 3 倍且结果一致）。
-验证：typecheck ✓、容器全套 **581 通过 / 0 失败**（干净库 `DB_NAME=aihot_clean_ci`）、CI `docker` 通过、`check` 当时在跑。
+验证：typecheck ✓、容器全套 **581 通过 / 0 失败**（干净库 `DB_NAME=aihot_clean_ci`）、
+GitHub CI 两个任务（`check` / `docker`）**都通过**、PR 状态 `CLEAN`（可合并）。
 发布公告、GitHub 通知都还没动（等上游反应）。
 
 ### ③ 5 条未确认的付费请求（**要站主本人**）
