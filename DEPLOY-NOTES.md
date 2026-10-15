@@ -3584,3 +3584,29 @@ Jina 把 RSS 渲染成 HTML 后结构正好可读（`<div><h3><a href=topic>标�
 **73 个启用中的源的窗口内产出日全部来自那次导入** → 折成一天后它们确实「没有可比较的历史」，
 按维护者的口径属于「历史不足、仍然列出」，不该硬算出一个假节奏去报超标。查询耗时 822ms → 987ms（一次性的窗口聚合）。
 
+
+## 并入上游 540c477（翻译修复，2026-10-15）
+
+站主指示「没冲突就并进来」。`git merge origin/main` **无冲突**（只带 3 个文件：`editorial/translate.ts`、
+`tests/translate.test.ts`、新迁移 `0086_translation_attempt_request_tag.sql`），合并提交 `c02ad68`。
+
+**合并后按老规矩重验我们的分叉**（都在）：
+
+| 分叉 | 位置 | 状态 |
+|---|---|---|
+| 归档门 | `editorial/analyze.ts` + `tests/history-limit.test.ts` | ✓（测试 3/3 通过） |
+| `DB_BACKUP_STORE_PATH_STYLE` | `operations/backup.ts` + `.env.example` | ✓ |
+| `LLM_SESSION_ID` → `x-opencode-session` | `providers/llm.ts` | ✓ |
+| 补扫去重键 | `jobs/content.ts`（`sweep:<ts>:<articleId>`） | ✓ |
+| 模型网关预设 | `site/models.ts` | ✓ |
+
+**顺手更正一处旧记录**：DEPLOY-NOTES 前面写「`LLM_SESSION_ID` 改了 `llm.ts` 和 `embeddings.ts` 两处」，
+现在树里只有 `llm.ts` 一处（`embeddings.ts` 只发 content-type + authorization）。生产上 embedding 调用一直是好的
+（今天 4,364 次），说明 Go 网关的 `/embeddings` 路由不要求这个头，所以不需要补。
+
+**验证**（本地，每文件一个干净库）：`npm run typecheck` 通过；`tests/translate.test.ts`（上游新测试）7/7、
+`tests/history-limit.test.ts` 3/3、`tests/source-health.test.ts` 5/5；
+`tests/backup-store-url.test.ts` 只因本机没有 `pg_dump` 而失败（`spawn pg_dump ENOENT`），属环境限制。
+
+**未部署**：这次合并带迁移（0086），上线时要在容器里跑一次 `node scripts/migrate.ts` 再重建 api/worker。
+按 HANDOFF 的口径不急。
