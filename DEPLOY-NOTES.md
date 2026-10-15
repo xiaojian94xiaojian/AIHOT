@@ -3777,3 +3777,29 @@ GET https://opencode.ai/zen/go/v1/usage   (Authorization: Bearer <key>)
 这是最大的单点。可选处置：给评分换更便宜的模型（`site/models.ts` 一步配置），或让它输出更短；
 换之前要抽 50 篇对比评分质量，不能只看省。
 
+
+## Codex 重置监控的 11 条「需复核」处理（2026-10-15 深夜）
+
+**现象**：站主收到 `🟠 仍未恢复：有 Codex 重置消息需要你确认（已持续 3 天）`。
+原因：`monitor.review` 的条件是 `recognition->>'needsReview' = true AND reviewed <> true`
+（`modules/monitor/backend/read.ts:101`），11 条 `thsottiaux` 的帖子被模型标了「没把握」、一直没人复核；
+这条 finding 是 `today` 级 → **每天重复提醒**，起点 10-12 22:20 是告警状态里记的首次发送时间
+（它没传 `since`，所以「已持续 3 天」是**准确**的 —— 正是今晚修的那类 bug 的反面）。监控本身健康：
+待识别 0 条、已识别 307 条。
+
+**处理（站主指示「按你的建议弄」）**：11 条全部走模块后台动作
+`resolveMonitorPost(id, { action: "reviewed", reason }, "admin:1")`（带审计），理由分两种：
+9 条玩笑/寒暄/产品计划/推送说明/空帖按「不是重置公告、无需改动」，2 条 `Day N/ Reset` 按「是进度标记、
+不是重置已发生」。结果：**需复核 11 → 0**，告警引擎随即发出 `monitor.review:recovered`（群里的 ✅ 已恢复），
+**告警状态清空**。脚本 `.cache/hot/resolve-monitor-review.mjs`。
+
+**踩到的坑（记下来）**：一开始我给 9 条用了 `action: "skip"`，报
+`Conflict: 这条帖子已经识别过了，请刷新` —— 读代码才明白两个动作的分工：
+`skip` 是给**还没识别、堵住队列**的帖子（`processed_at IS NULL`）「挪开」，改 `processed_at` 并清空识别；
+`reviewed` 才是给**已识别但结论被挂起**的帖子「我看过了」。用错动作时它只报错、不改数据（好在如此）。
+
+**明天的可选项**：这 11 条里 9 条是玩笑/寒暄（`Mashed @poteto on the house.`、`Also! Good evening!!`、
+`@hiarun02 Facts` 这类），识别提示词（版本 `tibo-reset-2026-09-26.5`，`modules/monitor/backend/recognize.ts`）
+可以加一句「明显是玩笑、寒暄、与重置无关的产品/推送说明，直接 `relevant=false` 或 `needsReview=false`」，
+能把复核量砍掉一大半。改提示词要配一批真实帖子做前后对照，别只看着像。
+

@@ -135,6 +135,7 @@ $0.289 ——这是「账要记准」的决定，不是钱的决定。涉及付�
 | （本轮） | **停用三个 arXiv 源**（10-15，站主决定）：`rss-arxiv`(cs.AI) / `-2`(cs.CL) / `-3`(cs.LG) 占当天 **64% 的模型调用**却从不进精选（`EXCLUDE_MP` → `selection_candidate=false`）。停源后待处理文章全来自别的源；今天的论文仍留在「全部动态」（站主确认不用管）。详见 `DEPLOY-NOTES.md` |
 | （本轮） | **10-15 增量包 + linux.do**：11 个候选去重后真加 5 个（张小珺播客、中华网科技 GN 兜底、4 个 X 账号——其中 yetone 也进了），跳过 5 个（界面新闻/Tom Huang 站内已有、OpenAI Developers 复测仍 403、Ideogram 整站 CF、博客园 feed 500）；**linux.do 用框架自带的 Jina 通路接上**（本站采集器被 CF TLS 指纹挡、curl 却 200）。包 649→**656**，全站启用 **556/662**。详见 `DEPLOY-NOTES.md` |
 | （本轮） | **并入上游 `540c477`**（翻译修复 + 迁移 0086）：无冲突，重验五个分叉与关键测试（`translate` 7/7、`history-limit` 3/3、`source-health` 5/5）。带迁移，`setup` 服务会在部署时自动补。 |
+| （本轮） | **处理 Codex 重置监控的 11 条「需复核」**（站主指示按建议弄）：全部走 `resolveMonitorPost(..., {action:"reviewed"})`（带审计），需复核 11→0，告警自动收尾（`monitor.review:recovered`），告警状态清空。**坑**：`skip` 是给未识别、堵队列的帖子（`processed_at IS NULL`），`reviewed` 才是给已识别但结论挂起的；用错只报错不改数据。**明天可选**：识别提示词加「玩笑/寒暄直接判无关」，能砍掉大半复核量（那 11 条里 9 条是噪声）|
 | （本轮） | **巡检 + 额度遗留清理**：`grouping_status='pending'` 的 14,431 条里只有 1,107 条真在等（8,313 是 skipped、5,000 是 `blocked` 主动拦截）—— 看 pending 必须按 `processing_state` 拆再套归组门槛；清理了 11 篇处理失败（`requeueFailedArticles`）与 1,895 条因额度失败而归组的文章（`groupingReset()`），归组失败 1,902→7，管道 0 失败。另附「额度花在哪一步」表：`score_article` 31% + `group_article` 23% = 54%，`score_article` 每次吐 2,181 输出 token 是最大单点。详见 `DEPLOY-NOTES.md` |
 | （本轮） | **Go 额度可见（go-quota 模块，已上线）**：网关有只读接口 `GET {LLM_BASE_URL}/usage`（滚动/周/月三个百分比），做成站点模块（`modules/go-quota/`）：每 30 分钟采样、按「没重置过的那一段」外推「还能撑几天」，窗口 ≥70% 且会在重置前用尽、或 ≥95% 时报给站主；**额度按 key 算**（换 key 即换额度，旧 key 留着就是备份额度）。镜像 `0b904ed57eb3`。详见 `DEPLOY-NOTES.md` |
 | （本轮） | **部署上线**（站主批准，10-15 22:05）：镜像 `a1587d2c3116`（`merge-060c5a6`），带上上游合并、`540c477` 翻译修复 + 迁移 0086（setup 自动跑，账本 80 条）、告警时长修复、额度熔断；站点五页 200、容器重启 0 次、模型调用 220/0 失败。回滚点 `rollback-before-060c5a6`（仓库 + 服务器都在）。详见 `DEPLOY-NOTES.md` |
@@ -201,6 +202,27 @@ $0.289 ——这是「账要记准」的决定，不是钱的决定。涉及付�
 1. `git log --oneline -3` 看 HEAD（应是本轮的源修复/补源提交压在 `d9ee498` 上），
    `git fetch origin && git rev-list --count HEAD..origin/main` 看有没有新提交。
 2. 若要跑测试：先确认 Docker 在跑 + `aihot-testdb` 已启动，再 `pwsh scripts/test-in-container.ps1`。
-3. **先看两件事**：① PR **#202** 上游有没有回复；② 10-14 新加的 29 个源过了第一个整天后，
-   后台「信源」页看 `rss-reddit-localllama`（429）和那 5 个首读超时的 X 账号有没有恢复
-   （Ali_TongyiLab / Cline / LM Studio / Cerebras / Figure_robot）。
+3. **先看三件事**：① 上游有没有新提交 / PR **#202 / #204 / #205** 有没有回复（#204、#205 的 CI 都是双绿）；
+   ② 10-14 与 10-15 加的新源过了第一个整天后的表现（后台「信源」页：`rss-reddit-localllama` 之前 429、
+   5 个首读超时的 X 账号、以及 linux.do 走 Jina 的稳定性）；
+   ③ `settings.go.quota` 的速度外推准不准（10-15 深夜上线，第一个"还能撑几天"的估计在采样满一小时后出现）。
+
+## 6. 明天的观察点与待选项（10-15 深夜留）
+
+**观察点（不用操作，自己会跑）**：
+
+- `go.quota` 每条 30 分钟采样一次，速度估计满一小时后出现；若"会在重置前用尽"，站主会收到
+  「Go 套餐…额度已用 X%」的告警（替换 key 或等重置后自动收尾）。
+- 额度熔断已上线：再遇到额度用尽，调用会**立刻停在熔断上**（不再白撞上千次）、文章留待处理、告警几分钟内到。
+- 积压告警的「已持续」现在报的是**本轮**时长（旧的是最老一篇的年龄）。
+
+**待选项（站主已看过菜单，点一个就做）**：
+
+| 选项 | 内容 | 备注 |
+|---|---|---|
+| A | 给最贵的两步瘦身：`score_article`（31%，每次吐 2,181 输出 token）+ `group_article`（23%）= 54% 的额度 | 先做对照实验再改 `site/models.ts`；这是直击"两次停摆的那个约束"的动作 |
+| B | R2 生命周期（日备 7 / 周备 4 / 月备 6）+ 存储盘点（库 2.9G、约 +250MB/天） | 十几分钟 |
+| C | 精选门槛校准（标 100 篇 → `scripts/eval-selection.ts` → 调 `industry/selection.ts`） | 需要站主 20 分钟标注 |
+| D | linux.do 自建代理（去掉 Jina 依赖）/ 知识库模块 `feat/kb-module` 的去留 | 可选项 |
+
+**未做完的小事**：归组失败还剩 7 条（内容是输出/格式问题，不是额度）；`x_article` 步骤有 2 次调用没记 usage（可查可不查）。
