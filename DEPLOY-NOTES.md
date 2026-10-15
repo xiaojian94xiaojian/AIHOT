@@ -3704,3 +3704,37 @@ Jina 把 RSS 渲染成 HTML 后结构正好可读（`<div><h3><a href=topic>标�
 2. 现场还看到 **归组待办 14,387 条**（`articles.grouping_status='pending'`）与 **12 篇 `failed`**（额度事故的遗留）——
    前者就是菜单里第 8 项（归组吞吐）要处理的量级，后者可以后续手动重排一次。
 
+
+## Go 套餐额度可见：新增 go-quota 模块（2026-10-15，已上线）
+
+站主提示「Go 套餐密钥应该可以查额度，可以按百分比算」。实测确实有只读接口（不花额度）：
+
+```
+GET https://opencode.ai/zen/go/v1/usage   (Authorization: Bearer <key>)
+{"usage":{"rolling":{"status":"ok","percent":10,"resetsAt":"2026-10-15T15:26:12Z"},
+          "weekly": {"status":"ok","percent":11,"resetsAt":"2026-10-19T00:00:00Z"},
+          "monthly":{"status":"ok","percent":60,"resetsAt":"2026-10-27T01:58:51Z"}}}
+```
+
+**顺带证实一件事：额度按 key 算** —— 10-15 那把用尽时，换上的另一把周额度只用了 11%
+（两把 key = 两份独立额度，这也是「留着旧 key」的价值）。状态里记密钥 sha256 前 6 位（当前 `700a89`），
+数字跳变时能分辨是用量还是换 key。
+
+**做成模块**（Go 专属，按 AGENTS 不进框架）：`modules/go-quota/`
+（`backend/quota.ts` 逻辑、`server.ts` 挂点、`tests/quota.test.ts`），在 `site/modules/server.ts` 装上。
+
+| 行为 | 说明 |
+|---|---|
+| 采样 | 每 30 分钟一次（`cron.go.quota`，Asia/Shanghai），`runOnStart` 让新库启动即查一次；留两天样本 |
+| 外推 | 只用「没有重置过的那一段」算用量速度（百分比下降即视为重置，之前的样本不参与），再算「还能撑几天」 |
+| 告警 | 任一窗口 ≥70% 且按速度会在重置前用尽、或 ≥95% 时，报给站主（≥95% 用 `now`，否则 `today`，都带 `owner`）；重置或换 key 后由告警状态机自动收尾 |
+| 非 Go 后端 | 换成官方 API 后整个模块什么都不做（`LLM_BASE_URL` 不是 Go 网关就直接返回） |
+
+**回归**：`modules/go-quota/tests/quota.test.ts` 6/6 通过（解析真实答复形状、重置切段、速度外推、两个阈值、指纹不是密钥）；
+`npm run typecheck` 通过。
+
+**上线**（第二次部署，同一天）：镜像 `0b904ed57eb3`（`merge-f60de5e`），回滚点 `rollback-before-f60de5e`（= 上一个镜像）。
+核验：模块文件在镜像里 ✓、`site/modules/server.ts` 装上 ✓、**启动 10 秒后 `settings.go.quota` 就有真实数据** ✓、
+`pgboss.schedule` 里有 `cron.go.quota` ✓、`operations/alerts.ts:155` 会调用模块的 alerts ✓、
+当前三个窗口 10%/11%/60%、**0 条告警** ✓（样本还少，速度要一小时后才外推得出来）、站点五页 200 ✓、模型调用 0 失败 ✓。
+
