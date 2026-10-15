@@ -3464,3 +3464,20 @@ OPENCODE_OLD_KEY                                                                
   真要稳，还是换成按量计费的 API（只改 `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL`，并去掉 `LLM_EXTRA_JSON`、`LLM_SESSION_ID`）。
 - 每次换 key 都会留下旧 key（`OPENCODE_OLD_KEY`），所以「另一把 key 的周额度重置了」是可以复用的退路；
   但两把都被用尽时会同时失效，**别把两把 key 都当成无限量**。
+
+### 2026-10-15 停掉三个 arXiv 源
+
+站主决定：arXiv 那三个源（`rss-arxiv` = cs.AI、`rss-arxiv-2` = cs.CL、`rss-arxiv-3` = cs.LG）**全部停用**。
+理由是它们占了当天 64% 的模型调用（9,555 次 / 17.8M token），而分级 `EXCLUDE_MP` 决定它们**从不进精选**，
+只进「全部动态」：今天 1,872 篇里 `selected=0`、`selection_candidate=0`。
+
+- 停法：库里 `enabled=false` + `next_fetch_at=null`（包 `industry/sources.json` 同步，620→649 那份里三个源也置 false），
+  三个源都是 **15 分钟轮询**，停掉后每天少约 288 次抓取。
+- **「移出评分」这件事本来就是关的**（这套机制值得记住）：分级 `EXCLUDE_MP` → `publish.ts` 的
+  `isSelectable(eligible, judgedSelected, tier)` 返回 false → `publications.selection_candidate = false`。
+  而 `selection_candidate` 同时管两件事：
+  1. 精选评分（`score_article`）：近 24 小时 1,136 次评分调用**全部来自其他源**，arXiv 是 0 次；
+  2. 归组清扫（`operations/grouping.ts` 只挑 `selection_candidate AND eligible AND public` 且未归组的）。
+  今天 1,872 篇、历史 6,669 篇的 `selection_candidate` **全是 false**，队列里也没有它们的任何任务。
+- 它们**仍以 `eligible=true` 出现在「全部动态」**（今天 1,864 条）——这是另一套开关（`visibility`/`eligible`），
+  站主没要求撤下，保持可见。

@@ -5402,7 +5402,7 @@
       "interval_minutes": 60,
       "site_fulltext": true,
       "syndicate_fulltext": false,
-      "enabled": true
+      "enabled": false
     },
     {
       "id": "rss-arxiv-2",
@@ -5420,7 +5420,7 @@
       "interval_minutes": 60,
       "site_fulltext": true,
       "syndicate_fulltext": false,
-      "enabled": true
+      "enabled": false
     },
     {
       "id": "rss-arxiv-3",
@@ -5438,7 +5438,7 @@
       "interval_minutes": 60,
       "site_fulltext": true,
       "syndicate_fulltext": false,
-      "enabled": true
+      "enabled": false
     },
     {
       "id": "src-github-8",
