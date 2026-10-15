@@ -3671,3 +3671,36 @@ Jina 把 RSS 渲染成 HTML 后结构正好可读（`<div><h3><a href=topic>标�
 
 **结论：备份是"能用"的，不只是"存在"。** 建议固化：每月挑一份最新 dump 走一遍同样的流程（脚本在
 `E:\cs\aihot\.cache\hot\restore-drill.sh`，约 5 分钟），并记下用时——恢复耗时是事故处置计划里要有数的一项。
+## 部署上线（2026-10-15 22:05 北京，站主批准）
+
+**镜像**：`a1587d2c3116`（标签 `merge-060c5a6` + `latest`），构建于本地、推送后服务器 `pull`；
+上一个好版本 `34b6b14b0c24` 已推成 **`rollback-before-060c5a6`** 存进仓库，服务器上也还留着（悬空层），
+两条回滚路都在。
+
+**这次带上的东西**：`d9ee498`（早先那次上游合并）→ `540c477`（翻译修复 + **迁移 0086**）→
+积压告警「已持续」时长修复（PR #204）→ **额度熔断**（PR #205）。
+
+**挂载目录同步**（代码在镜像里，`database/`、`industry/`、`scripts/` 是挂载的，必须单独放）：
+`database/migrations/0086_translation_attempt_request_tag.sql`（**关键**：不放上去 setup 会报 "up to date" 静默跳过）、
+`industry/sources.json`、`scripts/eval-selection.ts`、`scripts/eval-selection-core.ts`，全部 `sed -i 's/\r$//'` 去过 CR。
+
+**部署前的保险**：先在 worker 里跑了一次完整备份 —— `daily/aihot-202610151357.dump`（1280 MB，已上传 R2）✓。
+
+**过程与核验**：
+
+| 项 | 结果 |
+|---|---|
+| `setup` 服务 | 3 秒成功退出：`applied 0086_translation_attempt_request_tag.sql (17ms, transaction)`、`1 migration(s) applied`、`sources: 0 added, 656 already there` |
+| 迁移账本 | **80 条**已应用，最后一条 `0086_translation_attempt_request_tag.sql`；`translation_attempts.request_tag` 已存在 ✓ |
+| 容器 | api/worker/web 全部 Up、**重启 0 次**，镜像 `a1587d2c3116` ✓ |
+| 站点 | `/`、`/api/health`、`/hot`、`/daily`、`/codex-reset` 全 **200**；`/api/health` 返回 `{"ok":true,"db":"ok"}` ✓（刚起来的几秒内 `/` 是 503、`/api/health` 是 502，容器还在起 ✓） |
+| 代码核对 | 额度熔断 2 处 ✓、告警时长修复 1 处 ✓、上游翻译修复 5 处 ✓、归档门 ✓、备份 PATH_STYLE ✓、Go 会话头 ✓ |
+| 运行 | 近 5 分钟抓取 38 成功 / 0 失败；近 10 分钟模型调用 **220 次、失败 0**；`provider.quota.*` 无键（正常）；日志无 error |
+
+**两点要记住**：
+
+1. **这次没带 #202**（静默判据按信源节奏）—— 它还在上游复审，只存在于 `fix/source-silence-rhythm` 分支，
+   所以线上的「静默源」判据仍是旧口径，这是预期的，不是漏部署。
+2. 现场还看到 **归组待办 14,387 条**（`articles.grouping_status='pending'`）与 **12 篇 `failed`**（额度事故的遗留）——
+   前者就是菜单里第 8 项（归组吞吐）要处理的量级，后者可以后续手动重排一次。
+
