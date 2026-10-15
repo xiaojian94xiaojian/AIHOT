@@ -3608,5 +3608,7 @@ Jina 把 RSS 渲染成 HTML 后结构正好可读（`<div><h3><a href=topic>标�
 `tests/history-limit.test.ts` 3/3、`tests/source-health.test.ts` 5/5；
 `tests/backup-store-url.test.ts` 只因本机没有 `pg_dump` 而失败（`spawn pg_dump ENOENT`），属环境限制。
 
-**未部署**：这次合并带迁移（0086），上线时要在容器里跑一次 `node scripts/migrate.ts` 再重建 api/worker。
-按 HANDOFF 的口径不急。
+**未部署**：这次合并带迁移（0086 = `ALTER TABLE translation_attempts ADD COLUMN request_tag text`）。
+`docker-compose.server.yml` 里有 `setup` 服务（`node scripts/migrate.ts && node scripts/seed.ts`），api/web/worker 都
+`depends_on: setup: condition: service_completed_successfully` —— 所以**正常 `docker compose pull && up -d` 就会自动补迁移**，
+不用手动跑。生产库现在 79 条、到 `0085`；合并后是 80 个文件，部署时只会补这 1 条。按 HANDOFF 的口径不急。
