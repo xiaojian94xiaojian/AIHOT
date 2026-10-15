@@ -2486,7 +2486,7 @@ where a.backfill and r.created_at > now() - interval '1 day' group by r.purpose 
 
 [2026-10-10 00:45:01] gh：C:\Users\weijianlin\AppData\Roaming\npm\gh.cmd（存在：True）
 [2026-10-10 00:45:01] 开始：本地 00:45:01 / UTC 16:45
-[2026-10-10 00:45:02] 提交失败（限流未解除则等下次开机再跑）：advisory-3-prompts.md → gh: You have exceeded a secondary rate limit and have been temporarily blocked from content creation. Please retry your request again later. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service) If you reach out to GitHub Support for help, please include the request ID B8B8:1D57F0:1BE323:1FD2A8:6AC91A0E and timestamp 2026-10-09 16:45:02 UTC. (HTTP 403)
+[2026-10-10 00:45:02] 提交失败（限流未解除则等下次开机再跑）：advisory-3-prompts.md → gh: You have exceeded a secondary rate limit and have been temporarily blocked from content creation. Please retry your request again later. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service) If you reach out to GitHub Support for help, please include the request ID B8B8:1D57F0:1BE323:1FD2A8:6AC91A0E and timestamp 2026-10-09 16:45:02 UTC. (HTTP 403)
 
 
 ## 同步上游（2026-10-10）：落后 21 → 0
@@ -2903,8 +2903,8 @@ terminated; reinitializing`），api 拿不到库就一律 503。
 - **`backup.last` 的 `at` 字段**：超过一天没更新就是备份在失败（不要只看磁盘）。
 - **`job_runs` 里 `ops.backup` 的 status**、以及 `pgboss.job` 里同名任务。
 - **`/data/backups` 的文件数**：正常应 ≤ 3 对；只涨不降说明上传成功不了。
-- 备份是 `10 4 * * *`，**时区 Asia/Shanghai，即北京 04:10**（不是凌晨 UTC，也不是中午；
-  我先前写成 12:10 是误把它当 UTC，实测 `pgboss.schedule.timezone` 为 Asia/Shanghai）。
+- 备份是 `10 4 * * *`，**时区 Asia/Shanghai，即北京 04:10**（不是凌晨 UTC，也不是中午；
+  我先前写成 12:10 是误把它当 UTC，实测 `pgboss.schedule.timezone` 为 Asia/Shanghai）。
   其余定时任务同样在 Asia/Shanghai：系统日报 `0 9 * * *`（北京 09:00）、告警 `*/10 * * * *`、留存 03:30、出刊每半小时。
 
 ### 仍未解决的两件事（都要站主决定）
@@ -3480,4 +3480,74 @@ OPENCODE_OLD_KEY                                                                
   2. 归组清扫（`operations/grouping.ts` 只挑 `selection_candidate AND eligible AND public` 且未归组的）。
   今天 1,872 篇、历史 6,669 篇的 `selection_candidate` **全是 false**，队列里也没有它们的任何任务。
 - 它们**仍以 `eligible=true` 出现在「全部动态」**（今天 1,864 条）——这是另一套开关（`visibility`/`eligible`），
-  站主没要求撤下，保持可见。
+  站主确认：**出现在动态的不用管**，保持可见。
+
+## 2026-10-15 的增量包与 linux.do：去重、实测、入库
+
+输入是 `E:\cs\hot\2026-10-15\` 的五份文件（AIHOT 信源增量包 11 个 + linux.do 方案）。走的是同一套流程：
+先去重 → 再逐个实测（用采集器同一条网络路径）→ 判型/定分级 → 入库并实抓验证。
+
+### 一、增量包 11 个：真加 5 个，5 个跳过
+
+**加的（都实测通过）**：
+
+| 源 | 地址 | 分级/参与 | 实测 |
+|---|---|---|---|
+| 张小珺商业访谈录（播客） | `feed.xyzfm.space/dk4yh3pkpjp3` | T2 / editorial | 200、157 期、最新 10-15（首轮收 8 条，标题如「154. 对Dyna创始人Lindon的3小时访谈…」） |
+| 中华网科技 | `news.google.com/rss/search?q=site:tech.china.com…` | T2 / hot_signal | 200、100 条（站上 GN 兜底写法与手机中国/虎嗅一致） |
+| X：Legit (@legit_api) | `from:legit_api` | T2 / hot_signal | fxtwitter：14,954 粉、自述 "covering AI news… @voxelbench"；实读 20 条/收 8 条 |
+| X：Yihui Xie (@xieyihui) | `from:xieyihui` | T2 / hot_signal | 22,080 粉、名字吻合；实读 20 条/收 2 条 |
+| X：Rachel Metz (@rachelmetz) | `from:rachelmetz` | T2 / hot_signal | 34,169 粉、自述 Bloomberg AI 记者；实读 20 条/收 8 条 |
+
+（`yetone` 也加了，见下表的 X 账号；这里漏列，实际入库 4 个 X。）
+
+**跳过的（去重与实测的结论）**：
+
+- **界面新闻**：站内**已有** `src-992b39c481`（同名、同地址、已启用）——增量包给的 id `rss-src-992b39c4`
+  正是从它派生的，重复。（顺带说明：这个源是站上待处理积压最多的几个之一，194 篇。）
+- **OpenAI Developers：Blog**：站内已有 `rss-developers`（同名同地址），**因 403 被停用**；
+  本次从服务器复测仍是 **403 `Forbidden`（hkg1 边缘拦截）**，不能加。
+- **Tom Huang**：站内已有 `x-account-tuturetom`（`from:tuturetom`，已启用）。
+- **Ideogram Blog**：整站 Cloudflare 挑战（`/blog` 403、首页 403，sitemap 200），无 feed；
+  且 X 账号 `x-account-ideogram_ai` 已在站内。
+- **博客园·AI**：官方 feed 服务端 **500**（复测仍 500），增量包里也没给 config，留待其恢复。
+
+**与包的差异（有意为之）**：X 账号按站内命名规范写成 `X：显示名 (@handle)`；播客的 `site_fulltext` 打开
+（站内两个播客 Dwarkesh / Latent Space 都是 true）；张小珺用 `rss-zhangxiaojun` 这个干净的 id
+（包里那个 `web-src-94640ce5` 与 kind=rss 不符）。
+
+### 二、linux.do：**本站抓取端确实被 CF 挡**，用框架自带的 Jina 通路解决
+
+那份文档的结论「linux.do 有官方 Discourse RSS、直连即可抓，403 是 Python 库的 TLS 指纹问题」——
+**对一半**：同一台服务器上 `curl` 带采集器 UA 也是 **200**，但**我们的采集器（Node/undici）拿到的是
+403 `Just a moment...`**（三个端点全试：`c/news/34.rss`、`latest.rss`、`top.rss?period=daily`）。
+即：不是 UA 的问题，是 **TLS 指纹**；而框架不给信源配 UA/指纹的开关（这是有意的）。
+
+解法走框架**文档里写明**的 Jina 通路（`docs/sources.md`：到不了的站点把 `url` 写成 `r.jina.ai/…`）：
+
+```json
+{
+  "kind": "web_list",
+  "config": {
+    "url": "https://r.jina.ai/https://linux.do/c/news/34.rss",
+    "parseMode": "html",
+    "itemSelector": "body > div",
+    "linkSelector": "h3 a",
+    "titleSelector": "h3",
+    "publishedAtSelector": "time",
+    "allowUrlPrefixes": ["https://linux.do/t/topic/"]
+  }
+}
+```
+
+Jina 把 RSS 渲染成 HTML 后结构正好可读（`<div><h3><a href=topic>标题</a></h3>…<time>Thu, 15 Oct 2026 11:33:59 +0000</time>`），
+首抓 **25 条全收、标题与日期都对**（「IDC：Q3全球智能手机出货量同比暴跌22%」19:33 等）。
+代价是每次抓取一次 Jina 读取（60 分钟一轮 → 24 次/天），`cashToleranceSeconds` 未设、无详情页读取。
+**注**：RSS 的 Markdown 渲染也能读到标题和链接，但 `fromMarkdown` 不取日期 → 会全部落成「无发布时间的回填」，
+所以选了 html 渲染 + 选择器这条路。
+
+### 三、入库结果
+
+包 649 → **656**，`scripts/seed.ts` → **7 added, 649 already there**；全站 **启用 556 / 合计 662**。
+七个源首抓全部成功（播客 157 收 8、linux.do 25 收 25、中华网 100 收 8、4 个 X 账号各读 20 收 8/8/2/8），
+`health=ok`、`fail_count=0`。首轮导入的条目都带 `backfill`（首轮导入的既定行为），下一轮起进正常流程。

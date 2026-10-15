@@ -11820,6 +11820,137 @@
       "site_fulltext": false,
       "syndicate_fulltext": false,
       "enabled": false
+    },
+    {
+      "id": "rss-zhangxiaojun",
+      "name": "张小珺商业访谈录（播客 RSS）",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://feed.xyzfm.space/dk4yh3pkpjp3",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "site_fulltext": true,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "web-linuxdo-news",
+      "name": "linux.do：前沿快讯",
+      "kind": "web_list",
+      "config": {
+        "url": "https://r.jina.ai/https://linux.do/c/news/34.rss",
+        "parseMode": "html",
+        "itemSelector": "body > div",
+        "linkSelector": "h3 a",
+        "titleSelector": "h3",
+        "publishedAtSelector": "time",
+        "allowUrlPrefixes": [
+          "https://linux.do/t/topic/"
+        ]
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-legit-api",
+      "name": "X：Legit (@legit_api)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:legit_api -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-xieyihui",
+      "name": "X：Yihui Xie (@xieyihui)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:xieyihui -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-rachelmetz",
+      "name": "X：Rachel Metz (@rachelmetz)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:rachelmetz -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "x-account-yetone",
+      "name": "X：yetone (@yetone)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:yetone -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "src-b8f80c4916",
+      "name": "中华网科技",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://news.google.com/rss/search?q=site:tech.china.com&hl=zh-CN&gl=CN&ceid=CN:zh-Hans",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 120,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
     }
   ]
 }

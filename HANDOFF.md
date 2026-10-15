@@ -119,6 +119,8 @@ $0.289 ——这是「账要记准」的决定，不是钱的决定。涉及付�
 | （本轮） | **放行 4 条未确认回执**（站主指示）：1 条 embedding 按「未送达」、3 条 deepseek 超时按「可能已计费」记录并放行，3 篇 arXiv 回到处理队列；见 §1③ |
 | （本轮） | **从两份源清单里补 29 个源**（22 精选 + 7 氛围）：先去重（清单里 66 个名字有 48 个本站已有）、再逐个实测地址、按分级口径定权重，包 620→649 并用 `scripts/seed.ts` 入库；顺带找到 Impress Watch 的 feed。详见 `DEPLOY-NOTES.md` |
 | （本轮） | **换回 Go 网关的另一把 key**（10-15）：在用的 key 周额度用尽（16:00 起每次模型调用都 429），`OPENCODE_OLD_KEY` 那把周额度已重置、实测可用 → 对调并 `--force-recreate api worker web`。当天量：deepseek 11,478 次 / 2,704 万 token。详见 `DEPLOY-NOTES.md` §二 |
+| （本轮） | **停用三个 arXiv 源**（10-15，站主决定）：`rss-arxiv`(cs.AI) / `-2`(cs.CL) / `-3`(cs.LG) 占当天 **64% 的模型调用**却从不进精选（`EXCLUDE_MP` → `selection_candidate=false`）。停源后待处理文章全来自别的源；今天的论文仍留在「全部动态」（站主确认不用管）。详见 `DEPLOY-NOTES.md` |
+| （本轮） | **10-15 增量包 + linux.do**：11 个候选去重后真加 5 个（张小珺播客、中华网科技 GN 兜底、4 个 X 账号——其中 yetone 也进了），跳过 5 个（界面新闻/Tom Huang 站内已有、OpenAI Developers 复测仍 403、Ideogram 整站 CF、博客园 feed 500）；**linux.do 用框架自带的 Jina 通路接上**（本站采集器被 CF TLS 指纹挡、curl 却 200）。包 649→**656**，全站启用 **556/662**。详见 `DEPLOY-NOTES.md` |
 
 
 **安全报告结局**：清洗器惰性属性绕过、SSRF 结尾点绕过 → **已 published**（报告人是我们）；
