@@ -118,6 +118,7 @@ $0.289 ——这是「账要记准」的决定，不是钱的决定。涉及付�
 | （本轮） | **#195 的 PR**：静默判据改成按信源自己的节奏（90 天产出日的中位间隔、4 倍、至少 4 天），历史不足/从未收到的仍列出 —— PR **#202**，分支 `fix/source-silence-rhythm` |
 | （本轮） | **放行 4 条未确认回执**（站主指示）：1 条 embedding 按「未送达」、3 条 deepseek 超时按「可能已计费」记录并放行，3 篇 arXiv 回到处理队列；见 §1③ |
 | （本轮） | **从两份源清单里补 29 个源**（22 精选 + 7 氛围）：先去重（清单里 66 个名字有 48 个本站已有）、再逐个实测地址、按分级口径定权重，包 620→649 并用 `scripts/seed.ts` 入库；顺带找到 Impress Watch 的 feed。详见 `DEPLOY-NOTES.md` |
+| （本轮） | **换回 Go 网关的另一把 key**（10-15）：在用的 key 周额度用尽（16:00 起每次模型调用都 429），`OPENCODE_OLD_KEY` 那把周额度已重置、实测可用 → 对调并 `--force-recreate api worker web`。当天量：deepseek 11,478 次 / 2,704 万 token。详见 `DEPLOY-NOTES.md` §二 |
 
 
 **安全报告结局**：清洗器惰性属性绕过、SSRF 结尾点绕过 → **已 published**（报告人是我们）；
@@ -141,6 +142,12 @@ $0.289 ——这是「账要记准」的决定，不是钱的决定。涉及付�
   10-11 一天花掉 $1.81、把余额压到 $0.25，而**生产的预算与账本完全看不见**（两套库）。
   该栈已删除、本地 `.env` 的 key 已移除、`COLLECT_ENABLED`/`MODEL_CALLS_ENABLED` 已改回 `false`。
   **key 从未进过 git**（`.env.*` 被忽略），所以轮换是可选的。
+- **Go 套餐的额度是这套部署最脆弱的一环**：$10/月的额度撑不住本站的量（10-15 一天 deepseek 11,478 次、
+  2,704 万 token），周额度一到顶就**全站模型调用 100% 失败**（文章堆在 `processing_state='new'`）。
+  两把 key 轮着用可以顶一阵：老 key 留在 `.env` 的 `OPENCODE_OLD_KEY` 里，**周额度重置后还能用**。
+  换 key 一定要 `up -d --force-recreate api worker web`（`restart` 不重读 `.env`），并核对哈希：
+  `.env` 与容器里 `LLM_API_KEY` 的 sha256 前 12 位必须一致。**长期解**是按量计费 API（改三个变量，
+  去掉 `LLM_EXTRA_JSON`/`LLM_SESSION_ID`），按当天量粗算约 $5–8/天。
 - **Docker Desktop 在这台机器上一天挂四次**：本地测试前先确认守护进程在跑、`aihot-testdb` 已启动
   （`test-in-container.ps1` 里写死了 `172.17.0.2`，Docker 重启后 IP 可能变，必要时先重启该容器）。
 - **pre-push 钩子（ECC）会在 Docker 挂掉时误报失败**：先用容器套件自己验一遍，再用 `ECC_SKIP_PREPUSH=1` 推。

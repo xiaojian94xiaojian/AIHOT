@@ -3431,3 +3431,36 @@ Gemini API 更新日志（没有 feed，要写 `web_list` 选择器，留作后�
   一次加很多付费源时会看到这一分钟的尖峰，不是故障。
 - 那 5 个首读超时的 X 账号留下了未确认回执，`ops.recover` 在 30 分钟后（约 23:10）自动放行一次，
   下一次调度（约 00:55）重试；重试成功拿到水位后它们就并入分片。
+
+### 2026-10-15 再换一次 key（第二把额度也到顶了）
+
+**症状**：`deepseek HTTP 429 {"type":"GoUsageLimitError"}`。10-15 15:49 起零星出现，**16:00 之后每一次模型调用都失败**
+（16:00–19:00 每小时 0 成功、327/466/479 次失败），归组的 `group_article` 攒了 1221 次失败、2172 篇文章卡在
+`processing_state='new'`。站点自己的告警**发现了**（`alerts.state` → `content.process`「新内容卡住了，进不了网站」，
+10-15 10:50 UTC 发出）。
+
+**处置**：`.env` 里那把早先因周额度用尽而被顶下来的 key（`OPENCODE_OLD_KEY`）**周额度已经重置**，
+实测 `deepseek-flash` / `glm-5.3-flash` 都 200（在用的那把两个模型都 429）。于是对调：
+
+```
+LLM_API_KEY / DEEPSEEK_API_KEY / DASHSCOPE_API_KEY / ZHIPU_API_KEY / XIAOMI_MIMO_API_KEY  ← 700a89304d94（恢复使用）
+OPENCODE_OLD_KEY                                                                         ← d0cfcbf3fd23（本次用尽的）
+```
+
+（哈希是 sha256 前 12 位，用来核对不打印明文。）
+
+**步骤**（`.env` 里 6 行用 awk 就地改写，脚本 `keyswap.sh`，先 `cp -p .env .env.bak-20261015-before-keyswap`）：
+
+1. 改写后先比对 `.env` 与容器读到值的哈希；
+2. **`docker compose -f docker-compose.server.yml up -d --force-recreate api worker web`** ——
+   `restart` 不会重读 `.env`（老坑）；这次连 `web` 一起重建，因为它的环境里也带 `LLM_API_KEY`；
+3. 复核：6 个变量哈希两边一致、站点四页 200、模型调用恢复（19:11 起 0 失败，19:14 峰值 18 次/分钟）。
+
+**要记住的两件事**：
+
+- 这个 $10/月的 Go 套餐撑不住本站的量：**10-15 一天 deepseek 调用 11,478 次、2,704 万 token（输入 2,400 万 / 输出 304 万）**，
+  外加 embedding 4,364 次。按 DeepSeek 官方按量计费粗算约 **$5–8/天**（含缓存命中）；Go 套餐是给编码 agent 的，
+  文档写明「Traffic is monitored for abuse」，长期跑批量管道既有额度问题也有被判定滥用的风险。
+  真要稳，还是换成按量计费的 API（只改 `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL`，并去掉 `LLM_EXTRA_JSON`、`LLM_SESSION_ID`）。
+- 每次换 key 都会留下旧 key（`OPENCODE_OLD_KEY`），所以「另一把 key 的周额度重置了」是可以复用的退路；
+  但两把都被用尽时会同时失效，**别把两把 key 都当成无限量**。
