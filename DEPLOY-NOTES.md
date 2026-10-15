@@ -3612,3 +3612,26 @@ Jina 把 RSS 渲染成 HTML 后结构正好可读（`<div><h3><a href=topic>标�
 `docker-compose.server.yml` 里有 `setup` 服务（`node scripts/migrate.ts && node scripts/seed.ts`），api/web/worker 都
 `depends_on: setup: condition: service_completed_successfully` —— 所以**正常 `docker compose pull && up -d` 就会自动补迁移**，
 不用手动跑。生产库现在 79 条、到 `0085`；合并后是 80 个文件，部署时只会补这 1 条。按 HANDOFF 的口径不急。
+
+## 积压告警的「已持续」时长（2026-10-15）
+
+**现象**（站主收到的两条真实通知）：`🔴 新内容卡住了，进不了网站（已持续 45 小时 52 分钟）`、
+`✅ 已恢复：… 持续 47 小时 12 分钟（10月13日 21:48 起）` —— 但那次积压是当天 16:00–19:00 三小时里堆起来的
+（模型额度用尽），真实时长只有 3 小时多。
+
+**真因**（上游原始代码 `877d6d5` 带来的）：`operations/alerts.ts` 的 `content.process` 把 `Finding.since`
+设成**最老一篇还卡在 `new` 的文章的 `discovered_at`**。一篇几天前的遗留文章会跨过每一次积压，
+于是后续每一次积压都用它的年龄起算；`checkAlerts` 把这个值存进 `alerts.state`，恢复通知照抄，所以报成 47 小时。
+`Finding.since` 的约定本是「问题开始的时间，否则第一次看到的时间」——这个值两者都不是。
+
+**处置**：
+
+1. **提到上游**：**PR #204**（分支 `fix/backlog-alert-duration`，从 `origin/main` 的 `540c477` 开，提交 `deccb26`）。
+   改法：不再给这个 finding 传 `since`（交给 `checkAlerts` 的「第一次看到」语义起算），
+   最老一篇的时间作为事实写进 `detail`（`最老的一篇 10月13日 21:48 收进；…`）。
+   回归：`tests/alerts.test.ts` 的素材加一篇 **40 小时前**的遗留文章（在 2 天窗口内、旧代码会选中它），
+   断言首次告警后 `alerts.state` 的 `since` 等于首次告警时刻 —— 改后 7/7 通过，把那一行 `since` 放回去则这条断言失败。
+2. **同时并进我们的树**：`4bcbdbd`（`git merge fix/backlog-alert-duration`），这样**下次部署即生效**，不必等上游合并。
+
+**注意**：这是代码修复，**要部署才生效**（线上仍是 `34b6b14b0c24` 旧镜像）。下次部署把 `d9ee498`（上游合并）、
+`540c477`（翻译修复 + 迁移 0086）和本修复一起带上即可。
