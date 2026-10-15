@@ -3738,3 +3738,42 @@ GET https://opencode.ai/zen/go/v1/usage   (Authorization: Bearer <key>)
 `pgboss.schedule` 里有 `cron.go.quota` ✓、`operations/alerts.ts:155` 会调用模块的 alerts ✓、
 当前三个窗口 10%/11%/60%、**0 条告警** ✓（样本还少，速度要一小时后才外推得出来）、站点五页 200 ✓、模型调用 0 失败 ✓。
 
+
+## 巡检与额度事故遗留清理（2026-10-15 深夜）
+
+**巡检结论（站点健康）**：处理 `new=0` ✓；`events.group` 已完成 35,467 个 ✓ 近 60 分钟模型调用 0 失败 ✓；
+新源都在出内容（中华网 92、linux.do 25、X 各 5–10、reddit 7/4）✓；额度 10%/11%/60% ✓。
+
+**我自己看错了一次口径**：先看到 `grouping_status='pending'` 有 14,431 条就以为是积压，拆开看是
+**8,313 条 `processing_state='skipped'`（非编辑内容，本来就不归组）+ 5,000 条 `blocked`（`analyze.ts:586`
+按相关性主动拦截的噪声）+ 只有 1,107 条真在等**。教训：看 pending 要先按 `processing_state` 拆，
+再把「公开 + 合格 + 精选候选」这个归组门槛套上，否则数字会吓自己一跳。
+
+**清理（两类真正的遗留）**：
+
+| 动作 | 数量 | 走的路 |
+|---|---|---|
+| 处理失败的文章重排 | **11 篇** | `admin/runs.ts` 的 `requeueFailedArticles`（框架自带、写审计，actor `admin:1`） |
+| 因额度/配额失败而归组的文章放回待办 | **1,895 条** | `content/provenance.ts` 的 `groupingReset()` + `grouping_error ~* 'exhausted|GoUsageLimit|HTTP 429'` |
+| 剩下的归组失败 | 7 条 | 是内容/输出问题，不是额度，留着不动 |
+
+清理后核对：`grouping_status='failed'` 1,902 → **7**；归组在推进（90 秒内 `new` 8→4，近 10 分钟新归组 65→70），
+模型调用 0 失败 ✓。脚本 `.cache/hot/cleanup-stranded.mjs`。
+
+## 近 6 小时"额度花在哪一步"（菜单第 5 项）
+
+| 步骤 | 调用 | 合计 token | 占比 | 平均输入/输出 |
+|---|---|---|---|---|
+| `score_article` | 264 | 1.41M | **30.8%** | 3,199 / **2,181** |
+| `group_article` | 239 | 1.04M | **22.6%** | 3,876 / 515 |
+| `structure_article` | 140 | 0.44M | 9.6% | 3,016 / 137 |
+| `prefilter_article` | 271 | 0.44M | 9.5% | 1,589 / 24 |
+| `story_digest` | 234 | 0.30M | 6.5% | — |
+| `summarize_article` | 95 | 0.29M | 6.3% | — |
+| `understand_article` | 43 | 0.25M | 5.4% | — |
+| `group_signal` | 254 | 0.15M | 3.3% | — |
+
+**两步占了 54%**，其中 `score_article` 每次吐 **2,181 个输出 token**（评分这一步在写长文）——
+这是最大的单点。可选处置：给评分换更便宜的模型（`site/models.ts` 一步配置），或让它输出更短；
+换之前要抽 50 篇对比评分质量，不能只看省。
+
