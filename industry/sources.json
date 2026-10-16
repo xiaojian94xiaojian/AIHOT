@@ -1250,7 +1250,8 @@
       "name": "Eugene Yan：Writing",
       "kind": "web_list",
       "config": {
-        "url": "https://eugeneyan.com/writing/",
+        "url": "https://r.jina.ai/https://eugeneyan.com/writing/",
+        "parseMode": "html",
         "itemSelector": "h4.cp-title",
         "linkSelector": "a[href]",
         "_aihot": {
@@ -7002,7 +7003,7 @@
       "syndicate_fulltext": false,
       "enabled": true,
       "config": {
-        "feedUrl": "https://rsshub.rssforever.com/36kr/newsflashes"
+        "feedUrl": "https://hub.slarker.me/36kr/newsflashes"
       },
       "tier": "T2",
       "first_party": false,
@@ -7230,7 +7231,7 @@
       "syndicate_fulltext": false,
       "enabled": true,
       "config": {
-        "feedUrl": "https://rsshub.rssforever.com/juejin/category/frontend"
+        "feedUrl": "https://hub.slarker.me/juejin/category/frontend"
       },
       "tier": "T2",
       "first_party": false,
@@ -7314,7 +7315,7 @@
       "syndicate_fulltext": false,
       "enabled": true,
       "config": {
-        "feedUrl": "https://rsshub.rssforever.com/oschina/news"
+        "feedUrl": "https://hub.slarker.me/oschina/news"
       },
       "tier": "T2",
       "first_party": false,
@@ -7918,7 +7919,7 @@
       "syndicate_fulltext": false,
       "enabled": true,
       "config": {
-        "feedUrl": "https://feeds.feedburner.com/thenextweb",
+        "feedUrl": "https://thenextweb.com/feed/",
         "_aihot": {
           "initialBackfillLimit": 8
         }

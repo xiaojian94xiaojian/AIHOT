@@ -3803,3 +3803,60 @@ GET https://opencode.ai/zen/go/v1/usage   (Authorization: Bearer <key>)
 可以加一句「明显是玩笑、寒暄、与重置无关的产品/推送说明，直接 `relevant=false` 或 `needsReview=false`」，
 能把复核量砍掉一大半。改提示词要配一批真实帖子做前后对照，别只看着像。
 
+
+## 10-16 日报（8 条）的处理记录
+
+### 立即修好的（源地址，已在库与包两处改）
+
+| 源 | 原来 | 改成 | 证据 |
+|---|---|---|---|
+| `src-6d951949ba` TNW | `feeds.feedburner.com/thenextweb`（**404**，连败 9 次） | `thenextweb.com/feed/` | 实测 200、10 条、最新今天 12:04 |
+| `src-3a691df5b3` 开源中国 | `rsshub.rssforever.com`（**超时** 44 次） | `hub.slarker.me` | 实测 200、20 条、最新今天 12:11 |
+| `src-c05f2328a0` 掘金 | 同上（超时 61 次） | `hub.slarker.me` | 同上 |
+| `src-fac4f55973` 36氪 | 同上（超时 65 次） | `hub.slarker.me` | 同上 |
+| `web-eugeneyan` | 列表页（JS 渲染，抓得到但 0 条目） | `r.jina.ai/...` + `parseMode: html` | 框架自带的 Jina 通路（docs/sources.md） |
+
+RSSHub 实例实测：`rsshub.app` **403**、`rsshub.rss.tips` **502**、`pseudoyu`/`shab.fun`/`henry.wang` 连不上、
+`liumingye.cn` 超时；**能用的**是 `hub.slarker.me` 与 `rsshub.ktachibana.party`（200、20 条）。
+（本站另有 1 个源本来就用 ktachibana，这样两处分开、不会一起挂。）
+
+### 查清不是问题的
+
+- **第 3 条「71 个编辑源 7 天 0 新发现」**：抽 8 个亲手抓，**feed 全是好的**，只是最新一篇本身就旧：
+  BAIR 07-29、Ahead of AI 09-29、Answer.AI 08-19、Dwarkesh 10-01、Ethan Mollick 10-01、Lilian Weng 07-04、
+  Thinking Machines 07-31、Chips and Cheese 10-05 —— 属于日报自己说的「低频更新」，不是采集失效。
+- **第 1 条 deepseek 日额度 20,000/20,000**：是本站在 10-15 深夜清积压时（含我们重排的 1,895 条归组）撞到
+  自己的日上限（`budgets` 表：100/分钟、2,000/小时、20,000/天）。**已自行恢复**：近 24 小时 8,115 次、
+  近 26 小时**没有一次**被预算挡下的记录；Go 端周额度 25%、月额度 67%，模块外推「周还能撑 4.8 天、重置还有 60 小时」。
+  设计如此：撞上就等窗口滚动，文章留在待处理、不计失败。
+- **第 8 条 events.group 排队**：确实在排但**一直在消化**——最近几小时每小时完成 400–460 个，
+  队列 1,381 个 ≈ 3.5 小时清完；「排队超过 2 小时」是延迟告警，不是卡死。
+- **第 2 条 `rss-ithome`**：12.6% 失败都是连接层（`fetch failed`/超时），成功仍占 87%，属目标站不稳；
+  **`rss-youtube`**：配置是对的（`@anthropic-ai` 解出的 channel_id 与库里一致 `UCrDwWp7EBBv4NwvScIpBDOA`），
+  是这个频道的 RSS **只到 2023-06-15**，抓不到新东西——建议停用或换成别的采集方式。
+- **第 6 条 `src-f6d2ad6f1b`（t3n）HTTP 406**：找到原因——采集 RSS 时发的
+  `accept: application/rss+xml, application/atom+xml, application/xml`（`rss.ts:148`）被它的 WAF 拒；
+  我用 `accept: */*` 抓同一条 feed 是 **200、20 条、今天 13:55 更新**。值得提上游（406 时退一步用 `*/*`），
+  本地先不动（氛围源，成功的那 71% 仍在收）。
+- **第 4 条 7 个源的文章质量**（缺发布时间/反复修订）：都是个位数（最多 3 篇），影响有限，列入下次体检。
+
+### 查出的大问题：X 分片抓取有系统性缺陷（第 7 条 + 第 2 条的 X 部分）
+
+**证据链**：
+
+1. 那批「7 天 0 新发现」的 X 账号**名下真的没有内容了**：`x-account-claudeai` 最后一篇 **10-09 03:53**，
+   `alexalbert__`/`berkeley_ai`/`geoffreyhinton` 都是 **10-08**；对照组 `lxfater` 146 篇（今天 19:15）、
+   `yetone` 12 篇（今天 17:13）正常。
+2. 近 24 小时 X 抓取 **11,700 次里 10,883 次 found=0**（93%）。
+3. 直接问 SocialData `from:claudeai`（绕过分片）**返回 20 条** —— 内容存在，是分片没取到。
+4. 同分片成员的 `cursor.lastTweetId` **水位线完全相同**（5 个账号都是 11:54Z）—— 说明
+   `collect.ts:327` 把**整片的最新推文**写进了每个成员的游标（`read.lastId`），而不是各成员自己的最新推文。
+5. 搜索边界来自 `coveredTo()`（`collect.ts:274`）：`max(自己的水位, 上次检查时间 − 10 分钟)`，
+   分片取**最小值**当 `since_id`。两个效应叠加：安静账号的水位被"抬"到分片最新（它自己没读到的旧帖再也读不到），
+   而"上次检查 − 10 分钟"又让每次的窗口只有几十分钟；再加上水位被抬高后**没有 backlog**（详情里 `backlog: 0`），
+   中间漏掉的推文没有任何补读路径。
+
+**下一步（明天第一件事）**：在临时库上复现——对一个分片跑一次 `collectXShard`，
+对照"逐账号直接搜"的结果，确认漏读比例；修法方向是**各成员只推进到自己的最新推文**，
+并让 `coveredTo` 反映"这个账号真正被读到哪儿"（而不是分片整体）。这是框架代码，修好提上游。
+
