@@ -4326,10 +4326,17 @@ worker 重建后 **18 秒写入 8 行、0 错误**。
 
 ### 模型榜轮次每 6 小时失败（10-04 后榜单一直停在旧数据）
 根因：`cron.leaderboard.round` 从 10-04 起一直报 `42P01 relation "lb_calibrations" does not exist`。
-这张表由 `0064` 建过，但本站 10-11 的手工清理脚本把它 `DROP` 了，**迁移账本仍记着 0064 已应用**，
-所以任何部署都不会再建它。修法：新增幂等的模块迁移 `modules/leaderboard/migrations/0088_leaderboard_calibrations.sql`
-（与 0064 同 DDL、`IF NOT EXISTS`）；生产上把文件 `docker cp` 进 worker 后跑了一次 `scripts/migrate.ts`
+这条链是：**上游 4.0.0 有意把模型榜移出框架**，`0053` 按设计 DROP 掉全部 `lb_*` 表（不是缺陷）；
+我们把功能作为模块接回来（`e346e56`），自己写了 `0058`–`0065` 的重建迁移，`0064` 就是建这张表。
+账本显示 10-05 00:09 应用 `0048`（建表）→ `0053`（删表）→ 00:10 应用 `0064`（重建），本该把表建回来。
+但证据显示：10-04 19:26 升级前的备份里它本来就不存在（那时还没应用 `0048`）；**10-15、10-16 的保留备份里
+仍然没有它**，而账本一直记着 `0064` 已应用 —— 也就是表在 **10-05 00:10 之后**的某次手工操作/恢复里丢了，
+现有记录查不到具体是哪条命令（10-12 有过一次数据库恢复，是候选）。教训是"迁移账本与实库漂移"：
+`IF NOT EXISTS` 的重建迁移一旦账本记过，就再也不会自愈。
+修法：新增幂等的模块迁移 `modules/leaderboard/migrations/0088_leaderboard_calibrations.sql`
+（与 0064 同 DDL）；生产上把文件 `docker cp` 进 worker 后跑了一次 `scripts/migrate.ts`
 （`applied 0088_leaderboard_calibrations.sql (38ms)`，下一次部署会带上它）。
+**注**：该迁移文件里的注释把丢表归因于「10-11 的手工清理脚本」，那是当时的猜测，以本节证据为准。
 
 验证：手动跑一次轮次（`runLeaderboardRound({force:true})`）—— **status=published**、5 个榜全部
 `optimal`、`lb_runs` 从 10-04 12:05 推进到 10-17 13:18（总体榜 78 个模型）。**坑**：手动跑时不要用
