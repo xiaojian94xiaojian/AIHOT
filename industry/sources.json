@@ -8995,10 +8995,10 @@
     },
     {
       "id": "x-account-lijigang_com",
-      "name": "X：李继刚 (@lijigang_com)",
+      "name": "X：李继刚 (@lijigang)",
       "kind": "x_search",
       "config": {
-        "query": "from:lijigang_com -filter:replies",
+        "query": "from:lijigang -filter:replies",
         "_aihot": {
           "initialBackfillLimit": 8
         }
