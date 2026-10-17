@@ -111,3 +111,29 @@ questions:
    （可钉 `jev-1.13.0`；免费版是 `jev-1.13` 别名 + 限时，不能当长期契约）。
 3. **是否先做 P0 影子模块**（不动生产判定，只积累对照数据；成本约每天几美分）。
 4. **归组交给 Jev 后，"复核换一家模型"的对冲怎么处理**：保留 `mimo` 复核（推荐），还是让 Jev + 现有模型互为复核。
+
+## 八、P0 影子已上线（2026-10-17 晚）
+
+模块 `modules/jev-shadow/`，开关 `JEV_SHADOW_ENABLED`（默认关，打开需重启 worker）。每 10 分钟取
+最多 8 篇编辑源的新分析（`JEV_SHADOW_PER_RUN`），用**生产同一份材料与提示词**问 Jev 两道题：
+预筛三选一、评分五档；把生产判定与 Jev 答案并排写进 `jev_shadow`，不改判定、不发布、不推送。
+单篇失败只记该行，1 小时后重试；线路默认 OpenCode 的 `jev-1.13-free`（借 `LLM_API_KEY`，零成本），
+换 TypeSafe 官方只改 `JEV_SHADOW_BASE_URL` / `JEV_SHADOW_MODEL` / `JEV_SHADOW_API_KEY`，代码不动。
+
+上线 18 秒内写入首批 8 行、0 错误：预筛与生产 **8/8 一致**；评分平均绝对差 **4.6 分**
+（5 个有分数的样本，全部低于门槛，两边一致）。读数据：
+
+```sql
+-- 预筛一致率
+SELECT our_relevance, jev_prefilter, count(*) FROM jev_shadow
+ WHERE error IS NULL GROUP BY 1,2 ORDER BY 3 DESC;
+-- 评分差、跨门槛分歧
+SELECT count(*), round(avg(abs(our_score - jev_score))::numeric, 2) AS mad FROM jev_shadow
+ WHERE our_score IS NOT NULL AND jev_score IS NOT NULL;
+SELECT count(*) FILTER (WHERE our_score >= threshold AND jev_score < threshold) AS ours_only,
+       count(*) FILTER (WHERE our_score < threshold AND jev_score >= threshold) AS jev_only
+  FROM jev_shadow WHERE our_score IS NOT NULL AND jev_score IS NOT NULL AND threshold IS NOT NULL;
+```
+
+判断 P2/P3 是否值得做，至少等两类样本各到几百条，并按语种、信源分级拆开看；免费线路是限时的，
+真切换前用官方 key 复核同一批样本（免费与官方 4 个样本的答案差 ≤0.05/4）。
