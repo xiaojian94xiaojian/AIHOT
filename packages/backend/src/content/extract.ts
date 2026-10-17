@@ -27,6 +27,9 @@ export interface ExtractedBody {
 
 const MIN_BODY_CHARS = 200;
 
+type Doc = ReturnType<typeof parseHTML>["document"];
+type El = NonNullable<ReturnType<Doc["querySelector"]>>;
+
 /** Paths that serve a sign-in form rather than the page that was asked for. */
 const AUTH_PATH = /^\/(?:login|log-in|signin|sign-in|register|signup|sign-up)(?:\/|$)|(?:^|\/)(?:login|log-in|signin|sign-in|authorize|oauth2?|sso|auth)(?:\/|$)/i;
 
@@ -55,7 +58,7 @@ export function isSignInRedirect(asked: string, landed: string): boolean {
 }
 
 /** Restore only completed React streaming boundaries, without evaluating any page script. */
-function settleStreamedContent(document: ReturnType<typeof parseHTML>["document"]) {
+function settleStreamedContent(document: Doc) {
   for (const script of document.querySelectorAll("script:not([src])")) {
     const type = script.getAttribute("type")?.toLowerCase();
     if (type && type !== "text/javascript" && type !== "application/javascript") continue;
@@ -105,7 +108,7 @@ function settleStreamedContent(document: ReturnType<typeof parseHTML>["document"
  * later plain one, else the last. The nodes stay in place: Readability restores noscript images beside
  * their hidden placeholders, and drops every style from the body afterwards.
  */
-function settleInlineVisibility(document: ReturnType<typeof parseHTML>["document"]) {
+function settleInlineVisibility(document: Doc) {
   for (const el of document.querySelectorAll("[style]")) {
     const style = el.getAttribute("style") ?? "";
     if (!/display|visibility/i.test(style)) continue;
@@ -123,6 +126,87 @@ function settleInlineVisibility(document: ReturnType<typeof parseHTML>["document
   }
 }
 
+const collapsed = (s: string | null | undefined) => (s ?? "").replace(/\s+/g, " ").trim();
+/** Only letters and digits: "Value: what is it?" and "Value What is it" are the same words. */
+const words = (s: string) => s.replace(/[^\p{L}\p{N}]+/gu, "").toLowerCase();
+
+/** Hidden by an attribute or an inline style (settleInlineVisibility), itself or inside its figure. */
+function hiddenIn(el: El, figure: El): boolean {
+  for (let node: El | null = el; node && node !== figure; node = node.parentElement) {
+    if (node.hasAttribute("hidden") || /(?:^|;)(?:display:none|visibility:hidden)(?:;|$)/.test(node.getAttribute("style") ?? "")) return true;
+  }
+  return false;
+}
+
+/** A [role="img"] holder that has nothing besides its svgs: no text, image or video of its own. */
+function onlyDrawings(holder: El): boolean {
+  const copy = holder.cloneNode(true) as El;
+  for (const svg of copy.querySelectorAll("svg")) svg.remove();
+  return !collapsed(copy.textContent) && !copy.querySelector("img, picture, video");
+}
+
+/** The text alternative of a drawing, a line each: what aria-labelledby points to, aria-label, or an svg's title and desc. */
+function drawingText(document: Doc, el: El): string[] {
+  const ids: string[] = el.getAttribute("aria-labelledby")?.split(/\s+/).filter(Boolean) ?? [];
+  const labelledBy = ids.map(id => collapsed(document.getElementById(id)?.textContent)).filter(Boolean);
+  if (labelledBy.length) return labelledBy;
+  const label = collapsed(el.getAttribute("aria-label"));
+  if (label) return [label];
+  if (el.localName !== "svg") return [];
+  return ["title", "desc"].map(name => collapsed([...el.children].find(child => child.localName === name)?.textContent)).filter(Boolean);
+}
+
+/**
+ * An inline SVG drawing in a figure is not kept: its colours come from the page's stylesheet and its
+ * labels are not prose. The drawing is the figure's [role="img"] element holding the svg, else the svg;
+ * a holder with text or images of its own keeps them, and only its svgs are replaced by its text. The
+ * drawing's own text alternative stands in for it as a paragraph, written as text, never as markup. The page
+ * hides the drawing from screen readers (aria-hidden) because that text is read instead, so only hidden
+ * and style carry over. Wide and narrow versions of one figure give the same text once, from a version
+ * that is shown. Words the figure shows (its caption, a heading, not hidden text) are not repeated; a
+ * drawing without any text is left to be dropped.
+ */
+function describeFigureDrawings(document: Doc) {
+  const figures = new Map<El, { shown: string; texts: Map<string, El> }>();
+  for (const svg of document.querySelectorAll("figure svg")) {
+    const figure = svg.closest("figure");
+    if (!figure) continue; // inside a drawing already replaced
+    const holder = svg.closest('[role="img"]');
+    const held = holder && holder !== figure && figure.contains(holder) ? holder : null;
+    // The holder describes the drawing; it is replaced whole only when it holds nothing else.
+    const drawing = held && onlyDrawings(held) ? held : svg;
+    const lines = held ? drawingText(document, held) : [];
+    if (!lines.length) lines.push(...drawingText(document, svg));
+    const text = lines.join(" ");
+    if (!text) continue;
+    let seen = figures.get(figure);
+    if (!seen) {
+      const copy = figure.cloneNode(true) as El;
+      // Readability drops aria-hidden elements, so their words are not shown either.
+      for (const el of copy.querySelectorAll('svg, [role="img"], [hidden], [style], [aria-hidden="true"]')) {
+        if (el.localName === "svg" || (el.getAttribute("role") === "img" && onlyDrawings(el)) || el.getAttribute("aria-hidden") === "true" || hiddenIn(el, copy)) el.remove();
+      }
+      seen = { shown: words(copy.textContent ?? ""), texts: new Map() };
+      figures.set(figure, seen);
+    }
+    if (seen.shown.includes(words(text))) continue;
+    const earlier = seen.texts.get(text);
+    if (earlier && (!hiddenIn(earlier, figure) || hiddenIn(drawing, figure))) {
+      drawing.remove();
+      continue;
+    }
+    const p = document.createElement("p");
+    lines.forEach((line, i) => p.append(...(i ? [document.createElement("br"), line] : [line])));
+    for (const name of ["hidden", "style"]) {
+      const value = drawing.getAttribute(name);
+      if (value !== null) p.setAttribute(name, value);
+    }
+    drawing.replaceWith(p);
+    earlier?.remove();
+    seen.texts.set(text, p);
+  }
+}
+
 /** A publication time the page prints without a zone is read in utcOffset (the source's articleUtcOffset). */
 export function readable(html: string, url: string, utcOffset?: string): ExtractedBody | null {
   if (isVideoPageUrl(url)) return null;
@@ -136,6 +220,7 @@ export function readable(html: string, url: string, utcOffset?: string): Extract
   }
   settleStreamedContent(document);
   settleInlineVisibility(document);
+  describeFigureDrawings(document);
   const article = new Readability(document as unknown as ConstructorParameters<typeof Readability>[0], { charThreshold: MIN_BODY_CHARS, keepClasses: false }).parse();
   if (!article?.content) return null;
   const clean = trimTrailingChrome(sanitizeBody(article.content, url));
