@@ -4,6 +4,7 @@
   "type": "module",
   "sideEffects": false,
   "dependencies": {
+    "@aihot/backup-rotation": "*",
     "@aihot/chronicle": "*",
     "@aihot/go-quota": "*",
     "@aihot/jev-shadow": "*",

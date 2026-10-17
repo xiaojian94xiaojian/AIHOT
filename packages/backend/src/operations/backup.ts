@@ -14,7 +14,7 @@ import { screenshotsForwarded } from "./feedback.ts";
 const run = promisify(execFile);
 const KEEP_LOCAL = 3;
 
-interface Store {
+export interface Store {
   secretId: string;
   secretKey: string;
   bucket: string;
@@ -25,10 +25,10 @@ interface Store {
 
 /** Backups run where the object store is configured (production); development never uploads. */
 export function backupConfigured(): boolean {
-  return store() !== null;
+  return backupStore() !== null;
 }
 
-function store(): Store | null {
+export function backupStore(): Store | null {
   const get = (k: string) => process.env[k] || credential("integrations", k) || null;
   const secretId = get("DB_BACKUP_STORE_SECRET_ID");
   const secretKey = get("DB_BACKUP_STORE_SECRET_KEY");
@@ -53,7 +53,7 @@ const hex = (b: Buffer | string) => createHash("sha256").update(b).digest("hex")
 const hmac = (key: Buffer | string, data: string) => createHmac("sha256", key).update(data).digest();
 
 /** AWS Signature V4 headers for one S3 request. */
-function signV4(opts: {
+export function signV4(opts: {
   method: string; url: URL; region: string; accessKey: string; secretKey: string; payloadHash: string; headers?: Record<string, string>;
 }): Record<string, string> {
   const amzDate = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
@@ -86,7 +86,7 @@ async function upload(s: Store, key: string, file: string, sha: string, size: nu
 }
 
 export async function runBackup(now = new Date()) {
-  const s = store();
+  const s = backupStore();
   const dir = path.join(config.dataDir, "backups");
   await mkdir(dir, { recursive: true });
   const stamp = now.toISOString().slice(0, 16).replace(/[-:T]/g, "");

@@ -1,10 +1,11 @@
 // The backend of the site's modules, installed by the api and the worker when they start (site/modules/index.ts).
 import type { ServerModule } from "@aihot/backend/modules";
+import { backupRotationServerModule } from "@aihot/backup-rotation/server";
 import { chronicleServerModule } from "@aihot/chronicle/server";
 import { goQuotaServerModule } from "@aihot/go-quota/server";
 import { jevShadowServerModule } from "@aihot/jev-shadow/server";
 import { leaderboardServerModule } from "@aihot/leaderboard/server";
 import { monitorServerModule } from "@aihot/monitor/server";
 
-export const SERVER_MODULES: readonly ServerModule[] = [leaderboardServerModule, monitorServerModule, chronicleServerModule, goQuotaServerModule, jevShadowServerModule];
+export const SERVER_MODULES: readonly ServerModule[] = [leaderboardServerModule, monitorServerModule, chronicleServerModule, goQuotaServerModule, jevShadowServerModule, backupRotationServerModule];
 
