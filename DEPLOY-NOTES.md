@@ -4385,3 +4385,18 @@ worker 重建后 **18 秒写入 8 行、0 错误**。
 **部署踩坑**：`docker compose pull` 被 Docker Hub 502（caddy/postgres）卡住，整套拉取中止，
 `up -d` 用了旧镜像且没有重建应用容器。改成 `pull api worker web setup`（只拉 registry 里的应用镜像）
 再 `up -d --no-deps api worker web setup` 即恢复；检查 `docker image inspect` 的 RepoDigests 确认新摘要。
+
+## 10-17 22:55：备份桶保留策略上线（日备 7 天 / 周备 4 周 / 月备 6 个月，merge-6bffa19）
+
+R2 的 lifecycle 接口要 **Admin** 权限的 token：现有 `DB_BACKUP_STORE_*` 只有对象读写，`GET ?lifecycle`
+返回 403；但列举和删除都有权限（删一个不存在的键探测到 204）。所以做成站点模块
+`modules/backup-rotation/`：每天 **04:40**（备份 04:10 之后）列举桶并删除过期对象，复用
+`operations/backup.ts` 的 `backupStore()` 与 `signV4()`（这两个为复用改成了导出，行为不变）。
+
+- 只动 `daily/`、`weekly/`、`monthly/` 三个前缀里按 LastModified 过期的对象；其他键一律不删；分页跟进。
+- 盘点：桶里 **14 个对象 / 6.13GB**（daily 8、monthly 4、weekly 2），最早的 daily 是 10-14（3 天），
+  首次手动运行 **scanned=14, deleted=0, failed=0**，符合预期。
+- 开关 `BACKUP_ROTATION_ENABLED`（默认关，已在生产打开）；`pgboss.schedule` 里是
+  `cron.backup.rotate 40 4 * * * Asia/Shanghai`。
+- 测试 3 项（过期判定、分页且只删过期、未配置不动作）；全套 **733 通过 / 0 失败**。
+- 之前每次要清就手动删；现在不用了。真要换成桶自带 lifecycle，需要一把 R2 Admin token。
