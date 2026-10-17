@@ -1707,7 +1707,10 @@
         "detail": {
           "maxFetches": 12,
           "publishedAtSelector": "time[datetime]"
-        }
+        },
+        "allowUrlPrefixes": [
+          "https://www.liquid.ai/blog/"
+        ]
       },
       "tier": "T1_5",
       "first_party": false,
@@ -2584,8 +2587,11 @@
         },
         "detail": {
           "maxFetches": 12,
-          "publishedAtSelector": "time[datetime]"
-        }
+          "publishedAtRegex": "((?:January|February|March|April|May|June|July|August|September|October|November|December)\\s+\\d{1,2},\\s+20\\d\\d)"
+        },
+        "allowUrlPrefixes": [
+          "https://hai.stanford.edu/news/"
+        ]
       },
       "tier": "T1_5",
       "first_party": false,
@@ -2624,7 +2630,7 @@
         "_aihot": {
           "initialBackfillLimit": 8
         },
-        "publishedAtSelector": "span:contains(20)"
+        "publishedAtRegex": "((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\\.?\\s+\\d{1,2},\\s+20\\d\\d)"
       },
       "tier": "T1",
       "first_party": true,

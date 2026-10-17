@@ -4360,3 +4360,16 @@ worker 重建后 **18 秒写入 8 行、0 错误**。
 - 评分：17 条有分数，我们均值 44.5 / Jev 46.9，平均绝对差 **6.1**，偏差 +2.4，`r=0.808`；
   跨门槛分歧 0（样本都低于门槛）。
 - 延迟：单篇两次请求平均 941ms、p95 1342ms；预算零成本。
+
+### 网页源日期与历史噪声（HAI / Liquid / Suno，10-17 晚）
+- **HAI**：`itemSelector: "a"` 会把导航、主题页、外站全收进来（历史 73 条里 58 条不是 `/news/`，其中 52 条无日期）。
+  加 `allowUrlPrefixes: ["https://hai.stanford.edu/news/"]`；详情页日期从 `time[datetime]`（页面上没有）
+  改成 `publishedAtRegex`（正文里的 `October 14, 2026`）。干跑：11 条全是文章；生产抓取
+  `detailAttempts=11, failures=0`，此前三篇无日期的文章已补上（10-11、10-13、10-13）。
+- **Liquid**：加 `["https://www.liquid.ai/blog/"]`（历史 29 条非 `/blog/` 行：Pricing/FAQ/Careers/外站
+  HuggingFace）；详情 `time[datetime]` 仍有效，干跑 32 条博客、详情取到 `2026-10-15`。
+- **Suno**：原来的 `publishedAtSelector: "span:contains(20)"` 换成 `publishedAtRegex`（`Aug 10, 2026`
+  形态）；51 条里 49 条卡片有日期，featured 那条也补上了；只剩 `about-sidechaining` 一篇，文章页本身
+  没有日期，留空。
+- **历史噪声未清**：HAI 58 条 + Liquid 29 条非文章行**全部已发布、全部未精选**（只在「全部动态」/RSS/API 里）。
+  停收只影响以后，清理由站主决定。
