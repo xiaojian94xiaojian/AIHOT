@@ -76,10 +76,15 @@ export interface TimelineDecision {
   backfillReason: string | null;
 }
 
-/** The one timeline rule shared by every entrance. */
-export function decideTimeline(claimed: Date | null | undefined, discoveredAt: Date, explicitBackfill?: string | null): TimelineDecision {
+/**
+ * The one timeline rule shared by every entrance. `futureCheckAt` is the moment a claimed time must not
+ * be in the future of: the discovery by default, because a collector cannot know about tomorrow's post.
+ * A listing that reports the same entry again after that time has passed is carrying an ordinary date,
+ * so the fill below re-checks it against now instead.
+ */
+export function decideTimeline(claimed: Date | null | undefined, discoveredAt: Date, explicitBackfill?: string | null, futureCheckAt?: Date): TimelineDecision {
   let publishedAt: Date | null = claimed && Number.isFinite(claimed.getTime()) ? claimed : null;
-  if (publishedAt && publishedAt.getTime() > discoveredAt.getTime() + FUTURE_TOLERANCE_MS) publishedAt = null;
+  if (publishedAt && publishedAt.getTime() > (futureCheckAt ?? discoveredAt).getTime() + FUTURE_TOLERANCE_MS) publishedAt = null;
   let backfillReason: string | null = null;
   if (explicitBackfill) backfillReason = explicitBackfill;
   else if (!publishedAt) backfillReason = "unknown-publication-time";
@@ -93,6 +98,10 @@ export function decideTimeline(claimed: Date | null | undefined, discoveredAt: D
  * Fill a missing publication date from the original listing or page, against the first discovery
  * time. Explicit imports stay backfills. The caller holds the article lock and revises the material
  * with this change, so analysis and grouping cannot retain a decision made on an undated input.
+ *
+ * The future check uses now: an entry first discovered before its own publication time (a post
+ * scheduled ahead) is dateless when stored, and every later listing of it would otherwise be judged
+ * against that first discovery and stay dateless for good.
  */
 export async function fillPublicationTime(db: Db, articleId: string, claimed: Date | null | undefined): Promise<TimelineDecision | null> {
   if (!claimed || !Number.isFinite(claimed.getTime())) return null;
@@ -100,7 +109,7 @@ export async function fillPublicationTime(db: Db, articleId: string, claimed: Da
     SELECT published_at, discovered_at, backfill_reason FROM articles WHERE id = ${articleId}`;
   if (!a || a.published_at) return null;
   const explicit = a.backfill_reason === "unknown-publication-time" ? null : a.backfill_reason;
-  const next = decideTimeline(claimed, a.discovered_at, explicit);
+  const next = decideTimeline(claimed, a.discovered_at, explicit, new Date());
   if (!next.publishedAt) return null;
   await db`UPDATE articles SET published_at = ${next.publishedAt}, published_at_claim = ${claimed},
     timeline_at = ${next.timelineAt}, backfill = ${next.backfill}, backfill_reason = ${next.backfillReason} WHERE id = ${articleId}`;

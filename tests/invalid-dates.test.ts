@@ -113,6 +113,26 @@ test("storage preserves finite future claims and existing timeline boundaries", 
   }
 });
 
+// A post scheduled ahead is listed before its own publication time: the date is in the future of the
+// first discovery and is not trusted. Once that time has passed, the same listing reports an ordinary
+// past date, and the row must stop being dateless — some WordPress feeds (Databricks) list posts this way.
+test("a claim in the future of the first discovery is trusted once that time has passed", async () => {
+  const s = source(`epoch-late-claim-${T}`, "epoch_ms", []);
+  await saveSource(s);
+  const discoveredAt = new Date(Date.now() - 3 * 3600_000);
+  const publishedAt = new Date(Date.now() - 3600_000);
+  const material = { sourceId: s.id, url: `https://example.org/${s.id}/scheduled`, title: "Scheduled post", publishedAt, via: "fetch" as const };
+  const first = await upsertMaterial({ ...material, discoveredAt });
+  const early = await timeline(first.articleId);
+  assert.deepEqual([early.published_at, early.backfill_reason], [null, "unknown-publication-time"]);
+  const again = await upsertMaterial(material);
+  assert.equal(again.revised, true, "filling the date revises the material so its decisions start over");
+  const row = await timeline(again.articleId);
+  assert.equal(row.published_at?.getTime(), publishedAt.getTime());
+  assert.deepEqual([row.backfill, row.backfill_reason], [false, null]);
+  assert.equal(row.timeline_at.getTime(), discoveredAt.getTime());
+});
+
 test("unrelated storage failures still fail collection visibly", async () => {
   const s = source(`epoch-db-error-${T}`, "epoch_s", [Math.floor(Date.now() / 1000)]);
   await saveSource(s);
