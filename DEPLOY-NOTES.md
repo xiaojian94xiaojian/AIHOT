@@ -4301,3 +4301,23 @@ feed 不再提供，补不了。7 天缺时间 55 → 54，其中 47 篇来自�
 - 网页源的日期选择器：Stanford HAI（正文里一行 “October 14, 2026”，无 time/meta/JSON-LD）、
   Liquid（列表用 `dateTime` 属性）、Suno（卡片是 `<span>Aug 10, 2026</span>`）。
 - 额度路线（Jev P0 / 手动降开销）—— 月额度仍 71%，10-27 重置，约 10-25 撞线。
+
+## 10-17 20:47：Jev 影子模块（P0）上线（merge-00481ff）
+
+**模块**：`modules/jev-shadow/`，迁移 `0087_jev_shadow.sql`（一条 CREATE TABLE）。每 10 分钟取最多 8 篇
+编辑源新分析（`JEV_SHADOW_PER_RUN`），用**生产同一份材料与提示词**问 Jev 预筛（三选一）与评分（五档），
+把生产判定与 Jev 答案并排写进 `jev_shadow`；不改判定、不发布、不推送。单篇失败只记该行，1 小时后重试。
+开关 `JEV_SHADOW_ENABLED` 默认关。
+
+**线路**：默认 OpenCode 的 `jev-1.13-free`（借 `LLM_API_KEY`，零成本，限时）。实测同一批 4 个样本与
+TypeSafe 官方 `jev-1.13.0` 几乎一致（score 差 ≤0.05/4、confidence ≤0.04、choice/noul 全同）；
+Go key 打付费 `jev-1.13` 是 402（Go 套餐不含 Jev、无 Console 余额），所以官方线路要另配 key。
+
+**部署**：镜像 `sha256:2b838661aa41`（`merge-00481ff`），回滚点 `rollback-before-00481ff`；
+服务器 `.env` 加 `JEV_SHADOW_ENABLED=true`（备份 `.env.bak-*`）；setup 应用 0087（67ms）；
+worker 重建后 **18 秒写入 8 行、0 错误**。
+
+**首批对照**：预筛与生产 **8/8 一致**（block/BLOCK 3、pass/PASS 5）；评分平均绝对差 **4.6 分**
+（5 个有分数的样本，全部低于门槛、两边一致）；单篇两次请求约 0.8–2.0 秒。
+
+**测试**：模块 5/5（请求形状、落库、换算、失败重试窗口、线路切换），全套 **730 通过 / 0 失败**。
