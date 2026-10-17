@@ -2,7 +2,9 @@
 import type { ServerModule } from "@aihot/backend/modules";
 import { chronicleServerModule } from "@aihot/chronicle/server";
 import { goQuotaServerModule } from "@aihot/go-quota/server";
+import { jevShadowServerModule } from "@aihot/jev-shadow/server";
 import { leaderboardServerModule } from "@aihot/leaderboard/server";
 import { monitorServerModule } from "@aihot/monitor/server";
 
-export const SERVER_MODULES: readonly ServerModule[] = [leaderboardServerModule, monitorServerModule, chronicleServerModule, goQuotaServerModule];
+export const SERVER_MODULES: readonly ServerModule[] = [leaderboardServerModule, monitorServerModule, chronicleServerModule, goQuotaServerModule, jevShadowServerModule];
+

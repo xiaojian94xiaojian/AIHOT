@@ -20,6 +20,7 @@ COPY site/package.json site/
 COPY modules/chronicle/package.json modules/chronicle/
 COPY modules/leaderboard/package.json modules/leaderboard/
 COPY modules/monitor/package.json modules/monitor/
+COPY modules/jev-shadow/package.json modules/jev-shadow/
 RUN npm ci --no-audit --no-fund ${NPM_REGISTRY:+--registry=$NPM_REGISTRY}
 COPY . .
 RUN npm run build -w @aihot/web && npm prune --omit=dev --no-audit --no-fund
