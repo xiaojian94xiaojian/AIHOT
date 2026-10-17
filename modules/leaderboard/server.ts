@@ -97,6 +97,26 @@ async function unmarkedFinding(): Promise<Finding[]> {
   }];
 }
 
+/**
+ * 轮次每 6 小时一次，连续两次没成功就说明榜单在静默冻结：10-04 那次因为只有"来源抓取"的告警，
+ * 榜单停了 13 天没人知道。只在成功过至少一轮后才报（新装的站还没到第一个档期，不该被催）。
+ */
+async function staleRound(now: number): Promise<Finding[]> {
+  const [row] = await sql<{ generated_at: Date | null }[]>`SELECT max(generated_at) AS generated_at FROM lb_runs`;
+  const last = row?.generated_at ? row.generated_at.getTime() : null;
+  if (last === null || now - last < 13 * 3600_000) return [];
+  const [failed] = await sql<{ error: string | null }[]>`
+    SELECT left(coalesce(output::text, ''), 300) AS error FROM pgboss.job
+    WHERE name = 'cron.leaderboard.round' AND state = 'failed' ORDER BY created_on DESC LIMIT 1`;
+  return [{
+    key: "leaderboard.round",
+    level: "today",
+    title: `模型榜已经 ${Math.floor((now - last) / 3600_000)} 小时没有成功更新`,
+    impact: "榜单页、榜单 API 与 Agent 的榜单回答都停在上一份数据",
+    detail: failed?.error ? `最近一次失败：${failed.error}` : "看 worker 日志与 pgboss 里 cron.leaderboard.round 的记录",
+  }];
+}
+
 /** 一个榜单的 Markdown 摘要，给 Agent 与 MCP 工具用。 */
 async function boardMarkdown(key: LeaderboardBoardKey): Promise<string> {
   const body = await loadBoard(key);
@@ -185,7 +205,7 @@ export const leaderboardServerModule: ServerModule = {
     runs: runsPart,
   },
 
-  alerts: async (now) => [...(await staleSources(now)), ...(await unmarkedFinding())],
+  alerts: async (now) => [...(await staleSources(now)), ...(await unmarkedFinding()), ...(await staleRound(now))],
 
   agent: {
     abilities: [{
