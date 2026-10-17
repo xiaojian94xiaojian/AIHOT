@@ -4253,3 +4253,51 @@ caddy 5 天、db 健康）；**评分模型已回滚**为 `deepseek-v4.1-flash-s
 3. **查 `@lmarena_ai` / `@windsurf_ai` 的真实句柄**
 4. 月度额度：按 `JEV-PLAN.md` 走（P0 影子模块 / P1 上游适配），或先手动降低评分开销
 
+
+## 10-17 晚：合并上游 14 个提交、部署 merge-87639da、修好「日期补不回来」
+
+### 上游状态先纠正了两处过期结论
+- **#202（静默判据）与 #204（积压告警时长）不是「等复审」，10-16 凌晨就已合并**（02:10 / 02:02 北京时间）。
+- **#213 与 #214 也不是「等答复」**：维护者 10-17 已实现 —— `4f9ff20`（补排队按历史内容 -2 / 讨论帖 -1 /
+  其余 0 的优先级；额度耗尽时归组任务延后到额度窗口再跑，不再失败重试）、`e091a02`（X 分片里每个账号的
+  水位只推进到自己读到的最新推文）。#205 仍开着，但同一改法早在我们的树里。
+
+### 合并
+`upgrade-4.0` 落后 `origin/main` 14 个提交，另有本地 19 个（源修复、go-quota、交接文档）。合并 4f9c544，
+4 处冲突都是「本地功能 vs 上游新功能」：
+- `content/extract.ts`：本地的登录页跳转识别（`isSignInRedirect`）与上游 #208 新增的 `Doc`/`El` 类型并存；
+- `lib/url.ts`：上游 #219 的 `privateServiceAddress`/`refusedAddress` 保留，本地「结尾的点」注释挂回 `blockedHostname`；
+- `tests/grouping-reliability.test.ts`：额度测试保留**上游更强的那一版**（跑真实 worker、覆盖讨论帖与优先级），
+  删掉本地较弱的直调版（两者守的是同一行为，上游版合并前会删重复测试）；
+- `tests/url.standalone.test.ts`：本地结尾点测试与上游 `PRIVATE_FEED_HOSTS` 两个测试并存。
+
+typecheck ✓；容器内全套 **724 通过 / 0 失败**。
+
+### 日期修复（真问题，见上面对日报第 3 条的核对）
+`fillPublicationTime` 调 `decideTimeline` 时，未来时间检查一直拿**首次发现时间**当基准：
+订阅把定时发布的文章提前写进 feed（Databricks 五篇的 `published_at_claim` 都比首次发现晚 5–23 小时），
+入库时按未来时间拒掉并记 `unknown-publication-time`，之后每次列表再报同一个日期仍被判「未来」→ 永远补不上。
+改法：`decideTimeline` 新增可选 `futureCheckAt`，只让补日期这条路径传 `new Date()`；插入路径不变
+（“未来的时间不信任”仍按发现时刻判）。回归测试加在 `tests/invalid-dates.test.ts`（原 future 用例仍绿）。
+
+生产验证：清掉 `rss-databricks-blog` 的 ETag 让它 200 一次 → 仍在列表里的那篇（Sizing Lakebase）
+补上 `2026-10-15 00:06:48`、`backfill=f`；另一篇（Private Network Gateway）已不在当前 10 条列表里，
+feed 不再提供，补不了。7 天缺时间 55 → 54，其中 47 篇来自已停用的 Nikkei（历史残留）。
+
+### 部署
+- 构建 `merge-87639da`（sha256:5a8dc6d1d496），推 registry 的 `merge-87639da` 与 `latest`。
+- 部署前这台 e2-medium 在 IO 风暴里：可用内存 **39MB**、负载 **13.5**、worker 2.1GB、pg-boss 刷
+  “timeout exceeded when trying to connect”。所以脚本先 `stop worker` 释放内存（可用回到 2.4GB），
+  再 pull + `up -d`；服务器上先给旧镜像打 `rollback-before-87639da`。
+- setup 3 秒退出 0（“database is up to date”，无新迁移）；五页全 200；部署后可用内存 **1.9GB**、负载 **0.7**。
+- 代码标记核对：`futureCheckAt` 3 处、`privateFeedHosts` 1 处、`lastTweetId` 5 处。
+
+### 信源
+`rss-youtube` 停用（频道 RSS 停在 2023-06-15、抓取 HTTP 500）：库与 `industry/sources.json` 两处，
+启用 556 → **555 / 662**。
+
+### 仍然没做
+- `@lmarena_ai` / `@windsurf_ai` 的真实句柄（`@lijigang` 已在 10-17 白天修好）。
+- 网页源的日期选择器：Stanford HAI（正文里一行 “October 14, 2026”，无 time/meta/JSON-LD）、
+  Liquid（列表用 `dateTime` 属性）、Suno（卡片是 `<span>Aug 10, 2026</span>`）。
+- 额度路线（Jev P0 / 手动降开销）—— 月额度仍 71%，10-27 重置，约 10-25 撞线。
