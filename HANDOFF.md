@@ -4,11 +4,11 @@
 > `JEV-PLAN.md`（Jev/TypeSafe 接入方案，含实测数据）、`KB-PLAN.md`、`SECURITY-PLAN.md` / `SECURITY-REVIEW.md`。
 > 可复用脚本都在 `.cache/hot/`（不在 git 里）；跑远程脚本的入口是 `run.ps1`。
 
-## 0. 一分钟版本（2026-10-17 22:30 实测）
+## 0. 一分钟版本（2026-10-17 23:00 实测）
 
-- **生产**：https://hot.jian.ing → 镜像 `sha256:3519b593df72`（标签 `merge-2ef90c6`，22:26 上线，
-  带模型榜轮次告警）；上一个镜像 `2b838661aa41`（`merge-00481ff`）存成回滚点
-  `rollback-before-2ef90c6`。站点三页 200、5 个容器全 Up。
+- **生产**：https://hot.jian.ing → 镜像 `sha256:f0cbfed128c2`（标签 `merge-6bffa19`，22:55 上线，
+  带备份桶保留策略）；上一个镜像 `3519b593df72`（`merge-2ef90c6`）存成回滚点
+  `rollback-before-6bffa19`。站点三页 200、5 个容器全 Up。
 - **Jev P0 影子已跑起来**：`modules/jev-shadow` 每 10 分钟把最多 8 篇编辑源新分析的预筛/评分问题
   同时问免费 Jev（`jev-1.13-free`，借 Go key，**零成本**），两边答案并排写进 `jev_shadow`；
   上线 18 秒写入 8 行、0 错误，预筛与生产 **8/8 一致**，评分平均差 **4.6 分**。官方 key 备用，
