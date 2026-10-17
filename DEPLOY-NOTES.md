@@ -4321,3 +4321,31 @@ worker 重建后 **18 秒写入 8 行、0 错误**。
 （5 个有分数的样本，全部低于门槛、两边一致）；单篇两次请求约 0.8–2.0 秒。
 
 **测试**：模块 5/5（请求形状、落库、换算、失败重试窗口、线路切换），全套 **730 通过 / 0 失败**。
+
+## 10-17 21:15：模型榜修好（`lb_calibrations` 缺失）、清 pg-boss 4,616 条失败行、影子首份对照
+
+### 模型榜轮次每 6 小时失败（10-04 后榜单一直停在旧数据）
+根因：`cron.leaderboard.round` 从 10-04 起一直报 `42P01 relation "lb_calibrations" does not exist`。
+这张表由 `0064` 建过，但本站 10-11 的手工清理脚本把它 `DROP` 了，**迁移账本仍记着 0064 已应用**，
+所以任何部署都不会再建它。修法：新增幂等的模块迁移 `modules/leaderboard/migrations/0088_leaderboard_calibrations.sql`
+（与 0064 同 DDL、`IF NOT EXISTS`）；生产上把文件 `docker cp` 进 worker 后跑了一次 `scripts/migrate.ts`
+（`applied 0088_leaderboard_calibrations.sql (38ms)`，下一次部署会带上它）。
+
+验证：手动跑一次轮次（`runLeaderboardRound({force:true})`）—— **status=published**、5 个榜全部
+`optimal`、`lb_runs` 从 10-04 12:05 推进到 10-17 13:18（总体榜 78 个模型）。**坑**：手动跑时不要用
+`node --input-type=module`，这个启动参数会被轮次内部的 `worker_threads` 继承，计算子线程随即报
+`ERR_INPUT_TYPE_NOT_ALLOWED`（第一次手动跑就踩了这个，17 条 calibration 写进去后崩在计算阶段）；
+写成 `.mjs` 文件再 `node /tmp/round.mjs` 即可。
+
+### pg-boss 失败行清理
+删除前普查：共 **4,616** 条，3,768 条来自 10-15 的额度/重试风暴，其余是 10-10～10-17 的
+`events.digest`（333）、`sources.fetch`（294，多为 job timed out）等；最近 24 小时只有
+13 条 `sources.fetch` 超时 + 4 条榜单轮次（本次修掉）。`DELETE FROM pgboss.job WHERE state='failed'`
+后 `failed=0`（导出命令因列名写成 `retrycount` 失败，未留下备份；都是终态记录，摘要如上）。
+
+### Jev 影子首份对照（32 条，0 错误）
+- 预筛：29/32 一致（90.6%）；3 条不一致**全是「我们 PASS、Jev BLOCK」**（两条特斯拉 FSD 事故、
+  一条其它），Jev 的置信度 0.92。
+- 评分：17 条有分数，我们均值 44.5 / Jev 46.9，平均绝对差 **6.1**，偏差 +2.4，`r=0.808`；
+  跨门槛分歧 0（样本都低于门槛）。
+- 延迟：单篇两次请求平均 941ms、p95 1342ms；预算零成本。
