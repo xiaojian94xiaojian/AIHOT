@@ -4466,3 +4466,16 @@ Jina 返回 **402 InsufficientBalanceError**（账户余额不足），两条源
 - 删掉了已移除机制留下的 `settings.provider.quota.*`（1 行）。
 - 验证：5 个容器 Up、`/` `/api/health` `/leaderboard` 均 200、api/worker 日志 300 行无 ERROR、
   管道 new=0（部署时 3 条，随即消化）、`cron.jev.shadow` 与 `cron.leaderboard.round` 都在。
+
+### 10-19 21:30 PR #205 重写（不在本次部署里）
+
+按维护者 10-15 的 review 与 10-18 的说明，在 main（6d82afb）上重做并 force-push 成单提交 `d2c1525`：
+- 删掉自建的 `QUOTA_REFUSAL` 正则与 `provider.quota.*` 告警条目；分类直接用 `providerAccessRefused`。
+- 冷却挂在它的判定上：`settings.provider.stop.<service>`（900s），`checkBudget` 在发送前挡下；
+  成功回执清掉停止，不另设告警（沿用 `provider.refused.*`，它要求“拒绝后有更新的成功”才收尾，
+  所以冷却到期不会被报成恢复）。
+- 只对“下一个请求也会被同样拒绝”的账务拒绝停止：402、账务类 429；TPM/RPM 与 401/403 资源级拒绝不停止。
+- 回归：`tests/receipts.test.ts` 新增 3 条；两个既有测试（model-failover、translate）按“拒绝后服务被暂停”
+  补了冷却清理；`aihot_pr205_ci` 上全套 **704/704**，typecheck 通过。
+- 生产目前**没有**这条保护（合并上游时旧实现随 `providerAccessRefused` 一起移除）；要恢复的话把 `d2c1525`
+  cherry-pick 回 `upgrade-4.0` 再部署即可（与上游 main 同源，应无冲突）。
