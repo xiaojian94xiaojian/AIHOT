@@ -4541,3 +4541,17 @@ structure 平均每次输入 **2,800 tokens**（p50 2,623 / p90 3,481），而�
   降推理档位需要站主参与的门槛校准；② 把 structure+score 两次调用合并、或只对可能入选的文章
   做 structure，是框架级设计变更（应走上游讨论，不宜本站私改）。
 - 另外确认：structure 覆盖了 89% 的 `pass` 文章（归组需要），跳过 `unknown` 只能省 ~1.8%。
+
+### 10-19 23:05 上游 PR #237：登录/注册页不能变成文章（CI 绿）
+
+- 事故复盘：`web-arxiv` 是 **json_list**（HuggingFace Daily Papers API），标题/日期/摘要来自 JSON，
+  没有选择器；正文抓取当时指向 `huggingface.co/papers/{id}`，被 302 到 `/login?next=...`，登录表单
+  通过长度/密度检查成为正文（26 个 revision、标题 220）。该源**现在启用且健康**（846 篇，近 7 天 276，
+  urlTemplate 已改 `arxiv.org/abs`）。
+- 另外 5 条登录页来自 **web_list** 源（web-labs/web-fireworks/web-claude-blog/web-canarymedia），
+  是列表里的导航链接（Log In / Sign Up）被 `fromHtml` 当成条目；这些源现在已停用，Fireworks 已用
+  `allowUrlPrefixes` 限到 /blog/。
+- 修复两层：列表（fromHtml + markdown navigationLink）跳过登录/注册路径；详情跟随重定向后用最终地址判断。
+  测试在 `tests/error-page-extraction.test.ts`（去掉修复两条都失败）。
+- PR：https://github.com/KKKKhazix/AIHOT/pull/237 （1 commit，check 4m42s + docker 44s 全绿，mergeable）。
+- 本站树已同步两层防护（`e857a59`），全套 **831/831**；下次部署带上。
