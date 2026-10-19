@@ -1351,7 +1351,12 @@
         "_aihot": {
           "initialBackfillLimit": 8
         },
-        "publishedAtSelector": "span:contains(20)"
+        "publishedAtSelector": "span",
+        "titleSelector": "h3",
+        "publishedAtRegex": "(\\d{1,2}/\\d{1,2}/20\\d\\d)",
+        "allowUrlPrefixes": [
+          "https://fireworks.ai/blog/"
+        ]
       },
       "tier": "T1_5",
       "first_party": false,
@@ -2446,7 +2451,7 @@
       "interval_minutes": 60,
       "site_fulltext": true,
       "syndicate_fulltext": false,
-      "enabled": true
+      "enabled": false
     },
     {
       "id": "web-app",
@@ -7961,7 +7966,7 @@
       "syndicate_fulltext": false,
       "enabled": true,
       "config": {
-        "feedUrl": "https://news.google.com/rss/search?q=site:huxiu.com&hl=en-US&gl=US&ceid=US:en"
+        "feedUrl": "https://news.google.com/rss/search?q=site:huxiu.com&hl=zh-CN&gl=CN&ceid=CN:zh-Hans"
       },
       "tier": "T2",
       "first_party": false,
@@ -8602,10 +8607,10 @@
     },
     {
       "id": "x-account-lovable_dev",
-      "name": "X：Lovable (@lovable_dev)",
+      "name": "X：Lovable (@Lovable)",
       "kind": "x_search",
       "config": {
-        "query": "from:lovable_dev -filter:replies",
+        "query": "from:Lovable -filter:replies",
         "_aihot": {
           "initialBackfillLimit": 8
         }
@@ -8620,10 +8625,10 @@
     },
     {
       "id": "x-account-heygen_official",
-      "name": "X：HeyGen (@HeyGen_Official)",
+      "name": "X：HeyGen (@HeyGen)",
       "kind": "x_search",
       "config": {
-        "query": "from:HeyGen_Official -filter:replies",
+        "query": "from:HeyGen -filter:replies",
         "_aihot": {
           "initialBackfillLimit": 8
         }
@@ -8638,10 +8643,10 @@
     },
     {
       "id": "x-account-langchainai",
-      "name": "X：LangChain (@LangChainAI)",
+      "name": "X：LangChain (@LangChain)",
       "kind": "x_search",
       "config": {
-        "query": "from:LangChainAI -filter:replies",
+        "query": "from:LangChain -filter:replies",
         "_aihot": {
           "initialBackfillLimit": 8
         }
@@ -8656,10 +8661,10 @@
     },
     {
       "id": "x-account-txhunyuan",
-      "name": "X：Hunyuan (@TXhunyuan)",
+      "name": "X：腾讯混元 (@TencentHunyuan)",
       "kind": "x_search",
       "config": {
-        "query": "from:TXhunyuan -filter:replies",
+        "query": "from:TencentHunyuan -filter:replies",
         "_aihot": {
           "initialBackfillLimit": 8
         }
@@ -8688,14 +8693,14 @@
       "interval_minutes": 60,
       "site_fulltext": true,
       "syndicate_fulltext": false,
-      "enabled": true
+      "enabled": false
     },
     {
       "id": "x-account-firecrawl_dev",
-      "name": "X：Firecrawl (@firecrawl_dev)",
+      "name": "X：Firecrawl (@firecrawl)",
       "kind": "x_search",
       "config": {
-        "query": "from:firecrawl_dev -filter:replies",
+        "query": "from:firecrawl -filter:replies",
         "_aihot": {
           "initialBackfillLimit": 8
         }
@@ -9519,7 +9524,7 @@
       "interval_minutes": 120,
       "site_fulltext": false,
       "syndicate_fulltext": false,
-      "enabled": true
+      "enabled": false
     },
     {
       "id": "x-account-_mohansolo",
@@ -9811,10 +9816,10 @@
     },
     {
       "id": "x-account-lmarena_ai",
-      "name": "X：lmarena.ai (@lmarena_ai)",
+      "name": "X：LMArena / Arena.ai (@arena)",
       "kind": "x_search",
       "config": {
-        "query": "from:lmarena_ai -filter:replies",
+        "query": "from:arena -filter:replies",
         "_aihot": {
           "initialBackfillLimit": 8
         }
@@ -10135,10 +10140,10 @@
     },
     {
       "id": "x-account-yangyixxxx",
-      "name": "X：Yangyi (@Yangyixxxx)",
+      "name": "X：Yangyi (@yangyi)",
       "kind": "x_search",
       "config": {
-        "query": "from:Yangyixxxx -filter:replies",
+        "query": "from:yangyi -filter:replies",
         "_aihot": {
           "initialBackfillLimit": 8
         }

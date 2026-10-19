@@ -31,6 +31,14 @@ test("a date that carries its zone keeps it", () => {
   assert.equal(iso("Sat, 26 Sep 2026 10:00:00 +0200", "-07:00"), "2026-09-26T08:00:00.000Z");
 });
 
+test("a US page's month-first date is read as printed", () => {
+  assert.equal(iso("9/30/2026"), "2026-09-29T16:00:00.000Z");
+  assert.equal(iso("9/30/2026", "+00:00"), "2026-09-30T00:00:00.000Z");
+  assert.equal(iso("12/1/2026 10:30"), "2026-12-01T02:30:00.000Z");
+  assert.equal(iso("2/30/2026"), null);
+  assert.equal(iso("9/30/2026", "-07:00"), "2026-09-30T07:00:00.000Z");
+});
+
 test("no date at all is null", () => {
   assert.equal(iso(""), null);
   assert.equal(iso("yesterday"), null);

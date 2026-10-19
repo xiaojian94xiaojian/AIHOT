@@ -35,6 +35,10 @@ export function parseLooseDate(value: string | null | undefined, utcOffset = "+0
   if (!v) return null;
   const compact = /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})$/.exec(v);
   if (compact) return atOffset(compact[1]!, compact[2]!, compact[3]!, compact[4]!, compact[5]!, compact[6]!, utcOffset);
+  // A US page prints the month first ("9/30/2026"); the year is last, so this cannot be confused with the
+  // year-first forms below. An ambiguous pair follows the page's own order: month first.
+  const us = /^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/.exec(v);
+  if (us) return atOffset(us[3]!, us[1]!, us[2]!, us[4] ?? "00", us[5] ?? "00", us[6] ?? "00", utcOffset);
   const numeric = /(\d{4})[-/.年](\d{1,2})[-/.月](\d{1,2})日?(?:(?:T|\s*)(\d{1,2}):(\d{2})(?::(\d{2}))?)?/.exec(v);
   if (numeric && !calendarDay(numeric[1]!, numeric[2]!, numeric[3]!)) return null;
   const english = /\b([a-z]{3,9})\s+(\d{1,2})(?:st|nd|rd|th)?[,]?\s+(\d{4})\b/i.exec(v)
