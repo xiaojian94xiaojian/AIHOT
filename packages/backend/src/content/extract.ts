@@ -29,8 +29,11 @@ export interface ExtractedBody {
 
 const MIN_BODY_CHARS = 200;
 
-/** Paths that serve a sign-in form rather than the page that was asked for. */
-const AUTH_PATH = /^\/(?:login|log-in|signin|sign-in|register|signup|sign-up)(?:\/|$)|(?:^|\/)(?:login|log-in|signin|sign-in|authorize|oauth2?|sso|auth)(?:\/|$)/i;
+/**
+ * Paths that serve a sign-in form rather than the page that was asked for. A path segment, never a
+ * substring: "/auth-for-agents" and "/authors/x" are ordinary pages.
+ */
+const AUTH_PATH = /(?:^|\/)(?:login|log-in|signin|sign-in|register|signup|sign-up|authorize|oauth2?|sso|auth)(?:\/|$)/i;
 
 /**
  * A redirect that ended on a sign-in form: the site sent us to authenticate instead of to the page.
@@ -43,6 +46,15 @@ const AUTH_PATH = /^\/(?:login|log-in|signin|sign-in|register|signup|sign-up)(?:
  * every fetch looked like a new revision of the article (one reached 26 revisions), and the article
  * entered the pool under a title of "220".
  */
+/** Whether an address is a sign-in form's own path (a listing's "Log in" link is no post either). */
+export function isSignInUrl(url: string): boolean {
+  try {
+    return AUTH_PATH.test(new URL(url).pathname);
+  } catch {
+    return false;
+  }
+}
+
 export function isSignInRedirect(asked: string, landed: string): boolean {
   if (asked === landed) return false;
   try {
@@ -413,7 +425,6 @@ export async function extractFromUrl(url: string, subject: string, rules: PageRu
   try {
     const res = await guardedFetch(url, { headers: languageHeaders(rules.acceptLanguage), timeoutMs: 20_000, maxBytes: 6 * 1024 * 1024 });
     if (isVideoPageUrl(res.url)) return null;
-    // A sign-in page is not the article: no body at all is better than the wrong one (file header).
     if (isSignInRedirect(url, res.url)) return null;
     const type = res.headers.get("content-type") ?? "";
     if (res.status === 200 && /html/.test(type)) {
