@@ -4479,3 +4479,15 @@ Jina 返回 **402 InsufficientBalanceError**（账户余额不足），两条源
   补了冷却清理；`aihot_pr205_ci` 上全套 **704/704**，typecheck 通过。
 - 生产目前**没有**这条保护（合并上游时旧实现随 `providerAccessRefused` 一起移除）；要恢复的话把 `d2c1525`
   cherry-pick 回 `upgrade-4.0` 再部署即可（与上游 main 同源，应无冲突）。
+
+### 10-19 21:45 Jina 退役（部署后发现它仍被正文兜底调用）
+
+关闭 linux.do/eugeneyan 两个源之后，`body_fallback`（正文取不到时用 Jina Reader 兜底）仍然每十几分钟
+打一次 402，导致新的 `provider.refused.jina` 告警反复出现。处理：
+- 用现成的 budgets 机制：`budgets(service='jina')` 三个窗口置 0（原值 **30/400/2000**，恢复时改回）。
+  `checkBudget` 在发送前就抛 `BudgetExceededError`，`extract.ts` 的兜底会捕获并安静返回 null，
+  不再产生付费请求与失败回执。
+- 删掉 `alerts.state` 里 `provider.refused.jina` 条目，并清掉最近 2 小时的 5 条 jina 失败行（更早的
+  不在告警 1 小时窗口内）。
+- 验证：5 分钟内 0 次 jina 尝试、0 告警、管道正常（new=2，无 failed）、worker 无错误。
+- 恢复 Jina：budgets 改回 30/400/2000，再把两个源打开即可。
