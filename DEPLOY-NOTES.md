@@ -4452,3 +4452,17 @@ Jina 返回 **402 InsufficientBalanceError**（账户余额不足），两条源
 - 行为变化（部署后生效）：**不再有“余额用尽自动暂停调用”**，改为上游的拒绝告警；上游 `followXRenames`
   会自动跟进 X 账号改名；日期解析覆盖 `Sep 26, 2026 at 10:30`/`Sept.`。部署后清一次
   `settings` 里遗留的 `provider.quota.*` 行（机制已删）。
+
+### 10-19 21:15 部署合并镜像 merge-533850f（sha256:4c038e97e3fb）
+
+- 回滚点 `rollback-before-533850f`（即上一版 `merge-a0b81c2`，sha256:e4656f4b7e2e）。
+- **坑：服务器的 compose 把 `database/`、`industry/`、`scripts/` 三个目录 bind mount 进容器**，
+  只 `docker compose pull && up` 时容器里仍是**服务器上的旧目录**——本次 `publication_time` 迁移因此
+  一开始没跑到（容器里只有到 0086 的 80 个迁移）。正确顺序是：先同步这三个目录（tar 覆盖，不删除
+  服务器独有的一次性脚本），再重建 `setup` 跑迁移，最后 `--force-recreate api worker web`。
+- 本次同步后 setup 补了 4 个迁移：0086_feedback_ban_expiry、0087_feedback_submission_state、
+  0088_drop_translation_attempts_request_tag、0089_publication_time（`articles.publication_time` 已存在）；
+  迁移条数 86，最新 0089。
+- 删掉了已移除机制留下的 `settings.provider.quota.*`（1 行）。
+- 验证：5 个容器 Up、`/` `/api/health` `/leaderboard` 均 200、api/worker 日志 300 行无 ERROR、
+  管道 new=0（部署时 3 条，随即消化）、`cron.jev.shadow` 与 `cron.leaderboard.round` 都在。
