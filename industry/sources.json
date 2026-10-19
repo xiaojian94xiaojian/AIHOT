@@ -8589,10 +8589,10 @@
     },
     {
       "id": "x-account-groqinc",
-      "name": "X：Groq Inc (@GroqInc)",
+      "name": "X：Groq (@GroqLLC)",
       "kind": "x_search",
       "config": {
-        "query": "from:GroqInc -filter:replies",
+        "query": "from:GroqLLC -filter:replies",
         "_aihot": {
           "initialBackfillLimit": 8
         }

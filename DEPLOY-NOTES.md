@@ -4515,3 +4515,15 @@ Jina 返回 **402 InsufficientBalanceError**（账户余额不足），两条源
 标题抽样对路（Adina：StepFun/Ant Ling-3.1/MOSS image；decohack：AI 写交互；icviews：OLED/三星减产）。
 未启用：Jessie_Ma（仅 2 条）、Alignment Science 与 Dify（低频），按站主意愿先放着；
 Import AI 在册但停用，需要时可开。
+
+### 10-19 22:05 静默非 RSS 源核对（65 个）
+
+方法：`json_list`/`web_list` 用引擎自己的 `previewStoredSource`（采集同一条解析路径，免费）；
+X 账号用 provider 的 `searchTweets` **不带 cursor** 查最新帖（3.2 秒一条，避开 30 次/分钟上限），
+与库里最新一篇逐条对照。注意：preview 走源自己的 cursor，对老源会返回 0，不能用来判断原站有没有新帖。
+- **10 个 GitHub/HF/网页源**：原站最新 = 库里最新，全部真安静（Fireworks 09-29、TensorZero 05-11、
+  FireRedTeam 08-22、InternLM 10-06、DeepSeek GitHub 09-30、LongCat HF 07-31…）。
+- **55 个 X 账号**：54 个真安静（含 10-08 那批，provider 最新帖与库里一致）；**1 个真错**：
+  `x-account-groqinc` 指向的 `@GroqInc` 已不是 Groq（0 帖），官网现在链 **x.com/GroqLLC**；
+  已改 query/名称、清 cursor、立即抓取验证 **found=20 / new=7**（最新 10-15）。
+- 结论：这段时间的"7 天无内容"里没有别的漏采；唯一需要修的是 Groq 的句柄。
