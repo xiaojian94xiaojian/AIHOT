@@ -4400,3 +4400,27 @@ R2 的 lifecycle 接口要 **Admin** 权限的 token：现有 `DB_BACKUP_STORE_*
   `cron.backup.rotate 40 4 * * * Asia/Shanghai`。
 - 测试 3 项（过期判定、分页且只删过期、未配置不动作）；全套 **733 通过 / 0 失败**。
 - 之前每次要清就手动删；现在不用了。真要换成桶自带 lifecycle，需要一把 R2 Admin token。
+
+## 10-19 周报处理：7 个 X 账号改名、5 个源停用、虎嗅与 Fireworks 修复（merge-a0b81c2）
+
+**先核对口径**：58 个「7 天没有新内容」里绝大多数是「窗口内产出历史不足」（近期新加的源），不是采集坏了；
+4 个「超出自身节奏」的 X 账号用 SocialData 核对，最新推文与库里一致（@midjourney 10-10、@SpaceXSI 10-08、
+@sherwinwu 10-10、@haydenfield 10-09）→ 真安静，不动。
+
+**改名（SocialData 证实，全部首读命中）**：@LangChainAI→@LangChain、@firecrawl_dev→@firecrawl、
+@HeyGen_Official→@HeyGen、@lovable_dev→@Lovable、@Yangyixxxx→@yangyi、@lmarena_ai→@arena、
+@TXhunyuan→@TencentHunyuan。其中 @arena、@TencentHunyuan 已经有同名源（x-account-arena 79 篇、
+x-account-tencenthunyuan 12 篇）→ 改名后重复，两个源直接停用；其余 5 个首读各收 20 篇。
+
+**停用**：x-account-notebooklm（改名并入已跟踪的 @Gemini_Notebook）、x-account-windsurf_ai（句柄消失）、
+web-robbyantx（句柄消失，296 次抓取 0 条）。
+
+**虎嗅**：Google News 用的是 en-US/美国站，2026 年的条目标题为空 → 0 条入库；换 zh-CN/CN 后一次抓取
+**found=100、new=96**。
+
+**Fireworks**：页面改版（日期从英文月份变成 9/30/2026、标题变 h3、导航链接被收进来）→ 重写选择器
+（titleSelector h3、publishedAtSelector span + 正则、allowUrlPrefixes /blog/），并给框架的 parseLooseDate
+补了美式 M/D/YYYY（带单测）；干跑 21/21 有日期，生产验证解析器已生效。
+
+**Jina 余额用尽**（402 InsufficientBalanceError，uid 32545063）：linux.do 与 eugeneyan 停收；
+RSSHub 没有 linux.do 路由，等站主决定（充值 / 新 key / 替代通路）。告警 provider.quota.jina 会一直亮。
