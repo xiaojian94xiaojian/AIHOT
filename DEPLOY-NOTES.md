@@ -4430,3 +4430,25 @@ RSSHub 没有 linux.do 路由，等站主决定（充值 / 新 key / 替代通�
 Jina 返回 **402 InsufficientBalanceError**（账户余额不足），两条源从 18:41 起停收。站主决定不充值、
 先关闭：两处 enabled=false，启用源 **550 → 548**，已无启用的 Jina 源。要恢复时给 Jina 充值（或换 key）
 再把这两条源打开即可；`provider.quota.jina` 的暂停记录会自然过期，不影响其他 provider。
+
+## 10-19 晚：合并上游 7 个提交（merge `a04c7ce`）
+
+`git fetch` 后领先后 7 个提交 / 270 文件（+7967/−3818），17 个文件冲突：
+- 取上游：`dates.ts`（月优先 `monthFirst`，替代本站的 `us` 正则）、`receipts.ts`（`providerAccessRefused`
+  错误码分类，**本站 #205 的 `QUOTA_REFUSAL` 与 `provider.quota` 暂停一并移除**）、`alerts.ts`
+  （上游的 `provider.refused.*` 模型级告警）、`llm.ts`/`input.ts`/`extract.ts`（保留 GO-GATEWAY 会话头、
+  `backfill` 字段与登录页识别）、`topics.json`（本站字段 `leaderboardProvider`/`orgNames` 保留）、
+  三个测试文件（上游版本；本站的配额暂停测试改用例）。
+- 适配上游重构：`backup.ts` 保留自定义 `store.endpoint(key)` 与 R2 path-style，但改用上游的显式
+  `process.env` 读取（模板检查）；模块里 `beijingStamp`/`monthDay` 改从 `@aihot/contracts/time` 取；
+  `Finding.owner` 字段已删除（go-quota 同步删除）；`analyze.ts` 的评分参数改由 `site/models.ts` 的
+  `scoreCall` 提供（DeepSeek 评分预设补 32k 上限）。
+- 顺手修的模块规范：`BoardTable`/`rules` 改用 `IntentLink`（不再 `prefetch="intent"`）、
+  `reducedMotion()` 统一走 `lib/motion`、`modules/monitor` 的两处北京时间转换登记进
+  `tests/architecture.test.ts` 的 `CONVERTS_BEIJING_TIME`（管理表单的 datetime-local 值）。
+- `chronicle` 的 `companyNames` 补上 `orgNames`（`SpaceXAI` 这类只在 orgNames 里的名字），修好
+  “公司发布署名”用例。
+- 测试：容器内 **829/829**、standalone 日期 **23/23**、web **59/59**、typecheck 干净。
+- 行为变化（部署后生效）：**不再有“余额用尽自动暂停调用”**，改为上游的拒绝告警；上游 `followXRenames`
+  会自动跟进 X 账号改名；日期解析覆盖 `Sep 26, 2026 at 10:30`/`Sept.`。部署后清一次
+  `settings` 里遗留的 `provider.quota.*` 行（机制已删）。
