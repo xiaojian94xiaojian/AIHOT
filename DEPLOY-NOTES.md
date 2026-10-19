@@ -4527,3 +4527,17 @@ X 账号用 provider 的 `searchTweets` **不带 cursor** 查最新帖（3.2 秒
   `x-account-groqinc` 指向的 `@GroqInc` 已不是 Groq（0 帖），官网现在链 **x.com/GroqLLC**；
   已改 query/名称、清 cursor、立即抓取验证 **found=20 / new=7**（最新 10-15）。
 - 结论：这段时间的"7 天无内容"里没有别的漏采；唯一需要修的是 Groq 的句柄。
+
+### 10-19 22:30 `structure_article` 瘦身评估（结论：暂不动）
+
+近 7 天 token 账（input/输出占比）：group_article 24.0/16.5%、score_article 19.4/**67.9%**、
+structure_article **15.4%**/4.0%、summarize 13.5%、prefilter 11.2%。
+structure 平均每次输入 **2,800 tokens**（p50 2,623 / p90 3,481），而渲染后的 system 提示词
+`structure.md` 就有 **4,138 字符**（模板 3,029 + 实体/标签列表/安全段），材料只占很小一部分；
+即成本几乎全在提示词本身。
+- 试着把规则压到 2,577 字符（-15%，只压措辞、不删语义），估算只省约 **1.6%** 的总 token；
+  再往下压就要删规则（X 引用帖、scope 判定、条件摘录等），风险大于收益，**不做单方面改写**。
+- 真正的杠杆在别处：① score_article 的输出占 **67.9%**（每次约 2k 输出 token，是推理预算），
+  降推理档位需要站主参与的门槛校准；② 把 structure+score 两次调用合并、或只对可能入选的文章
+  做 structure，是框架级设计变更（应走上游讨论，不宜本站私改）。
+- 另外确认：structure 覆盖了 89% 的 `pass` 文章（归组需要），跳过 `unknown` 只能省 ~1.8%。
