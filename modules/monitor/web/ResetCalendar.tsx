@@ -4,7 +4,7 @@ import { addDays } from "@aihot/contracts/time";
 import { IconChevronRight } from "@aihot/web/components/icons";
 import { PostCard } from "./PostCard";
 import { bjDate, dayWord, durationText, stamp, windowText } from "./format";
-import { monthDay } from "@aihot/web/lib/format";
+import { monthDay } from "@aihot/contracts/time";
 
 // Day cells: a faint plain day, green for landed resets, a dashed green edge on white for "should have
 // landed", warm sand for announced ones; the label chip repeats the tone.

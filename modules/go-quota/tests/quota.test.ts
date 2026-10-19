@@ -61,7 +61,6 @@ test("a window that runs out before it resets is reported, with the estimate", (
   const [finding] = quotaFindings(state(windows, history), now);
   assert.ok(finding, "89% 且按速度会在重置前用尽，应当报");
   assert.equal(finding.level, "today");
-  assert.equal(finding.owner, true, "只有站主能换 key 或等额度");
   assert.match(finding.title, /Go 套餐本周额度已用 89%/);
   // 12 小时涨 18 个百分点 = 每天 36 点：剩下的 11 点只够 7 小时，而它 82 小时后才重置。
   assert.match(finding.impact!, /还能撑 7 小时/);

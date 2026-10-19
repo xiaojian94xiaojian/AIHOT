@@ -64,7 +64,7 @@ const plain = (title: string) => title.normalize("NFKC").toLowerCase().replace(/
 
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const companyNames = new Map(Object.entries(ENTITIES).map(([id, e]) => {
-  const names = [id, e.name, ...e.aliases, ...(e.otherNames ?? [])].map(escape).join("|");
+  const names = [id, e.name, ...e.aliases, ...(e.orgNames ?? []), ...(e.otherNames ?? [])].map(escape).join("|");
   return [id, { anywhere: new RegExp(`(?<![A-Za-z])(?:${names})(?![A-Za-z])`, "i"), first: new RegExp(`^(?:${names})(?![A-Za-z])`, "i") }];
 }));
 /** The company a text names first. */

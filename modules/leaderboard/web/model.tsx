@@ -6,7 +6,7 @@ import { LEADERBOARD_BOARD_LABELS, LEADERBOARD_PUBLIC_BOARDS } from "@aihot/cont
 import { beijingDate } from "@aihot/contracts/time";
 import { SITE } from "@aihot/site";
 import { edgeTtl, loadOr404 } from "@aihot/web/lib/api.server";
-import { monthDay } from "@aihot/web/lib/format";
+import { monthDay } from "@aihot/contracts/time";
 import { breadcrumbLd, pageMeta, siteUrl, titled } from "@aihot/web/lib/seo";
 import { BrandMark } from "@aihot/web/components/BrandMark";
 import { boardHref, listPrice, noOfficialApi, pctFixed, score, shortStamp, tokensWan, yuan } from "./format";

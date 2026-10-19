@@ -6,7 +6,8 @@
 // 所以状态里记 key 的 sha256 前 6 位 —— 数字跳变时能分辨是用量还是换 key。
 import { createHash } from "node:crypto";
 import { sql } from "@aihot/backend/db";
-import { beijingStamp, type Finding } from "@aihot/backend/notify/feishu";
+import { beijingStamp } from "@aihot/contracts/time";
+import type { Finding } from "@aihot/backend/notify/feishu";
 
 export const QUOTA_SETTING = "go.quota";
 /** 每 30 分钟一条样本，最多留两天：够算"最近的用量速度"，也不会把 settings 撑大。 */
@@ -116,7 +117,6 @@ export function quotaFindings(state: QuotaState, now: number): Finding[] {
       return {
         key: `go.quota.${o.window}`,
         level: urgent ? "now" : "today",
-        owner: true,
         title: `Go 套餐${label}额度已用 ${o.percent}%`,
         impact: `${left}，而${use}在 ${reset}；用尽会让所有模型调用停下来（文章堆着，等额度回来或换 key 才继续），精选和热点会缺内容`,
         heals: "不会自己好，除非额度重置或换 key；换 key 后系统会自己接上",

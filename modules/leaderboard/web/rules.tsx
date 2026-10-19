@@ -1,6 +1,7 @@
 // Public method statement for the leaderboard (method v17, docs/leaderboard.md).
 // The copy states how rankings are actually computed; it changes only together with the method.
 import { Link, useLoaderData } from "react-router";
+import { IntentLink } from "@aihot/web/components/ui/IntentLink";
 import type { LbRulesData } from "@aihot/contracts/leaderboard";
 import { SITE } from "@aihot/site";
 import { edgeTtl, loadOr404 } from "@aihot/web/lib/api.server";
@@ -158,10 +159,10 @@ export default function LeaderboardRulesPage() {
             ["/leaderboard", "模型榜"],
             ["/leaderboard/sources", "每一份评测证据"],
           ].map(([to, label]) => (
-            <Link key={to} to={to!} viewTransition={to !== "/leaderboard"} prefetch="intent" className="flex items-center justify-between rounded-control px-2 py-2 text-[13.5px] text-ink-2 transition-colors hover:bg-bg-sunk hover:text-ink">
+            <IntentLink key={to} to={to!} viewTransition={to !== "/leaderboard"} className="flex items-center justify-between rounded-control px-2 py-2 text-[13.5px] text-ink-2 transition-colors hover:bg-bg-sunk hover:text-ink">
               {label}
               <IconChevronRight size={14} className="text-ink-4" />
-            </Link>
+            </IntentLink>
           ))}
         </nav>
       </AsideCard>

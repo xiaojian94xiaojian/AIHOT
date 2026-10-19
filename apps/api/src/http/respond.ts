@@ -2,6 +2,7 @@
 // (modules/<name>/server.ts `http`) can answer exactly like the engine's; this file re-exports them.
 export {
   applyPublicHeaders,
+  clientIp,
   etagMatches,
   looseQuery,
   QueryError,

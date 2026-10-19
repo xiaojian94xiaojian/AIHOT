@@ -13,7 +13,7 @@ import path from "node:path";
 import { z } from "zod";
 import { sendFile } from "@aihot/api/routes/static";
 import type { Finding } from "@aihot/backend/notify/feishu";
-import { beijingStamp } from "@aihot/backend/notify/feishu";
+import { beijingStamp } from "@aihot/contracts/time";
 import type { ServerModule } from "@aihot/backend/modules";
 import { sendJsonWithEtag, sendProblem } from "@aihot/backend/lib/http";
 import { sql } from "@aihot/backend/db";

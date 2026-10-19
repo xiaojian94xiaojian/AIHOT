@@ -1,10 +1,12 @@
 import { useLayoutEffect, useMemo, useRef, type ReactNode } from "react";
-import { Link, useNavigate } from "react-router";
+import { useNavigate } from "react-router";
+import { IntentLink } from "@aihot/web/components/ui/IntentLink";
+import { reducedMotion } from "@aihot/web/lib/motion";
 import type { LbBoardEntry } from "@aihot/contracts/leaderboard";
 import { SITE } from "@aihot/site";
 import { BrandMark } from "@aihot/web/components/BrandMark";
 import { modelHref, noOfficialApi, score, yuan } from "./format";
-import { monthDay } from "@aihot/web/lib/format";
+import { monthDay } from "@aihot/contracts/time";
 import { IconChevronDown } from "@aihot/web/components/icons";
 
 export type SortKey = "rank" | "released" | "coverage" | "cached" | "input" | "output";
@@ -94,7 +96,7 @@ export function BoardTable({ entries, board, sort, dir, onSort, onSortSheet }: {
   const order = rows.map((e) => e.model.slug).join(",");
   useLayoutEffect(() => {
     if (!body.current) return;
-    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    const reduce = reducedMotion();
     // Animate sorting the same models. A filtered subset may move rows several screens upward.
     const sameModels = tops.current.size === rows.length && rows.every((e) => tops.current.has(e.model.slug));
     const next = new Map<string, number>();
@@ -175,9 +177,9 @@ export function BoardTable({ entries, board, sort, dir, onSort, onSortSheet }: {
                 <BrandMark brand={e.model.brand} size={32} />
                 <span className="min-w-0">
                   <span className="flex flex-wrap items-baseline gap-x-2">
-                    <Link viewTransition to={modelHref(e.model.slug, board)} prefetch="intent">
+                    <IntentLink viewTransition to={modelHref(e.model.slug, board)}>
                       <strong className="text-[15px] font-[650] leading-[21px] text-ink transition-colors group-hover:text-accent">{e.model.name}</strong>
-                    </Link>
+                    </IntentLink>
                     {e.access?.weightsUrl && (
                       <a href={e.access.weightsUrl} target="_blank" rel="noopener noreferrer" className="whitespace-nowrap text-[11px] text-accent hover:underline" aria-label={`${e.model.name} 开源权重`}>
                         开源权重 ↗

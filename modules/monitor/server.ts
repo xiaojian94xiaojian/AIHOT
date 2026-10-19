@@ -17,7 +17,8 @@ import { sendJsonWithEtag, sendProblem, looseQuery } from "@aihot/backend/lib/ht
 import { cached } from "@aihot/backend/lib/cache";
 import { sql } from "@aihot/backend/db";
 import { siteUrl } from "@aihot/backend/publication/links";
-import { beijingStamp, duration, type Finding } from "@aihot/backend/notify/feishu";
+import { beijingStamp } from "@aihot/contracts/time";
+import { duration, type Finding } from "@aihot/backend/notify/feishu";
 import { CODEX_RESET_SCAN_MINUTES } from "@aihot/contracts/monitor";
 import { codexAnswer, codexPageAnswer } from "./backend/answer.ts";
 import { awaitingReviewCondition, codexResetPage, codexResetVersion, codexResetsRecent, codexResetsSnapshot } from "./backend/read.ts";

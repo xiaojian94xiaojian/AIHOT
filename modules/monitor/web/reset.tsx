@@ -7,7 +7,7 @@ import { pageMeta } from "@aihot/web/lib/seo";
 import { PostCard } from "./PostCard";
 import { ResetCalendar } from "./ResetCalendar";
 import { bjDate, bjTime, dayWord, durationText, stamp, typeName, windowText } from "./format";
-import { monthDay } from "@aihot/web/lib/format";
+import { monthDay } from "@aihot/contracts/time";
 import { IconChevronDown, IconChevronRight } from "@aihot/web/components/icons";
 import { useEntrance } from "@aihot/web/lib/hydration";
 import { PhoneBar } from "@aihot/web/components/shell/PhoneBar";

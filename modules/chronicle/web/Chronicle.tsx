@@ -7,6 +7,7 @@ import { Link } from "react-router";
 import type { TopicEvent, TopicKind, TopicMilestone, TopicMilestoneKind, TopicMonth } from "@aihot/contracts/site";
 import { IconArrowUpRight, IconChevronDown, IconChevronLeft, IconChevronRight } from "@aihot/web/components/icons";
 import { beijingDate } from "@aihot/contracts/time";
+import { reducedMotion } from "@aihot/web/lib/motion";
 
 type Kinds = Record<TopicMilestoneKind, TopicKind>;
 
@@ -138,7 +139,7 @@ export function ChronicleBand({ milestones, kinds }: { milestones: TopicMileston
   const page = (towards: -1 | 1) => {
     const el = scroller.current;
     if (!el) return;
-    const instant = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const instant = reducedMotion();
     el.scrollBy({ left: towards * el.clientWidth * 0.75, behavior: instant ? "auto" : "smooth" });
   };
   const { placed, marks, columns, byYear } = layout(milestones, kinds);

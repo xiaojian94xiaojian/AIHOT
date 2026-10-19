@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { after, test } from "node:test";
 import { config } from "@aihot/backend/config";
 import { closeDb, sql } from "@aihot/backend/db";
-import { FUTURE_TOLERANCE_MS, STALE_ON_DISCOVERY_MS, upsertMaterial } from "@aihot/backend/content/materials";
+import { FUTURE_TOLERANCE_MS, STALE_ON_DISCOVERY_MS, fillScheduledPublications, upsertMaterial } from "@aihot/backend/content/materials";
 import { QUEUES, stopBoss } from "@aihot/backend/jobs/queue";
 import { collectSource } from "@aihot/backend/sources/collect";
 import type { SourceRow } from "@aihot/backend/sources/types";
@@ -113,24 +113,42 @@ test("storage preserves finite future claims and existing timeline boundaries", 
   }
 });
 
-// A post scheduled ahead is listed before its own publication time: the date is in the future of the
-// first discovery and is not trusted. Once that time has passed, the same listing reports an ordinary
-// past date, and the row must stop being dateless — some WordPress feeds (Databricks) list posts this way.
-test("a claim in the future of the first discovery is trusted once that time has passed", async () => {
-  const s = source(`epoch-late-claim-${T}`, "epoch_ms", []);
+// A scheduled post is listed hours before the time its page gives (Databricks, LangChain, Cognition):
+// that time was refused as future on arrival and never filled afterwards, so the post stayed undated.
+test("a post listed up to a day before its stated time gets that time once it arrives; a far-future date never", async () => {
+  const s = source(`epoch-scheduled-${T}`, "epoch_ms", []);
   await saveSource(s);
-  const discoveredAt = new Date(Date.now() - 3 * 3600_000);
-  const publishedAt = new Date(Date.now() - 3600_000);
-  const material = { sourceId: s.id, url: `https://example.org/${s.id}/scheduled`, title: "Scheduled post", publishedAt, via: "fetch" as const };
-  const first = await upsertMaterial({ ...material, discoveredAt });
-  const early = await timeline(first.articleId);
-  assert.deepEqual([early.published_at, early.backfill_reason], [null, "unknown-publication-time"]);
-  const again = await upsertMaterial(material);
-  assert.equal(again.revised, true, "filling the date revises the material so its decisions start over");
-  const row = await timeline(again.articleId);
-  assert.equal(row.published_at?.getTime(), publishedAt.getTime());
-  assert.deepEqual([row.backfill, row.backfill_reason], [false, null]);
-  assert.equal(row.timeline_at.getTime(), discoveredAt.getTime());
+  const hour = 3600_000, now = Date.now();
+  const cases = [
+    { name: "arrived", discovered: now - 8 * hour, claim: now - hour, filled: true },
+    { name: "not-yet", discovered: now - hour, claim: now + 5 * hour, filled: false },
+    { name: "event-page", discovered: now - 50 * hour, claim: now - 2 * hour, filled: false },
+  ];
+  const ids: Record<string, string> = {};
+  for (const c of cases) {
+    const { articleId } = await upsertMaterial({ sourceId: s.id, url: `https://example.org/${s.id}/${c.name}`, title: c.name,
+      publishedAt: new Date(c.claim), discoveredAt: new Date(c.discovered), via: "fetch" });
+    assert.equal((await timeline(articleId)).published_at, null, `${c.name} is refused on arrival`);
+    ids[c.name] = articleId;
+  }
+  // Postponed after it was first listed: the later time is the one to wait for.
+  const postponed = { discovered: now - 8 * hour, first: now - hour, later: now + 3 * hour };
+  const url = `https://example.org/${s.id}/postponed`;
+  const { articleId: moved } = await upsertMaterial({ sourceId: s.id, url, title: "postponed", publishedAt: new Date(postponed.first), discoveredAt: new Date(postponed.discovered), via: "fetch" });
+  await upsertMaterial({ sourceId: s.id, url, title: "postponed", publishedAt: new Date(postponed.later), via: "fetch" });
+  await fillScheduledPublications(s.id);
+  const later = await timeline(moved);
+  assert.equal(later.published_at, null, "not filled with the time it was moved from");
+  assert.equal(later.published_at_claim?.getTime(), postponed.later);
+  for (const c of cases) {
+    const row = await timeline(ids[c.name]!);
+    assert.equal(row.published_at?.getTime() ?? null, c.filled ? c.claim : null, c.name);
+    assert.equal(row.revision, c.filled ? 2 : 1, `${c.name}: a filled date is a new revision, judged again`);
+    if (c.filled) {
+      assert.equal(row.backfill, false, "news, not history");
+      assert.equal(row.timeline_at.getTime(), c.discovered);
+    }
+  }
 });
 
 test("unrelated storage failures still fail collection visibly", async () => {
