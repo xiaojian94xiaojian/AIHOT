@@ -6967,7 +6967,7 @@
       "interval_minutes": 60,
       "site_fulltext": false,
       "syndicate_fulltext": false,
-      "enabled": true,
+      "enabled": false,
       "config": {
         "feedUrl": "https://news.google.com/rss/search?q=site:it168.com&hl=zh-CN&gl=CN&ceid=CN:zh-Hans"
       },
@@ -11963,6 +11963,150 @@
       "site_fulltext": false,
       "syndicate_fulltext": false,
       "enabled": true
+    },
+    {
+      "id": "x-account-decohack",
+      "name": "X：viggo (@decohack)",
+      "kind": "x_search",
+      "config": {
+        "query": "from:decohack -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false
+    },
+    {
+      "id": "web-dify-blog",
+      "name": "Dify：Blog（Google News）",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://news.google.com/rss/search?q=site:dify.ai/blog&hl=en-US&gl=US&ceid=US:en",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false
+    },
+    {
+      "id": "web-anthropic-alignment-science-blog",
+      "name": "Anthropic：Alignment Science Blog（网页）",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://news.google.com/rss/search?q=site:alignment.anthropic.com&hl=en-US&gl=US&ceid=US:en",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false
+    },
+    {
+      "id": "web-browserbase-stagehand",
+      "name": "Browserbase / Stagehand 工程博客",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://news.google.com/rss/search?q=site:browserbase.com&hl=en-US&gl=US&ceid=US:en",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false
+    },
+    {
+      "id": "src-645cf755fd",
+      "name": "刘小排",
+      "kind": "x_search",
+      "config": {
+        "query": "from:bourneliu66 -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false
+    },
+    {
+      "id": "src-ad0941d416",
+      "name": "半导体产业纵横",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://news.google.com/rss/search?q=site:icviews.cn&hl=zh-CN&gl=CN&ceid=CN:zh-Hans",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false
+    },
+    {
+      "id": "src-0c120b4f03",
+      "name": "Adina Yakup",
+      "kind": "x_search",
+      "config": {
+        "query": "from:AdinaYakup -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false
+    },
+    {
+      "id": "src-d689d68c9d",
+      "name": "Jessie_Ma",
+      "kind": "x_search",
+      "config": {
+        "query": "from:ytjessie_ -filter:replies",
+        "_aihot": {
+          "initialBackfillLimit": 8
+        }
+      },
+      "tier": "T2",
+      "first_party": false,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 60,
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false
     }
   ]
 }

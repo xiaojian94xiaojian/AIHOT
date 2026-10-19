@@ -4491,3 +4491,18 @@ Jina 返回 **402 InsufficientBalanceError**（账户余额不足），两条源
   不在告警 1 小时窗口内）。
 - 验证：5 分钟内 0 次 jina 尝试、0 告警、管道正常（new=2，无 failed）、worker 无错误。
 - 恢复 Jina：budgets 改回 30/400/2000，再把两个源打开即可。
+
+### 10-19 22:00 增量源导入（E:\cs\hot\2026-10-19）
+
+包内 10 条，实际**入包 8 条、跳过 2 条**，全部 `enabled:false` 起步（预览后由站主决定开哪些）：
+- **跳过 IT168**：站上已有同源 `src-19d6423d01`（同名同 Google News 地址），而且这条 feed 抽到的
+  全是博彩/游戏 SEO 垃圾（"亚傅娱乐""鸭脖体育""IT168下载站"）。已把站上那条**停用**：它已灌入
+  **710 篇**（近 3 天 348 篇），其中 0 篇被精选/发布。需要的话可以再清掉这些行。
+- **跳过赛迪网**：GN feed 最新只到 **09-30**（19.5 天前），且内容混杂，停用。
+- **Dify**：原查询 `site:dify.ai` 返回的是**文档页**（Completion App API、Knowledge API…），已改成
+  `site:dify.ai/blog`（最新 10-16，7 天 1 条，博客低频但真实）。
+- 其余 7 条预览：decohack 20 条（最新 10-17）、刘小排 20 条（10-19）、Adina 20 条（10-18）、
+  Jessie 2 条（10-17，低频）、Alignment Science 65 条（10-15，低频）、Browserbase 100 条
+  （10-15，30 天 20 条）、半导体产业纵横 100 条（10-18，30 天 26 条，行业偏半导体）。
+- 校验包内"已收录 4 条"：swyx / SemiAnalysis / DAIR.AI 都在收；**Import AI 在册但停用**（`rss-import-ai`）。
+- 服务器已 seed（8 added），DB 670 个源、启用 547；备份 `industry/sources.json.bak-before-1019-import`。
