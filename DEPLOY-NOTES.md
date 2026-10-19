@@ -4424,3 +4424,9 @@ web-robbyantx（句柄消失，296 次抓取 0 条）。
 
 **Jina 余额用尽**（402 InsufficientBalanceError，uid 32545063）：linux.do 与 eugeneyan 停收；
 RSSHub 没有 linux.do 路由，等站主决定（充值 / 新 key / 替代通路）。告警 provider.quota.jina 会一直亮。
+
+### 10-19 20:00 收尾：Jina 余额用尽，按站主决定关闭受影响的源
+`web-linuxdo-news`（208 篇）与 `web-eugeneyan`（181 篇，最近一篇 06-21）以 `r.jina.ai` 为入口，
+Jina 返回 **402 InsufficientBalanceError**（账户余额不足），两条源从 18:41 起停收。站主决定不充值、
+先关闭：两处 enabled=false，启用源 **550 → 548**，已无启用的 Jina 源。要恢复时给 Jina 充值（或换 key）
+再把这两条源打开即可；`provider.quota.jina` 的暂停记录会自然过期，不影响其他 provider。

@@ -1268,7 +1268,7 @@
       "interval_minutes": 60,
       "site_fulltext": true,
       "syndicate_fulltext": false,
-      "enabled": true
+      "enabled": false
     },
     {
       "id": "web-every",
@@ -11872,7 +11872,7 @@
       "interval_minutes": 60,
       "site_fulltext": false,
       "syndicate_fulltext": false,
-      "enabled": true
+      "enabled": false
     },
     {
       "id": "x-account-legit-api",
