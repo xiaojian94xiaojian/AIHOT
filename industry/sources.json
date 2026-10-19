@@ -11980,7 +11980,7 @@
       "interval_minutes": 60,
       "site_fulltext": false,
       "syndicate_fulltext": false,
-      "enabled": false
+      "enabled": true
     },
     {
       "id": "web-dify-blog",
@@ -12034,7 +12034,7 @@
       "interval_minutes": 60,
       "site_fulltext": false,
       "syndicate_fulltext": false,
-      "enabled": false
+      "enabled": true
     },
     {
       "id": "src-645cf755fd",
@@ -12052,7 +12052,7 @@
       "interval_minutes": 60,
       "site_fulltext": false,
       "syndicate_fulltext": false,
-      "enabled": false
+      "enabled": true
     },
     {
       "id": "src-ad0941d416",
@@ -12070,7 +12070,7 @@
       "interval_minutes": 60,
       "site_fulltext": false,
       "syndicate_fulltext": false,
-      "enabled": false
+      "enabled": true
     },
     {
       "id": "src-0c120b4f03",
@@ -12088,7 +12088,7 @@
       "interval_minutes": 60,
       "site_fulltext": false,
       "syndicate_fulltext": false,
-      "enabled": false
+      "enabled": true
     },
     {
       "id": "src-d689d68c9d",

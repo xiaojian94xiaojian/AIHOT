@@ -4506,3 +4506,12 @@ Jina 返回 **402 InsufficientBalanceError**（账户余额不足），两条源
   （10-15，30 天 20 条）、半导体产业纵横 100 条（10-18，30 天 26 条，行业偏半导体）。
 - 校验包内"已收录 4 条"：swyx / SemiAnalysis / DAIR.AI 都在收；**Import AI 在册但停用**（`rss-import-ai`）。
 - 服务器已 seed（8 added），DB 670 个源、启用 547；备份 `industry/sources.json.bak-before-1019-import`。
+
+### 10-19 21:51 启用 5 条新源（首次抓取已验证）
+
+站主选定：`x-account-decohack`、`src-645cf755fd`（刘小排）、`src-0c120b4f03`（Adina Yakup）、
+`web-browserbase-stagehand`、`src-ad0941d416`（半导体产业纵横）。配置与 DB 同步启用（552/670），
+`next_fetch_at=now()` 后首抓全部 ok：found 20/20/20/100/100，各入库 8 条（initialBackfillLimit），
+标题抽样对路（Adina：StepFun/Ant Ling-3.1/MOSS image；decohack：AI 写交互；icviews：OLED/三星减产）。
+未启用：Jessie_Ma（仅 2 条）、Alignment Science 与 Dify（低频），按站主意愿先放着；
+Import AI 在册但停用，需要时可开。
