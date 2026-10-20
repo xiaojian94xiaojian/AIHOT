@@ -36,71 +36,69 @@ async function releaseDates(): Promise<string[]> {
   return [...dates].sort().reverse();
 }
 
-/** The newest release that actually has both files, and where they are readable. */
-async function latestRelease(): Promise<{ release: string; tag: string; base: string }> {
-  for (const release of (await releaseDates()).slice(0, 8)) {
-    const tag = release.replaceAll("-", "_");
-    for (const base of DATA_BASES) {
-      const categories = await guardedFetch(`${base}/categories_${tag}.json`, { timeoutMs: 20_000, maxBytes: 2 * 1024 * 1024 });
-      if (categories.status !== 200) continue;
-      const table = await guardedFetch(`${base}/table_${tag}.csv`, { timeoutMs: 30_000 });
-      if (table.status === 200) return { release, tag, base };
+/** The rows of every board for one release's table. */
+function buildBoards(release: string, categories: Record<string, string[]>, lines: Record<string, string>[], upstream: string | null): FetchResult[] {
+  const modelColumn = Object.keys(lines[0] ?? {})[0];
+  const out: FetchResult[] = [];
+  for (const b of BOARDS) {
+    const cats = b.categories ?? Object.keys(categories);
+    const rows: ParsedRow[] = [];
+    for (const line of lines) {
+      const model = modelColumn ? line[modelColumn]?.trim() : null;
+      if (!model) continue;
+      const categoryScores: number[] = [];
+      for (const c of cats) {
+        const vals = (categories[c] ?? []).map((t) => line[t]?.trim()).filter((v) => v != null && v !== "").map(Number).filter(Number.isFinite);
+        if (vals.length === (categories[c] ?? []).length && vals.length) categoryScores.push(mean(vals));
+      }
+      if (categoryScores.length !== cats.length) continue;
+      const peeled = peelEffortSuffix(model);
+      rows.push({
+        sourceModelName: model,
+        keyName: slug(model),
+        baseName: peeled.base,
+        configuration: configurationOf(peeled.tier ? [peeled.tier] : []),
+        metricKey: b.key,
+        metricName: b.name,
+        rawScore: mean(categoryScores),
+        // Each category's own score, shown beside the pair on a model's evidence.
+        metadata: {
+          release, categories: cats.join(" + "), categoryCount: cats.length, metricDirection: "HIGHER",
+          ...Object.fromEntries(cats.map((c, i) => [`livebenchCategoryScore:${c}`, categoryScores[i]!])),
+          livebenchTaskScores: Object.fromEntries(cats.flatMap((c) => (categories[c] ?? []).map((task) => [task, Number(line[task])]))),
+        },
+      });
     }
+    out.push({
+      sourceKey: b.key,
+      sourceName: b.name,
+      sourceUrl: "https://livebench.ai/",
+      license: "Apache 2.0",
+      attributionUrl: b.url,
+      publishedAt: upstream ? new Date(upstream).toISOString() : null,
+      rows,
+      metadata: { release, taskGroups: Object.fromEntries(cats.map((c) => [c, categories[c]])), upstreamPublishedAt: upstream ? new Date(upstream).toISOString() : null, sourceOperator: "LiveBench", sourceFamily: "rolling-objective", metricCount: 1 },
+    });
   }
-  throw new Error("livebench: no release has both categories and table files");
+  return out;
 }
 
 export const livebench: Fetcher = {
   sourceKeys: BOARDS.map((b) => b.key),
   async fetch() {
-    const { release, tag, base } = await latestRelease();
-    const categories = JSON.parse((await guardedFetch(`${base}/categories_${tag}.json`, { timeoutMs: 30_000 })).text()) as Record<string, string[]>;
-    const table = await guardedFetch(`${base}/table_${tag}.csv`, { timeoutMs: 30_000 });
-    if (table.status !== 200) throw new Error(`livebench table ${release} HTTP ${table.status}`);
-    const upstream = table.headers.get("last-modified");
-    const lines = parseCsv(table.text());
-    const modelColumn = Object.keys(lines[0] ?? {})[0];
-    const out: FetchResult[] = [];
-    for (const b of BOARDS) {
-      const cats = b.categories ?? Object.keys(categories);
-      const rows: ParsedRow[] = [];
-      for (const line of lines) {
-        const model = modelColumn ? line[modelColumn]?.trim() : null;
-        if (!model) continue;
-        const categoryScores: number[] = [];
-        for (const c of cats) {
-          const vals = (categories[c] ?? []).map((t) => line[t]?.trim()).filter((v) => v != null && v !== "").map(Number).filter(Number.isFinite);
-          if (vals.length === (categories[c] ?? []).length && vals.length) categoryScores.push(mean(vals));
-        }
-        if (categoryScores.length !== cats.length) continue;
-        const peeled = peelEffortSuffix(model);
-        rows.push({
-          sourceModelName: model,
-          keyName: slug(model),
-          baseName: peeled.base,
-          configuration: configurationOf(peeled.tier ? [peeled.tier] : []),
-          metricKey: b.key,
-          metricName: b.name,
-          rawScore: mean(categoryScores),
-          // Each category's own score, shown beside the pair on a model's evidence.
-          metadata: {
-            release, categories: cats.join(" + "), categoryCount: cats.length, metricDirection: "HIGHER",
-            ...Object.fromEntries(cats.map((c, i) => [`livebenchCategoryScore:${c}`, categoryScores[i]!])),
-            livebenchTaskScores: Object.fromEntries(cats.flatMap((c) => (categories[c] ?? []).map((task) => [task, Number(line[task])]))),
-          },
-        });
+    for (const release of (await releaseDates()).slice(0, 8)) {
+      const tag = release.replaceAll("-", "_");
+      for (const base of DATA_BASES) {
+        const categories = await guardedFetch(`${base}/categories_${tag}.json`, { timeoutMs: 20_000, maxBytes: 2 * 1024 * 1024 });
+        if (categories.status !== 200) continue;
+        const table = await guardedFetch(`${base}/table_${tag}.csv`, { timeoutMs: 30_000 });
+        if (table.status !== 200) continue;
+        const built = buildBoards(release, JSON.parse(categories.text()) as Record<string, string[]>, parseCsv(table.text()), table.headers.get("last-modified"));
+        // A release mid-publish (a category names a task its table lacks) yields no complete rows for
+        // some board; the previous release still describes the benchmark, so use it instead.
+        if (built.every((b) => b.rows.length > 0)) return built;
       }
-      out.push({
-        sourceKey: b.key,
-        sourceName: b.name,
-        sourceUrl: "https://livebench.ai/",
-        license: "Apache 2.0",
-        attributionUrl: b.url,
-        publishedAt: upstream ? new Date(upstream).toISOString() : null,
-        rows,
-        metadata: { release, taskGroups: Object.fromEntries(cats.map((c) => [c, categories[c]])), upstreamPublishedAt: upstream ? new Date(upstream).toISOString() : null, sourceOperator: "LiveBench", sourceFamily: "rolling-objective", metricCount: 1 },
-      });
     }
-    return out;
+    throw new Error("livebench: no release produced complete rows");
   },
 };
