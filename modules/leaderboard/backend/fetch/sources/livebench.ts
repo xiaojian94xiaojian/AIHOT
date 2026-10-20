@@ -92,16 +92,20 @@ export const livebench: Fetcher = {
     const candidates: Array<{ built: FetchResult[]; rows: number }> = [];
     for (const release of (await releaseDates()).slice(0, 4)) {
       const tag = release.replaceAll("-", "_");
-      for (const base of DATA_BASES) {
-        const categories = await guardedFetch(`${base}/categories_${tag}.json`, { timeoutMs: 20_000, maxBytes: 2 * 1024 * 1024 });
-        if (categories.status !== 200) continue;
-        const table = await guardedFetch(`${base}/table_${tag}.csv`, { timeoutMs: 30_000 });
-        if (table.status !== 200) continue;
-        const built = buildBoards(release, JSON.parse(categories.text()) as Record<string, string[]>, parseCsv(table.text()), table.headers.get("last-modified"));
-        // A release mid-publish (a category names a task its table lacks) yields no complete rows for
-        // some board; the previous release still describes the benchmark, so use it instead.
-        if (built.every((b) => b.rows.length > 0)) candidates.push({ built, rows: Math.min(...built.map((b) => b.rows.length)) });
-        break;
+      try {
+        for (const base of DATA_BASES) {
+          const categories = await guardedFetch(`${base}/categories_${tag}.json`, { timeoutMs: 20_000, maxBytes: 2 * 1024 * 1024 });
+          if (categories.status !== 200) continue;
+          const table = await guardedFetch(`${base}/table_${tag}.csv`, { timeoutMs: 30_000 });
+          if (table.status !== 200) continue;
+          const built = buildBoards(release, JSON.parse(categories.text()) as Record<string, string[]>, parseCsv(table.text()), table.headers.get("last-modified"));
+          // A release mid-publish (a category names a task its table lacks) yields no complete rows for
+          // some board; the previous release still describes the benchmark, so use it instead.
+          if (built.every((b) => b.rows.length > 0)) candidates.push({ built, rows: Math.min(...built.map((b) => b.rows.length)) });
+          break;
+        }
+      } catch {
+        // One bad or unroutable release does not hide the others.
       }
     }
     if (!candidates.length) throw new Error("livebench: no release produced complete rows");
