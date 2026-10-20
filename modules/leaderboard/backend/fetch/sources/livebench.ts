@@ -86,7 +86,11 @@ function buildBoards(release: string, categories: Record<string, string[]>, line
 export const livebench: Fetcher = {
   sourceKeys: BOARDS.map((b) => b.key),
   async fetch() {
-    for (const release of (await releaseDates()).slice(0, 8)) {
+    // Releases are not all full tables: 2026-06-25 re-scored 28 models, while the release before it
+    // lists 127. Taking the newest unconditionally shrinks the board to a fraction of its rows, which
+    // the admission check refuses. Keep the newest release that is still a full-sized table.
+    const candidates: Array<{ built: FetchResult[]; rows: number }> = [];
+    for (const release of (await releaseDates()).slice(0, 4)) {
       const tag = release.replaceAll("-", "_");
       for (const base of DATA_BASES) {
         const categories = await guardedFetch(`${base}/categories_${tag}.json`, { timeoutMs: 20_000, maxBytes: 2 * 1024 * 1024 });
@@ -96,9 +100,12 @@ export const livebench: Fetcher = {
         const built = buildBoards(release, JSON.parse(categories.text()) as Record<string, string[]>, parseCsv(table.text()), table.headers.get("last-modified"));
         // A release mid-publish (a category names a task its table lacks) yields no complete rows for
         // some board; the previous release still describes the benchmark, so use it instead.
-        if (built.every((b) => b.rows.length > 0)) return built;
+        if (built.every((b) => b.rows.length > 0)) candidates.push({ built, rows: Math.min(...built.map((b) => b.rows.length)) });
+        break;
       }
     }
-    throw new Error("livebench: no release produced complete rows");
+    if (!candidates.length) throw new Error("livebench: no release produced complete rows");
+    const largest = Math.max(...candidates.map((c) => c.rows));
+    return (candidates.find((c) => c.rows >= largest * 0.5) ?? candidates[0]!).built;
   },
 };
