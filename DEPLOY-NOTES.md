@@ -4555,3 +4555,36 @@ structure 平均每次输入 **2,800 tokens**（p50 2,623 / p90 3,481），而�
   测试在 `tests/error-page-extraction.test.ts`（去掉修复两条都失败）。
 - PR：https://github.com/KKKKhazix/AIHOT/pull/237 （1 commit，check 4m42s + docker 44s 全绿，mergeable）。
 - 本站树已同步两层防护（`e857a59`），全套 **831/831**；下次部署带上。
+
+## 10-20 事故：机器内存压力失联 + 日报 16 项处理
+
+### 事故（17:37–19:33）
+- 串口日志：`Under memory pressure, flushing caches` 从 17:37 持续，19:23 起 `ens4: Failed to update link state`、
+  dockerd 连元数据 DNS 超时 → SSH/HTTPS 全挂，实例仍 RUNNING。机器 3.8G 内存、**无 swap**。
+- 处理：`gcloud compute instances reset` 恢复；加 **2G swap**（swappiness 10）；**停用 Google Cloud Ops Agent**
+  （它一直因权限错误刷日志，journal 涨到 724MB）；journal 上限 200M 并 vacuum（724M→120M）。
+  容器重启策略自动拉起，站点恢复 200。
+- 日报正是在 19:30 事故期间生成，部分失败计数与断网窗口重叠。
+
+### 模型榜 4 个 LiveBench（已修，镜像 97f0c2e / sha256:fef729ea）
+- 根因：livebench.ai 今天的部署把数据文件弄丢——首页 bundle 列出的 release 在站点上全部 404；
+  且最新的 2026-06-25 只是重测 28 个模型的小发布，之前 2026-01-08 有 127 个。
+- 改法：release 从 bundle 收集、按新到旧探测；站点缺文件时回退
+  `raw.githubusercontent.com/LiveBench/livebench.github.io/main/public`；在最近 4 个 release 里选
+  “行数不低于最大候选一半”的最新一个（28 行会被准入检查拒绝）。
+- 验证：手动轮次 12:13 `published`，四个榜各 **126 行**（coding 57.1 / general 61.4 / reasoning 69.9 / writing 58.4）。
+- 另：`artificial-analysis` 一直报 `ARTIFICIAL_ANALYSIS_API_KEY is not configured`（与本次无关，待配 key）。
+
+### 其余日报项
+- **9. Ahead of AI 译文**：`translateArticle(cg7n2b94i4rekrk0m53i4wi90)` 重翻，147/147 段，链接/图片集合
+  与原文完全一致（旧译文有一段链接顺序/对应错位）。
+- **16. 未确认付费请求**：回执 242476（embedding，文章已 `skipped`）按“计费未知、经授权”放行，
+  `requeued=false`，不再重发。
+- **3/7 Bloomberg、NVIDIA 反复修订**：正文为空、只有 RSS 摘要；Bloomberg 是实时更新（标题/摘要多次改），
+  正常，不是混入变化内容。
+- **4. Claude Code releases 缺时间**：Atom 只有 `<updated>` 没有 `<published>`；框架刻意不用 updated
+  当发布时间（防编辑过的旧帖当新闻，测试里有这条），所以记为未知时间、按历史处理。要改需加来源级开关。
+- **6/8 Liquid/Suno 缺时间**：Liquid 是 Pricing/API/FAQ 等导航页，Suno 是 10-01 之前的历史行（导航/低价值），
+  按“历史噪声不动”保留。
+- **2/10-15 反复失败的源**：重启后 2 小时内 IT之家/36氪/开源中国/掘金均正常；t3n 仍 406（IP/地域拦截）、
+  YouTube 两条仍间歇 404（feed 活着）、Reddit 429，均为已知目标侧不稳定。
