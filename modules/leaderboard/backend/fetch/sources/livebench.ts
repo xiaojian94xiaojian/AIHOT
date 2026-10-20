@@ -14,25 +14,48 @@ const BOARDS = [
 
 const mean =(xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
 
-/** The newest release date the site lists (its bundle carries the release array). */
-async function latestRelease(): Promise<string> {
+// The site's deploy has twice dropped the data files while the homepage kept listing their release:
+// 2026-10-19 it served a bundle naming 2026-09-10 with no categories/table at all. The repository the
+// site is built from keeps every release, so the same file is read from there when the site lacks it.
+const DATA_BASES = [
+  "https://livebench.ai",
+  "https://raw.githubusercontent.com/LiveBench/livebench.github.io/main/public",
+];
+
+/** Every release date the bundle carries, newest first. */
+async function releaseDates(): Promise<string[]> {
   const home = (await guardedFetch("https://livebench.ai/", { timeoutMs: 30_000 })).text();
   const js = /src="\.?\/?(static\/js\/main\.[a-z0-9]+\.js)"/.exec(home)?.[1];
   if (!js) throw new Error("livebench: bundle not found");
   const bundle = (await guardedFetch(`https://livebench.ai/${js}`, { timeoutMs: 30_000, maxBytes: 16 * 1024 * 1024 })).text();
-  const arrays = [...bundle.matchAll(/\[((?:"\d{4}-\d{2}-\d{2}",?){3,})\]/g)].map((m) => m[1]!.match(/\d{4}-\d{2}-\d{2}/g)!);
-  const dates = arrays.sort((a, b) => b.length - a.length)[0];
-  if (!dates?.length) throw new Error("livebench: release list not found");
-  return [...dates].sort().pop()!;
+  const dates = new Set<string>();
+  for (const m of bundle.matchAll(/\[((?:"\d{4}-\d{2}-\d{2}",?){2,})\]/g)) {
+    for (const date of m[1]!.match(/\d{4}-\d{2}-\d{2}/g)!) dates.add(date);
+  }
+  if (!dates.size) throw new Error("livebench: release list not found");
+  return [...dates].sort().reverse();
+}
+
+/** The newest release that actually has both files, and where they are readable. */
+async function latestRelease(): Promise<{ release: string; tag: string; base: string }> {
+  for (const release of (await releaseDates()).slice(0, 8)) {
+    const tag = release.replaceAll("-", "_");
+    for (const base of DATA_BASES) {
+      const categories = await guardedFetch(`${base}/categories_${tag}.json`, { timeoutMs: 20_000, maxBytes: 2 * 1024 * 1024 });
+      if (categories.status !== 200) continue;
+      const table = await guardedFetch(`${base}/table_${tag}.csv`, { timeoutMs: 30_000 });
+      if (table.status === 200) return { release, tag, base };
+    }
+  }
+  throw new Error("livebench: no release has both categories and table files");
 }
 
 export const livebench: Fetcher = {
   sourceKeys: BOARDS.map((b) => b.key),
   async fetch() {
-    const release = await latestRelease();
-    const tag = release.replaceAll("-", "_");
-    const categories = JSON.parse((await guardedFetch(`https://livebench.ai/categories_${tag}.json`, { timeoutMs: 30_000 })).text()) as Record<string, string[]>;
-    const table = await guardedFetch(`https://livebench.ai/table_${tag}.csv`, { timeoutMs: 30_000 });
+    const { release, tag, base } = await latestRelease();
+    const categories = JSON.parse((await guardedFetch(`${base}/categories_${tag}.json`, { timeoutMs: 30_000 })).text()) as Record<string, string[]>;
+    const table = await guardedFetch(`${base}/table_${tag}.csv`, { timeoutMs: 30_000 });
     if (table.status !== 200) throw new Error(`livebench table ${release} HTTP ${table.status}`);
     const upstream = table.headers.get("last-modified");
     const lines = parseCsv(table.text());
