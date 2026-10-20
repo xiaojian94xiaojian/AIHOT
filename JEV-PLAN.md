@@ -270,3 +270,16 @@ Gemini Notebook、Ming-3.0-tts 登顶……Jev 给它们的分数低 10–30 分
 2. **预筛先记着，不动生产**，继续让影子跑 3–7 天；每周检查"Jev 拦下且我们分数 ≥ 门槛"的条数，
    保持 0 就把预筛切给 Jev（可先 T2 后全量）；
 3. Jev 的另一项低成本用法：**复核我们 BLOCK 的条目**（Reuters OpenAI 融资这类误杀）。
+
+## 12. 10-20 20:38 T2 预筛切给 Jev（已上线）
+
+按第十一节结论，T2 源的预筛改由 Jev 判定（T1/T1_5 仍用聊天模型）：`JEV_PREFILTER_ENABLED=true`、
+`JEV_PREFILTER_TIERS=T2`，地址/模型/key 回退影子配置（官方 `jev-1.13.0`）。镜像 `5a51faa`
+（`sha256:27d8ffb5`），回滚点 `rollback-before-5a51faa`；回滚只需把 `JEV_PREFILTER_ENABLED=false` 再重启。
+- 实现：`providers/jev.ts` + `runPrefilter` 的 tier 分支；Jev 失败自动回退聊天模型；`prefilter.receiptId` 可为 null。
+- 验证（12:39 起的新 T2 分析）：`prefilter.reason="Jev 判定"`；BLOCK 的 `receipt_ids={}`（没有 Go 调用）；
+  影子跳过 T2（12:34 后无 T2 行）。
+- 预期收益：预筛占四个分析步骤 token 的 15.4%（T2 是主体），加上被 Jev 拦下的 T2 条目跳过
+  structure/score/summarize，总 Go 额度约省 10–15%。
+- 监控：每日看 T2 的 BLOCK 比例与入选数量（与切换前对比）；每周抽 10 条 Jev 拦下的 T2 标题，
+  确认没有漏掉真 AI 新闻；Go 额度掉速应放缓。连续两周无漏选再考虑 T1_5。

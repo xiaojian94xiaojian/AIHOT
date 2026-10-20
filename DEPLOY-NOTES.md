@@ -4588,3 +4588,11 @@ structure 平均每次输入 **2,800 tokens**（p50 2,623 / p90 3,481），而�
   按“历史噪声不动”保留。
 - **2/10-15 反复失败的源**：重启后 2 小时内 IT之家/36氪/开源中国/掘金均正常；t3n 仍 406（IP/地域拦截）、
   YouTube 两条仍间歇 404（feed 活着）、Reddit 429，均为已知目标侧不稳定。
+
+### 10-20 20:38 T2 预筛切到 Jev（镜像 5a51faa / sha256:27d8ffb5）
+
+依据 24h 影子：Jev 拦下的 57 条我们 PASS 的稿子里 0 条达到入选门槛；预筛占四个分析步骤 token 的
+15.4%。已在生产打开 `JEV_PREFILTER_ENABLED=true`、`JEV_PREFILTER_TIERS=T2`（T1/T1_5 不变）。
+验证：12:39 起新 T2 分析 `prefilter.reason="Jev 判定"`，Jev BLOCK 的文章没有回执；影子自动跳过 T2。
+回滚点 `rollback-before-5a51faa`；回滚 = `JEV_PREFILTER_ENABLED=false` 后重启 api/worker。
+观察指标：T2 的 BLOCK 比例/入选数、每周抽 10 条被拦标题、Go 额度掉速。
