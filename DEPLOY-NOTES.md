@@ -4596,3 +4596,15 @@ structure 平均每次输入 **2,800 tokens**（p50 2,623 / p90 3,481），而�
 验证：12:39 起新 T2 分析 `prefilter.reason="Jev 判定"`，Jev BLOCK 的文章没有回执；影子自动跳过 T2。
 回滚点 `rollback-before-5a51faa`；回滚 = `JEV_PREFILTER_ENABLED=false` 后重启 api/worker。
 观察指标：T2 的 BLOCK 比例/入选数、每周抽 10 条被拦标题、Go 额度掉速。
+
+### 10-20 20:55 上游 #205 / #237 均已合并，合并 5 个提交并部署（镜像 3ac9767 / sha256:e8123e46）
+
+- **PR #205（额度停止）已合并**：维护者补成 `provider.stop.<service>[:model]` **按模型记**，与
+  `provider.refused.*` 告警同口径；成功回执清停止，冷却到期不算恢复。我们树里的额度停止随之恢复
+  （之前合并上游时被移除），对当前 78% 月度额度是保护。
+- **PR #237（登录/注册页）已合并**：维护者补了“请求地址本来就在登录/注册路径、只是多了斜杠时不算被转去
+  登录”的边界，并把注释挪回各自函数；列表层 `fromHtml`/`navigationLink` 与详情重定向两层都在。
+- 合并冲突只在 `extract.ts` 与 `tests/error-page-extraction.test.ts`，取上游版本（含维护者修复）；
+  另外给 LiveBench 的 release 循环加了 try/catch（单个 release 抓不到不影响其它候选）。
+- 全套 **836/836**、typecheck 通过；部署后回滚点 `rollback-before-3ac9767`。
+- 验证：部署后 22 篇 T2 分析仍全部 `reason="Jev 判定"`（无回退），T1/T1_5 仍走聊天模型；站点 200、日志无错。
