@@ -33,6 +33,7 @@ import {
 import { CATEGORY_GUIDE, CATEGORY_TAGS, ENTITIES, ENTITY_TAGS, ITEM_TYPES, normalizeTags, TOPIC_TAGS } from "./vocabulary.ts";
 import { promptText, promptVersion } from "./prompts.ts";
 import { originalPostCopy } from "../content/posts.ts";
+import { jevAsk, jevSettings, PREFILTER_CRITERIA } from "../providers/jev.ts";
 import { wordingProblems } from "./wording.ts";
 
 export { buildMaterial, loadAnalyzeInput, type AnalyzeInputArticle };
@@ -191,7 +192,8 @@ export function normalizeStructure(data: z.infer<typeof StructureSchema>, a: Ana
 
 export interface AnalysisRun {
   /** Absent when there is nothing to judge yet: only a title, and no displayable original post. */
-  prefilter: { label: "PASS" | "BLOCK" | "UNKNOWN"; reason: string; model: string; receiptId: number; reused: boolean } | null;
+  /** `receiptId` is null when Jev answered (its cost is metered outside the receipts). */
+  prefilter: { label: "PASS" | "BLOCK" | "UNKNOWN"; reason: string; model: string; receiptId: number | null; reused: boolean } | null;
   /**
    * The independent score calls and the tier threshold they are held against; absent when the material
    * is not scored. `refused`: the model's content filter declined it, so it is not selected.
@@ -230,6 +232,27 @@ const subjectOf = (a: AnalyzeInputArticle) => `article:${a.id}@${a.revision}`;
 const tagged = (attemptTag: string | undefined, step: string) => [attemptTag, step].filter(Boolean).join(":") || undefined;
 
 async function runPrefilter(a: AnalyzeInputArticle, opts: StepOpts): Promise<NonNullable<AnalysisRun["prefilter"]>> {
+  // The prefilter can be answered by Jev: same material, same three labels, metered outside the Go plan.
+  // A Jev outage must not hold collection, so any failure falls through to the chat model below.
+  const jev = jevSettings();
+  const tier = a.source.tier;
+  if (jev.enabled && jev.apiKey && tier && jev.tiers.includes(tier)) {
+    checkAnalysisRunning();
+    try {
+      const answers = await jevAsk(jev.baseUrl, jev.apiKey, {
+        model: jev.model,
+        state: prefilterUser(a),
+        questions: { prefilter: { type: "choice", instructions: PREFILTER_SYSTEM, criteria: PREFILTER_CRITERIA } },
+      });
+      const choice = answers.prefilter?.choice;
+      const label = choice === "PASS" || choice === "BLOCK" || choice === "UNKNOWN" ? choice : "UNKNOWN";
+      // The same evidence rule as the model path: a BLOCK with nothing to back it goes on as UNKNOWN.
+      const finalLabel = label === "BLOCK" && missingEvidence(a) ? "UNKNOWN" : label;
+      return { label: finalLabel, reason: "Jev 判定", model: jev.model, receiptId: null, reused: false };
+    } catch {
+      // fall through to the chat model
+    }
+  }
   const model = await modelFor("prefilter");
   checkAnalysisRunning();
   const res = await chatJson({
@@ -257,7 +280,7 @@ export async function runSelectionPrefilter(
 ): Promise<NonNullable<AnalysisRun["prefilter"]>> {
   try {
     const result = await runPrefilter(a, opts);
-    onReceipt?.(result.receiptId);
+    if (result.receiptId !== null) onReceipt?.(result.receiptId);
     return result;
   } catch (error) {
     const receiptId = failedReceiptId(error);
@@ -568,7 +591,7 @@ export async function analyzeArticle(articleId: string, opts: StepOpts = {}): Pr
   const run = await runAnalysis(input, opts);
   const out = normalizeAnalysis(run);
   const receiptIds = [
-    ...(run.prefilter ? [run.prefilter.receiptId] : []), ...(run.scores?.receiptIds ?? []), ...(run.writing?.receiptIds ?? []),
+    ...(run.prefilter?.receiptId != null ? [run.prefilter.receiptId] : []), ...(run.scores?.receiptIds ?? []), ...(run.writing?.receiptIds ?? []),
     ...(run.structure ? [run.structure.receiptId] : []),
   ];
   const w = run.writing;

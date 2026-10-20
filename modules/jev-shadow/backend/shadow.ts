@@ -8,17 +8,14 @@
 import { sql } from "@aihot/backend/db";
 import { buildScoreInput, loadAnalyzeInput, SCORE_SYSTEM, tierThreshold } from "@aihot/backend/editorial/analyze";
 import { PREFILTER_SYSTEM, prefilterUser } from "@aihot/backend/editorial/writing";
+import { jevAsk, jevSettings, PREFILTER_CRITERIA } from "@aihot/backend/providers/jev";
+
+/** Re-exported for the shadow's own callers; the criteria live beside the production prefilter. */
+export { PREFILTER_CRITERIA };
 
 /** OpenCode 的免费 Jev；官方线路把它换掉即可。 */
 export const DEFAULT_MODEL = "jev-1.13-free";
 export const DEFAULT_BASE_URL = "https://opencode.ai/inference/systemone/v1/systemone";
-
-/** 预筛的三档，语义照 industry/prompts/prefilter.md。 */
-export const PREFILTER_CRITERIA = {
-  PASS: "内容主体是 AI：模型、Agent、评测、开发工具、生成作品与用法、机器人、AI 业务经营或社会影响；或产品的核心功能本身就是 AI",
-  BLOCK: "内容主体不是 AI，AI 只是顺带出现：普通消费电子、营收股价、专利标准、只谈商业的人物观点",
-  UNKNOWN: "只有代词、表情、链接或无法识别的名称，提供的文字不足以判断相关性",
-} as const;
 
 /**
  * 评分的五档，对应生产 0–100 的 attentionScore；Jev 返回 0…4 的加权均值，这里按 (n−1) 换成 0–100。
@@ -84,6 +81,9 @@ export interface ShadowResult {
  * spend every article of the day on one bad window.
  */
 async function shadowCandidates(model: string, limit: number): Promise<ShadowRow[]> {
+  // A tier whose production prefilter already asks Jev would compare Jev with itself; skip it.
+  const jev = jevSettings();
+  const tierFilter = jev.enabled ? sql`s.tier <> ALL(${jev.tiers})` : sql`true`;
   return sql<ShadowRow[]>`
     SELECT a.id, a.revision, an.relevance, an.score::float8 AS score, a.source_id, s.tier
     FROM analyses an
@@ -91,6 +91,7 @@ async function shadowCandidates(model: string, limit: number): Promise<ShadowRow
     JOIN sources s ON s.id = a.source_id
     WHERE s.participation_mode = 'editorial'
       AND an.relevance IS NOT NULL
+      AND ${tierFilter}
       AND NOT EXISTS (
         SELECT 1 FROM jev_shadow sh
         WHERE sh.article_id = a.id AND sh.input_revision = a.revision AND sh.model = ${model}
@@ -101,17 +102,7 @@ async function shadowCandidates(model: string, limit: number): Promise<ShadowRow
 }
 
 async function ask(baseUrl: string, apiKey: string, body: unknown): Promise<Record<string, JevAnswer>> {
-  const res = await fetch(baseUrl, {
-    method: "POST",
-    headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(45_000),
-  });
-  const text = await res.text();
-  if (!res.ok) throw new Error(`Jev ${res.status}: ${text.slice(0, 200)}`);
-  const parsed = JSON.parse(text) as { answers?: Record<string, JevAnswer> };
-  if (!parsed.answers) throw new Error(`Jev 答复里没有 answers: ${text.slice(0, 200)}`);
-  return parsed.answers;
+  return jevAsk(baseUrl, apiKey, body);
 }
 
 /** 0–100 换算：Jev 的 score 是档位序号的加权均值（0…n−1）。 */
