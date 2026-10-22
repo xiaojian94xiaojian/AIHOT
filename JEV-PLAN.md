@@ -302,3 +302,15 @@ Jev 拦下我们 PASS 的条目里，**T1 有 4 条、T1_5 有 2 条我们的分
 tsrs 69、Void 67 等），即真的会漏选；同时 Jev 在 T1_5 上把 43 条我们 PASS 的判成 UNKNOWN（不拦但也不给结论）。
 量上 T1+T1_5 只有约 207 篇/天（T2 是 707），切过去省的预筛 token 只有 T2 的两三成，风险却更高，
 所以维持聊天模型；若以后要试，可给高价值源单独放宽 Jev 的预筛标准再影子一周。
+
+## 十四、10-22 20:22 起只保留 T2 预筛，影子对比停用
+
+- 站主决定：Jev 只保留 T2 预筛，其他对比全部停掉。
+- 操作：`JEV_SHADOW_ENABLED=false` 后重启 worker；框架自动删除 `cron.jev.shadow` 定时与队列
+  （`pgboss.schedule` / `pgboss.queue` 已无 jev.shadow）。重启后 `jev_shadow` 无新增行（历史保留，不删）。
+- 验证：重启后 3 篇 T2 分析仍全部 `reason="Jev 判定"`；站点 200，worker 无错误。
+- 之后的监控：不再自动跑对照；每周人工抽 10 条 Jev 拦下的 T2 标题，确认没有漏掉真 AI 新闻;
+  Go 额度看月度百分比即可。`JEV_SHADOW_*` 的地址/模型/key 保留，因为 T2 预筛的 `JEV_PREFILTER_*`
+  留空时回退到它们。
+- 价值口径：T2 预筛约省 15–16% 的 Go token（~2M/天），Jev 成本约 $0.04/天；Jev 的 choice/score API
+  接不了 score/group/structure/写作这些大头，这是它在这条流水线里的唯一位置。
