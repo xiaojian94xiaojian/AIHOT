@@ -4631,3 +4631,11 @@ structure 平均每次输入 **2,800 tokens**（p50 2,623 / p90 3,481），而�
 
 `JEV_SHADOW_ENABLED=false` 重启 worker；`cron.jev.shadow` 定时与队列已删，`jev_shadow` 无新增（历史保留）。
 T2 预筛继续（重启后 3/3 篇 `reason="Jev 判定"`）。监控改为每周人工抽 10 条被拦 T2 标题。
+
+### 10-22 20:45 合并上游 11 个提交（镜像 90ccb6b / sha256:ddc733a8）
+
+内容：sanitize-html 2.18.x、fastify/undici 安全修复版本；后台"已登录访问登录页/登录接口直接跳目标页"、
+登出表单不再 415、登出表单解析大小上限、登录后 return 只能指本站；依赖 bump（vite 8.3.3、MCP 2.3.0）
+与 sources 文档补充。无冲突，全套 836/836，typecheck 通过。回滚点 `rollback-before-90ccb6b`。
+部署后验证：sanitize-html 2.18.1 / fastify 5.12.7 / undici 7.30.0；JEV_SHADOW_ENABLED=false 保持，
+`cron.jev.shadow` 无；T2 预筛仍 `reason="Jev 判定"`，影子 0 新增；站点 200。
