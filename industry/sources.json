@@ -548,12 +548,15 @@
       "kind": "web_list",
       "config": {
         "url": "https://www.anthropic.com/engineering",
-        "itemSelector": "a.ArticleList-module-scss-module___tpu-a__cardLink",
-        "linkSelector": "a[href]",
+        "itemSelector": "article",
+        "linkSelector": "a[href^='/research/']",
+        "allowUrlPrefixes": [
+          "https://www.anthropic.com/research/"
+        ],
+        "publishedAtRegex": "((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\\.?\\s+\\d{1,2},\\s+20\\d\\d)",
         "_aihot": {
           "initialBackfillLimit": 8
-        },
-        "publishedAtSelector": "time[datetime]"
+        }
       },
       "tier": "T2",
       "first_party": false,

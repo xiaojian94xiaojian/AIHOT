@@ -4608,3 +4608,21 @@ structure 平均每次输入 **2,800 tokens**（p50 2,623 / p90 3,481），而�
   另外给 LiveBench 的 release 循环加了 try/catch（单个 release 抓不到不影响其它候选）。
 - 全套 **836/836**、typecheck 通过；部署后回滚点 `rollback-before-3ac9767`。
 - 验证：部署后 22 篇 T2 分析仍全部 `reason="Jev 判定"`（无回退），T1/T1_5 仍走聊天模型；站点 200、日志无错。
+
+### 10-22 日报处理（12 项）
+
+- **web-anthropic（已修）**：官网改版，卡片从 CSS-module 类名换成 `<article>`，日期从 `<time datetime>` 换成正文
+  文本（"Apr 23, 2026"），原选择器 `a.ArticleList-...cardLink` 已不存在 → 连续 7 次 `no items matched (html)`。
+  改为 `itemSelector: article` + `linkSelector: a[href^="/research/"]` + `allowUrlPrefixes` + `publishedAtRegex`；
+  抓取恢复 ok（found 24 / new 1，日期正常），health 从 failing 回 ok。
+- **rss-nvidia-blog**：三篇（gtc-berlin-2026-keynote、local-ai-gtc-rtx-dgx-spark-station-sync、
+  open-models-europe-industry）已按当前修订重翻（75/65/37 段）。
+- **rss-magazine**：10-20 已重翻（147/147 段，链接集合一致）；日报仍报"第 28 段链接无法对应"，实际是
+  `rebaseTranslation` 的**版面重排校验**（按块序号比链接顺序），段落本身无图无链接，属展示层提示，不影响正文；
+  该文正文未变（revision 1），再翻也是同样结果，留作低优先。
+- **12. 未确认回执**：当前 `status='unknown'` 为 0（10-20 已放行 242476；最新一条是处理中的 score 请求），无需动作。
+- **2/7-11 反复失败的源**：近 2 天 IT之家 18/161、YouTube mwolfe 3/13、berman 3/13、t3n 31/91（406）、
+  开源中国 13/47、掘金 26/145（hub 超时），均为已知目标侧/中转侧不稳定，仍在出稿。
+- **监控告警** `monitor.review`：10-20 起"有 Codex 重置消息需要你确认"，需站主在后台确认，不是抓取问题。
+- **额度**：月度 85%、周 23%（10-22 12:00 UTC），按目前速度可能在 10-27 重置前用尽；按模型停止已生效，
+  建议站主决定是否降载或充值。
