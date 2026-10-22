@@ -1139,7 +1139,7 @@
       "interval_minutes": 120,
       "site_fulltext": true,
       "syndicate_fulltext": false,
-      "enabled": true
+      "enabled": false
     },
     {
       "id": "web-api-docs",
@@ -1747,7 +1747,7 @@
       "interval_minutes": 120,
       "site_fulltext": true,
       "syndicate_fulltext": false,
-      "enabled": true
+      "enabled": false
     },
     {
       "id": "web-metr",
@@ -2171,7 +2171,7 @@
       "interval_minutes": 60,
       "site_fulltext": true,
       "syndicate_fulltext": false,
-      "enabled": true
+      "enabled": false
     },
     {
       "id": "rss-newcomer",
@@ -2701,7 +2701,7 @@
       "interval_minutes": 60,
       "site_fulltext": true,
       "syndicate_fulltext": false,
-      "enabled": true
+      "enabled": false
     },
     {
       "id": "rss-thinkingmachines",
@@ -2928,7 +2928,7 @@
       "interval_minutes": 60,
       "site_fulltext": true,
       "syndicate_fulltext": false,
-      "enabled": true
+      "enabled": false
     },
     {
       "id": "x-account-karpathy",
@@ -3234,7 +3234,7 @@
       "interval_minutes": 60,
       "site_fulltext": true,
       "syndicate_fulltext": false,
-      "enabled": true
+      "enabled": false
     },
     {
       "id": "x-account-hendrycks",
@@ -3414,7 +3414,7 @@
       "interval_minutes": 60,
       "site_fulltext": true,
       "syndicate_fulltext": false,
-      "enabled": true
+      "enabled": false
     },
     {
       "id": "x-account-drfeifei",
@@ -4044,7 +4044,7 @@
       "interval_minutes": 60,
       "site_fulltext": true,
       "syndicate_fulltext": false,
-      "enabled": true
+      "enabled": false
     },
     {
       "id": "x-account-hailuo-ai",
@@ -4512,7 +4512,7 @@
       "interval_minutes": 60,
       "site_fulltext": true,
       "syndicate_fulltext": false,
-      "enabled": true
+      "enabled": false
     },
     {
       "id": "x-account-sherwinwu",
@@ -4638,7 +4638,7 @@
       "interval_minutes": 60,
       "site_fulltext": true,
       "syndicate_fulltext": false,
-      "enabled": true
+      "enabled": false
     },
     {
       "id": "x-account-trq212",
@@ -4872,7 +4872,7 @@
       "interval_minutes": 60,
       "site_fulltext": true,
       "syndicate_fulltext": false,
-      "enabled": true
+      "enabled": false
     },
     {
       "id": "x-account-karminski3",
@@ -5124,7 +5124,7 @@
       "interval_minutes": 60,
       "site_fulltext": true,
       "syndicate_fulltext": false,
-      "enabled": true
+      "enabled": false
     },
     {
       "id": "x-account-baichuanai",
@@ -6194,7 +6194,7 @@
       "interval_minutes": 60,
       "site_fulltext": true,
       "syndicate_fulltext": false,
-      "enabled": true
+      "enabled": false
     },
     {
       "id": "rss-hamel-husain",

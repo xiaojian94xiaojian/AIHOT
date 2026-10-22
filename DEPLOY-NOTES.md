@@ -4639,3 +4639,28 @@ T2 预筛继续（重启后 3/3 篇 `reason="Jev 判定"`）。监控改为每�
 与 sources 文档补充。无冲突，全套 836/836，typecheck 通过。回滚点 `rollback-before-90ccb6b`。
 部署后验证：sanitize-html 2.18.1 / fastify 5.12.7 / undici 7.30.0；JEV_SHADOW_ENABLED=false 保持，
 `cron.jev.shadow` 无；T2 预筛仍 `reason="Jev 判定"`，影子 0 新增；站点 200。
+
+### 10-22 21:00 为省额度关闭 13 个低分高耗编辑源
+
+近 7 天按实际 token（回执 usage 按 article→source 归集）排序，关掉平均分低、入选 0–1 的源，合计约 **14.8%** token：
+
+| 源 | tier | 7 天均分 | 入选 | token 占比 |
+|---|---|---|---|---|
+| rss-nature | T2 | 19.0 | 0 | 0.7% |
+| x-account-alexandr-wang | T1_5 | 21.6 | 0 | 0.8% |
+| x-account-cb-doge | T2 | 22.0 | 1 | 2.5% |
+| x-account-hongming731 | T2 | 28.6 | 0 | 1.0% |
+| x-account-emollick | T2 | 30.6 | 1 | 0.9% |
+| x-account-semianalysis | T2 | 39.4 | 0 | 0.9% |
+| rss-databricks-blog | T1_5 | 41.6 | 0 | 0.9% |
+| web-llamaindex | T1_5 | 45.5 | 0 | 0.7% |
+| x-account-testingcatalog | T2 | 45.6 | 1 | 2.1% |
+| x-account-minimax-ai | T2 | 47.1 | 0 | 0.6% |
+| x-account-dair-ai | T2 | 48.7 | 0 | 0.7% |
+| x-account-fal | T2 | 53.9 | 0 | 0.7% |
+| rss-theverge-2 | T2 | 54.6 | 0 | 2.3% |
+
+- DB `enabled=false`，`industry/sources.json` 同步并在服务器更新；关闭后这些源 0 次抓取，其他源正常（15 分钟 38 次）。
+- 保留 IT之家 / Bloomberg（近 7 天各入选 8 / 3 篇）和全部第一方源。
+- 预计日耗从 ~3.5% 降到 ~3.0%/天，剩余 15% 可撑到 10-27 重置；明天再看实际曲线，若仍偏快再降 IT之家/Bloomberg 的抓取间隔或评分次数。
+- 重置后要恢复：把 JSON 里 `enabled` 改回 true 并 `UPDATE sources SET enabled=true WHERE id IN (...)`。
