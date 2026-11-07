@@ -8,12 +8,13 @@ import { NavigationProgress } from "../../components/shell/Chrome";
 import type { AdminMe, AdminNavCounts } from "@aihot/contracts/admin";
 import { Toaster } from "../../features/admin/toast";
 import { adminGet } from "../../lib/admin.server";
+import { webModules } from "../../site-modules";
 
 interface AdminNavEntry {
   to: string;
   label: string;
-  /** The badge: one of the navigation counts. */
-  count?: keyof AdminNavCounts;
+  /** The badge: one of the navigation counts (the engine's, or a module's own). */
+  count?: string;
   tone?: "bad" | "accent";
 }
 
@@ -34,11 +35,13 @@ export const meta: Route.MetaFunction = () => [{ title: `${SITE.name} 后台` },
 export const headers: Route.HeadersFunction = () => ({ "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow", "X-Accel-Buffering": "no" });
 
 const nav = (): Array<{ group: string; items: AdminNavEntry[] }> => [
+  ...webModules().flatMap((m) => m.admin?.groups ?? []),
   {
     group: "内容",
     items: [
       { to: "/admin/content", label: "内容诊断" },
       { to: "/admin/sources", label: "信源", count: "sources", tone: "bad" },
+      ...webModules().flatMap((m) => m.admin?.content ?? []),
       { to: "/admin/feedback", label: "反馈", count: "feedback", tone: "accent" },
     ],
   },
@@ -56,12 +59,12 @@ const nav = (): Array<{ group: string; items: AdminNavEntry[] }> => [
 
 type Counts = Pick<Route.ComponentProps["loaderData"], "counts" | "countsKey">;
 
-function NavCount({ counts, countsKey, name, className }: Counts & { name: keyof AdminNavCounts | undefined; className: string }) {
+function NavCount({ counts, countsKey, name, className }: Counts & { name: string | undefined; className: string }) {
   if (!name) return null;
   return (
     <Suspense key={countsKey} fallback={null}>
       <Await resolve={counts} errorElement={null}>
-        {(resolved: AdminNavCounts) => resolved[name] ? <span className={className}>{resolved[name]}</span> : null}
+        {(resolved: AdminNavCounts) => (resolved as Record<string, number>)[name] ? <span className={className}>{(resolved as Record<string, number>)[name]}</span> : null}
       </Await>
     </Suspense>
   );

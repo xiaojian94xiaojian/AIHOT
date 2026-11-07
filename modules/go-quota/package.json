@@ -1,0 +1,13 @@
+{
+  "name": "@aihot/go-quota",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    "./server": "./server.ts",
+    "./backend/*": "./backend/*.ts"
+  },
+  "dependencies": {
+    "@aihot/backend": "*"
+  }
+}

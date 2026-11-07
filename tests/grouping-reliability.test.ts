@@ -147,7 +147,8 @@ test("primary timeout continues through the backup; two timeouts wait for releas
   const continuedId = await report("backup-continues");
   const realFetch = globalThis.fetch;
   globalThis.fetch = async (input, init) => {
-    if (String(input).startsWith(provider.url) && JSON.parse(String(init?.body)).model === "deepseek-flash") throw new DOMException("request timed out", "TimeoutError");
+    // This fork's preset sends the concrete model id (deepseek-v4.1-flash), not the alias.
+    if (String(input).startsWith(provider.url) && JSON.parse(String(init?.body)).model === MODELS["test-group-primary"]!.model) throw new DOMException("request timed out", "TimeoutError");
     return realFetch(input, init);
   };
   try { assert.equal((await groupArticle(continuedId)).verdict, "same-fact"); }

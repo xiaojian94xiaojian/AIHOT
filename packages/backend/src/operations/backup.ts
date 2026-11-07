@@ -13,37 +13,50 @@ import { sql } from "../db.ts";
 import { screenshotsForwarded } from "./feedback.ts";
 
 const run = promisify(execFile);
-const KEEP_LOCAL = 3;
+// 本地只留最新一份：每份 dump 约 2.5GB，对象存储里已有 7 天日备；留三份会把 40GB 的盘占掉一大半。
+const KEEP_LOCAL = 1;
 
-interface Store {
+export interface Store {
   secretId: string;
   secretKey: string;
   bucket: string;
   region: string;
-  endpoint: string;
+  /** Where the bucket is named: in the host (virtual-host style) or in the path. */
+  endpoint: (key: string) => string;
 }
 
 /** Backups run where the object store is configured (production); development never uploads. */
 export function backupConfigured(): boolean {
-  return store() !== null;
+  return backupStore() !== null;
 }
 
-/** The object store, from the environment (backend.env); named one by one so the template check sees them. */
-function store(): Store | null {
+/**
+ * The object store, from the environment (backend.env); named one by one so the template check sees them.
+ * R2 must be path style: a bucket in the host name comes back 403, which is how this deployment's
+ * backups stopped on 2026-10-03. A name that is not a DNS label cannot be a host label either.
+ */
+export function backupStore(): Store | null {
   const secretId = process.env.DB_BACKUP_STORE_SECRET_ID;
   const secretKey = process.env.DB_BACKUP_STORE_SECRET_KEY;
   const bucket = process.env.DB_BACKUP_STORE_BUCKET;
   const region = process.env.DB_BACKUP_STORE_REGION;
   if (!secretId || !secretKey || !bucket || !region) return null;
   const domain = process.env.DB_BACKUP_STORE_DOMAIN;
-  return { secretId, secretKey, bucket, region, endpoint: domain ? `https://${domain.replace(/^https?:\/\//, "")}` : `https://${bucket}.cos.${region}.myqcloud.com` };
+  if (!domain) {
+    // The bucket spelled itself into the host, the way a COS endpoint hands it back.
+    return { secretId, secretKey, bucket, region, endpoint: (key) => `https://${bucket}.cos.${region}.myqcloud.com/${key}` };
+  }
+  const base = `https://${domain.replace(/^https?:\/\//, "")}`;
+  const label = /^[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$/.test(bucket);
+  const pathStyle = !label || (process.env.DB_BACKUP_STORE_PATH_STYLE ?? "").trim() === "true";
+  return { secretId, secretKey, bucket, region, endpoint: (key) => (pathStyle ? `${base}/${bucket}/${key}` : `https://${bucket}.${base.slice(8)}/${key}`) };
 }
 
 const hex = (b: Buffer | string) => createHash("sha256").update(b).digest("hex");
 const hmac = (key: Buffer | string, data: string) => createHmac("sha256", key).update(data).digest();
 
 /** AWS Signature V4 headers for one S3 request. */
-function signV4(opts: {
+export function signV4(opts: {
   method: string; url: URL; region: string; accessKey: string; secretKey: string; payloadHash: string; headers?: Record<string, string>;
 }): Record<string, string> {
   const amzDate = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
@@ -69,14 +82,14 @@ async function fileSha256(file: string): Promise<string> {
 }
 
 async function upload(s: Store, key: string, file: string, sha: string, size: number) {
-  const url = new URL(`${s.endpoint}/${key}`);
+  const url = new URL(s.endpoint(key));
   const headers = signV4({ method: "PUT", url, region: s.region, accessKey: s.secretId, secretKey: s.secretKey, payloadHash: sha, headers: { "content-length": String(size), "content-type": "application/octet-stream" } });
   const res = await fetch(url, { method: "PUT", headers, body: createReadStream(file) as never, duplex: "half", signal: AbortSignal.timeout(60 * 60_000) } as RequestInit);
   if (!res.ok) throw new Error(`backup upload ${key}: HTTP ${res.status} ${(await res.text()).slice(0, 300)}`);
 }
 
 export async function runBackup(now = new Date()) {
-  const s = store();
+  const s = backupStore();
   const dir = path.join(config.dataDir, "backups");
   await mkdir(dir, { recursive: true });
   const stamp = now.toISOString().slice(0, 16).replace(/[-:T]/g, "");

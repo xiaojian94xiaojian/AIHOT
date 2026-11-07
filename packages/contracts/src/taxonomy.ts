@@ -51,3 +51,16 @@ export function isChannelKey(value: unknown): value is ChannelKey {
 
 /** Article ids. Also the local-data import validation pattern. */
 export const ARTICLE_ID_PATTERN = /^[a-zA-Z0-9_-]{1,80}$/;
+
+// 模型榜的公开榜单。4.0.0 把模型榜移出框架时删掉了这几个常量，我们把它作为本站模块恢复，
+// 因此这里一并放回（leaderboard 的 DTO 与页面都按这几个键取值）。
+export const LEADERBOARD_PUBLIC_BOARDS = ["overall", "coding", "reasoning", "knowledge", "professional"] as const;
+export type LeaderboardBoardKey = (typeof LEADERBOARD_PUBLIC_BOARDS)[number];
+
+export const LEADERBOARD_BOARD_LABELS: Record<LeaderboardBoardKey, string> = {
+  overall: "综合",
+  coding: "编程",
+  reasoning: "推理",
+  knowledge: "知识",
+  professional: "专业办公",
+};

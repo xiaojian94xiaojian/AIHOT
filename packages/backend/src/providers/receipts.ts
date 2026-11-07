@@ -228,15 +228,17 @@ async function checkBudget(tx: Db, service: string, model?: string | null): Prom
   // request per cooldown, not one per article. Requests already in flight cannot be stopped.
   const stopped = await stopUntil(tx, providerStopKey(service, model));
   if (stopped !== null) throw new BudgetExceededError(service, "provider", Math.ceil((stopped - Date.now()) / 1000));
-  const [budget] = await tx<{ per_minute: number; per_hour: number; per_day: number }[]>`
-    SELECT per_minute, per_hour, per_day FROM budgets WHERE service = ${service}`;
+  const [budget] = await tx<{ per_minute: number; per_hour: number; per_day: number; per_day_usd: string }[]>`
+    SELECT per_minute, per_hour, per_day, per_day_usd FROM budgets WHERE service = ${service}`;
   if (!budget) return; // default rows come with the migrations; a service an operator removed is unlimited
   // Every request sent counts, retries of the same logical request included.
-  const [counts] = await tx<{ minute: number; hour: number; day: number }[]>`
+  const [counts] = await tx<{ minute: number; hour: number; day: number; spent: string; oldest: Date | null }[]>`
     SELECT
       count(*) FILTER (WHERE started_at > now() - interval '1 minute') AS minute,
       count(*) FILTER (WHERE started_at > now() - interval '1 hour') AS hour,
-      count(*) AS day
+      count(*) AS day,
+      coalesce(sum(cost), 0)::text AS spent,
+      min(started_at) AS oldest
     FROM receipt_attempts
     WHERE service = ${service} AND origin = 'live' AND started_at > now() - interval '1 day'`;
   const c = counts!;
@@ -246,6 +248,14 @@ async function checkBudget(tx: Db, service: string, model?: string | null): Prom
   if (c.minute >= budget.per_minute) throw new BudgetExceededError(service, "minute", 60);
   if (c.hour >= budget.per_hour) throw new BudgetExceededError(service, "hour", 600);
   if (c.day >= budget.per_day) throw new BudgetExceededError(service, "day", 3600);
+  // A service billed per returned object can spend far more than a fixed count suggests (one X search
+  // response bills up to 20 tweets). A positive daily cap stops calls once what was recorded reaches it;
+  // it frees as the day's earlier attempts leave the window.
+  const cap = Number(budget.per_day_usd);
+  if (cap > 0 && Number(c.spent) >= cap) {
+    const freesIn = c.oldest ? Math.max(60, Math.ceil((new Date(c.oldest).getTime() + 86_400_000 - Date.now()) / 1000)) : 3600;
+    throw new BudgetExceededError(service, "spend", freesIn);
+  }
 }
 
 /**

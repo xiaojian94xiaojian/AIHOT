@@ -511,8 +511,8 @@ const sharded = () => sql`kind = 'x_search' AND config->>'query' ~* ${SHARDABLE_
 
 /** Every minute: a shard is read when any of its accounts is due, all of them at once. */
 async function scheduleXShards(): Promise<number> {
-  const rows = await sql<Array<Pick<SourceRow, "id" | "kind" | "config" | "cursor" | "participation_mode"> & { due: boolean }>>`
-    SELECT id, kind, config, cursor, participation_mode, (next_fetch_at IS NULL OR next_fetch_at <= now()) AS due
+  const rows = await sql<Array<Pick<SourceRow, "id" | "kind" | "config" | "cursor" | "participation_mode" | "interval_minutes"> & { due: boolean }>>`
+    SELECT id, kind, config, cursor, participation_mode, interval_minutes, (next_fetch_at IS NULL OR next_fetch_at <= now()) AS due
     FROM sources WHERE enabled AND ${sharded()}`;
   const due = new Set(rows.filter((r) => r.due).map((r) => r.id));
   let enqueued = 0;
@@ -543,6 +543,15 @@ const X_SHARD_MINUTES: Record<string, number> = { editorial: 30, hot_signal: 60 
 /** An account outside the news is read as often as its uses ask, hourly when none says. */
 const shardMinutes = (mode: string, uses: readonly string[]) => X_SHARD_MINUTES[mode] ?? (Number.isFinite(usePace(uses)) ? usePace(uses) : 60);
 
+/**
+ * Minutes between reads of a hot-signal shard, from its accounts' recent output (this site's pacing):
+ * busy accounts at the base pace, middling ones twice as slow, quiet ones four times. Shards group accounts
+ * with the same pace, so one quiet account is not dragged along by a busy neighbour.
+ */
+function hotSignalShardMinutes(perDay: number): number {
+  return perDay >= 2 ? 60 : perDay >= 0.5 ? 120 : 180;
+}
+
 /** Listings read through Jina, paid per read. */
 const paidListing = sql`coalesce(config->>'url', '') LIKE 'https://r.jina.ai/%'`;
 /** They are not looked at more than hourly: busy ones would outrun Jina's daily budget. */
@@ -565,8 +574,13 @@ export async function adaptIntervals(): Promise<{ updated: number }> {
     // hot signals may wait longer.
     const max = r.participation_mode === "hot_signal" ? 180 : r.kind === "x_search" || r.paid_listing ? 120 : 60;
     const min = r.paid_listing ? PAID_LISTING_FLOOR : 15;
-    // X accounts read by shard follow the shard's pace, whatever their own volume.
-    const own = shardHandle(r) ? shardMinutes(r.participation_mode, r.uses) : perDay <= 0.15 ? max : Math.round(Math.min(max, Math.max(min, (24 * 60) / (perDay * 3))));
+    // X accounts read by shard follow the shard's pace, whatever their own volume; hot-signal shards this
+    // site paces by their accounts' output when no use asks for something else.
+    const own = shardHandle(r)
+      ? r.participation_mode === "hot_signal" && usePace(r.uses) === Infinity
+        ? hotSignalShardMinutes(perDay)
+        : shardMinutes(r.participation_mode, r.uses)
+      : perDay <= 0.15 ? max : Math.round(Math.min(max, Math.max(min, (24 * 60) / (perDay * 3))));
     // Another use may want the source sooner, never later, and a paid listing still waits its hour.
     const target = Math.max(min, Math.min(own, usePace(r.uses)));
     const res = await sql`UPDATE sources SET interval_minutes = ${target} WHERE id = ${r.id} AND interval_minutes <> ${target}`;

@@ -19,6 +19,12 @@ export interface Scheduled {
   missed?: "skip" | "once";
   /** Read when the worker starts, after the modules are installed: false removes the schedule and its execution queue; run history remains. */
   when?: () => boolean;
+  /**
+   * Read when the worker starts: true runs it once right away, so work that has never run here (a new
+   * site, or one whose table is still empty) does not wait for the first slot of its cron. Answer false
+   * once it has run; the cron run and this one cannot both be queued (pg-boss's singleton policy).
+   */
+  runOnStart?: () => boolean | Promise<boolean>;
 }
 
 /** A model step (editorial/models.ts); its default model comes from site/models.ts, else `default`. */
@@ -178,6 +184,15 @@ export interface ServerModule {
     requests?: string[];
   };
   llms?: () => Promise<LlmsLines> | LlmsLines;
+  /**
+   * Its part of the admin (this deployment keeps the slot the engine dropped): jobs it schedules elsewhere,
+   * badges on the admin navigation, and its section of the admin's runs page.
+   */
+  admin?: {
+    currentJobs?: () => Promise<readonly string[]>;
+    counts?: Record<string, () => Promise<number>>;
+    runs?: () => Promise<unknown>;
+  };
   sitemap?: {
     /** After the stories. */
     entries?: () => Promise<SitemapEntry[]>;

@@ -3,6 +3,15 @@
   "private": true,
   "type": "module",
   "sideEffects": false,
+  "dependencies": {
+    "@aihot/backup-rotation": "*",
+    "@aihot/chronicle": "*",
+    "@aihot/go-quota": "*",
+    "@aihot/jev-shadow": "*",
+    "@aihot/leaderboard": "*",
+    "@aihot/monitor": "*",
+    "@aihot/x-profile": "*"
+  },
   "exports": {
     ".": "./site.ts",
     "./models": "./models.ts",

@@ -60,20 +60,25 @@ export async function setTargetEnabled(key: string, enabled: boolean, reason: st
 
 export async function listBudgets(): Promise<BeforeJson<AdminBudget>[]> {
   return sql<BeforeJson<AdminBudget>[]>`
-    SELECT b.service, b.per_minute, b.per_hour, b.per_day, b.note, b.updated_at,
+    SELECT b.service, b.per_minute, b.per_hour, b.per_day, b.per_day_usd::float8, b.note, b.updated_at,
            (SELECT count(*)::int FROM receipt_attempts a WHERE a.service = b.service AND a.origin = 'live' AND a.started_at > now() - interval '1 day') AS used_day,
-           (SELECT count(*)::int FROM receipt_attempts a WHERE a.service = b.service AND a.origin = 'live' AND a.started_at > now() - interval '1 hour') AS used_hour
+           (SELECT count(*)::int FROM receipt_attempts a WHERE a.service = b.service AND a.origin = 'live' AND a.started_at > now() - interval '1 hour') AS used_hour,
+           (SELECT coalesce(sum(a.cost), 0)::float8 FROM receipt_attempts a WHERE a.service = b.service AND a.origin = 'live' AND a.started_at > now() - interval '1 day') AS spent_day
     FROM budgets b ORDER BY b.service`;
 }
 
-export async function updateBudget(service: string, input: { perMinute: number; perHour: number; perDay: number; reason: string }, actor: string) {
+export async function updateBudget(service: string, input: { perMinute: number; perHour: number; perDay: number; perDayUsd: number; reason: string }, actor: string) {
   if (!input.reason?.trim()) throw new Error("reason is required");
   for (const v of [input.perMinute, input.perHour, input.perDay]) if (!Number.isInteger(v) || v < 0) throw new Error("budgets are non-negative integers (0 stops the service)");
-  const [before] = await sql`SELECT per_minute, per_hour, per_day FROM budgets WHERE service = ${service}`;
+  // A spend cap may be fractional (cents); 0 is no cap.
+  if (!Number.isFinite(input.perDayUsd) || input.perDayUsd < 0) throw new Error("the daily spend cap is a non-negative amount in USD (0 turns it off)");
+  const cap = Math.round(input.perDayUsd * 100) / 100;
+  const [before] = await sql`SELECT per_minute, per_hour, per_day, per_day_usd::float8 FROM budgets WHERE service = ${service}`;
   const [after] = await sql`
-    INSERT INTO budgets (service, per_minute, per_hour, per_day, note) VALUES (${service}, ${input.perMinute}, ${input.perHour}, ${input.perDay}, ${input.reason})
-    ON CONFLICT (service) DO UPDATE SET per_minute = EXCLUDED.per_minute, per_hour = EXCLUDED.per_hour, per_day = EXCLUDED.per_day, note = EXCLUDED.note, updated_at = now()
-    RETURNING service, per_minute, per_hour, per_day`;
+    INSERT INTO budgets (service, per_minute, per_hour, per_day, per_day_usd, note) VALUES (${service}, ${input.perMinute}, ${input.perHour}, ${input.perDay}, ${cap}, ${input.reason})
+    ON CONFLICT (service) DO UPDATE SET per_minute = EXCLUDED.per_minute, per_hour = EXCLUDED.per_hour, per_day = EXCLUDED.per_day,
+      per_day_usd = EXCLUDED.per_day_usd, note = EXCLUDED.note, updated_at = now()
+    RETURNING service, per_minute, per_hour, per_day, per_day_usd::float8`;
   await audit(actor, "budget.update", `budget:${service}`, input.reason, before ?? null, after);
   return after;
 }

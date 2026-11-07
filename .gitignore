@@ -14,3 +14,24 @@ apps/web/.react-router/
 # Font package unpacked to regenerate the report nameplates (docs/customize.md)
 package/
 fontsource-noto-sans-sc-*.tgz
+
+# 信源改动的本地备份（不进仓库）
+industry/sources.json.bak-*
+industry/topics.json.bak-*
+
+# 运维与内部文档只在本地（E:\cs\aihot-notes），不进公开仓库
+DEPLOY-GCP.md
+DEPLOY-NOTES.md
+HANDOFF.md
+WORKBENCH-V2.md
+
+# 历史交接与安全审查（本地私有）
+HANDOFF-2026-10-17.md
+UPGRADE-HANDOFF.md
+KB-PLAN.md
+SECURITY-PLAN.md
+SECURITY-REVIEW.md
+
+# 信源/主题的手工备份
+*.bak-*
+*.bak-before-*

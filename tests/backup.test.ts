@@ -39,7 +39,8 @@ const stem = sql.options.database.toLowerCase().replace(/[^a-z0-9]+/g, "-");
 
 globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
   const url = new URL(input instanceof Request ? input.url : String(input));
-  assert.equal(url.origin, "https://backup.invalid", "the backup fixture must not contact any real service");
+  // Virtual-host style (the default): the bucket is the first label of the host, so the path is the key.
+  assert.equal(url.origin, `https://${env.DB_BACKUP_STORE_BUCKET}.backup.invalid`, "the backup fixture must not contact any real service, and without DB_BACKUP_STORE_PATH_STYLE the bucket stays in the host");
   const chunks: Buffer[] = [];
   for await (const chunk of init!.body as unknown as AsyncIterable<Uint8Array>) chunks.push(Buffer.from(chunk));
   objects.set(url.pathname.slice(1), Buffer.concat(chunks));
@@ -229,10 +230,10 @@ test("persistent packing failure still sends the database and reports incomplete
   assert.deepEqual(await readFile(path.join(config.dataDir, "feedback-screenshots/failure.png")), PNG);
 });
 
-test("local retention keeps three dump/archive pairs without deleting source attachments", async () => {
+test("local retention keeps one dump/archive pair without deleting source attachments", async () => {
   await save("feedback-screenshots/retained.png");
   for (const day of [1, 2, 3, 4]) await runBackup(new Date(`2026-11-0${day}T04:00:00Z`));
-  assert.deepEqual((await readdir(path.join(config.dataDir, "backups"))).sort(), [2, 3, 4].flatMap(day => [`${stem}-2026110${day}0400.dump`, `${stem}-files-2026110${day}0400.tar.gz`]).sort());
+  assert.deepEqual((await readdir(path.join(config.dataDir, "backups"))).sort(), [4].flatMap(day => [`${stem}-2026110${day}0400.dump`, `${stem}-files-2026110${day}0400.tar.gz`]).sort());
   assert.deepEqual(await readFile(path.join(config.dataDir, "feedback-screenshots/retained.png")), PNG);
 });
 
@@ -304,7 +305,8 @@ for (const phase of ["pg_dump", "tar"] as const) {
       const { getBoss, stopBoss } = await import("@aihot/backend/jobs/queue");
       const { closeDb } = await import("@aihot/backend/db");
       globalThis.fetch = async (input, init) => {
-        assert.equal(new URL(input).origin, "https://backup.invalid");
+        // This fork keeps the bucket in the host unless DB_BACKUP_STORE_PATH_STYLE says otherwise.
+        assert.equal(new URL(input).origin, "https://test-bucket.backup.invalid");
         for await (const chunk of init.body) {} // consume the real dump/archive, never send it outside
         return new Response(null, { status: 200 });
       };

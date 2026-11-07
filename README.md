@@ -1,3 +1,7 @@
+> **这个分支是 [AIHOT](https://github.com/KKKKhazix/AIHOT) 的一个部署分支**，跑在 https://hot.jian.ing ，
+> 在框架之上加了 X 运营工具（涨粉榜、博主画像、今天发什么、算法视角、周报订阅）。
+> 加了什么、口径和代码位置见 **[FORK.md](FORK.md)**；框架本身的说明见下面的 README。
+
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/assets/banner-dark.png">

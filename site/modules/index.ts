@@ -2,5 +2,9 @@
 // it has an entry for: here for its addresses (module.ts), in server.ts for its backend, in web.ts for its
 // pages' parts. Each list keeps the order its entries appear in on the site.
 import type { ModuleDeclaration } from "@aihot/contracts/modules";
+import { chronicleModule } from "@aihot/chronicle/module";
+import { leaderboardModule } from "@aihot/leaderboard/module";
+import { monitorModule } from "@aihot/monitor/module";
+import { xProfileModule } from "@aihot/x-profile/module";
 
-export const MODULES: readonly ModuleDeclaration[] = [];
+export const MODULES: readonly ModuleDeclaration[] = [leaderboardModule, monitorModule, chronicleModule, xProfileModule];

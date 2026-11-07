@@ -175,6 +175,9 @@ const CONVERTS_BEIJING_TIME: Record<string, string> = {
   "packages/contracts/src/time.ts": "the conversions themselves",
   "packages/backend/src/editorial/analyze.ts": "the score input keeps the form its prompt was tuned on (whole seconds without .000)",
   "packages/backend/src/editorial/writing.ts": "a beijingDate written out, left to the next change of editorial/",
+  "modules/codex-reset/web/admin-monitor.tsx": "sends a Beijing date and time typed in the admin with its zone, to the minute",
+  "modules/monitor/backend/read.ts": "the admin form's datetime-local value needs a Beijing instant with its zone (bjIso)",
+  "modules/monitor/web/admin.tsx": "the same form's value, typed in Beijing time, read back into an instant",
   "site/changelog/FeatureRelease.tsx": "a changelog entry's Beijing date and time with its zone, to the minute, in dateTime",
   "clients/watchdog/watchdog.mjs": "installed as one file away from the repository, so it cannot import time.ts",
   "clients/mp-watch/articles.ts": "installed away from the repository with only its module's contracts, so it cannot import time.ts",
@@ -270,4 +273,18 @@ test("pages are prefetched only through IntentLink", () => {
       && /\bprefetch\s*=|\bprefetch\s*:\s*["'`]|PrefetchPageLinks|rel=["']prefetch/.test(line))
     .map(({ at }) => at);
   assert.deepEqual(found, [], "link with IntentLink (in PillTabs, prefetchOnPress), which prefetches when the reader presses");
+});
+
+// Prompts that put collected material in front of a model say so: without the clause, text a source
+// wrote reads as instructions to the model. The wording lives in the pack (industry/prompts/safety.md),
+// so one edit reaches every step. The `-quoted` fragments are left out on their own: each only fills a
+// line of the prompt that includes it.
+test("every prompt that carries collected material includes the safety clause", () => {
+  const dir = path.join(ROOT, "industry/prompts");
+  const prompts = ["summarize-article.md", "summarize-short-post.md", "summarize-long-post.md", "translate-body.md", "translate-post.md", "understand.md"];
+  const family = /^(?:summarize-article|summarize-short-post|summarize-long-post|translate-body|translate-post|understand)$/;
+  const all = readdirSync(dir).filter((name) => name.endsWith(".md") && family.test(name.slice(0, -3)));
+  assert.deepEqual(all.filter((name) => !prompts.includes(name)), [], "a new writing prompt: add it to this list and give it the clause");
+  const missing = prompts.filter((name) => !readFileSync(path.join(dir, name), "utf8").includes("{{> safety}}"));
+  assert.deepEqual(missing, [], "add {{> safety}} to it (industry/prompts/safety.md)");
 });

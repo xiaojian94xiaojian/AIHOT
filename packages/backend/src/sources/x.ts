@@ -69,7 +69,13 @@ export function tweetToCandidate(t: SdTweet): Candidate {
     bodyStatus: linksXArticle(post.text) ? "pending" : "ok",
     xPost: post,
     media: post.media ?? [],
-    raw: { favorite: t.favorite_count ?? null, retweet: t.retweet_count ?? null, views: t.views_count ?? null },
+    raw: {
+      favorite: t.favorite_count ?? null,
+      retweet: t.retweet_count ?? null,
+      reply: t.reply_count ?? null,
+      quote: t.quote_count ?? null,
+      views: t.views_count ?? null,
+    },
   };
 }
 
@@ -271,26 +277,41 @@ export function shardQuery(handles: string[], selfThreads: string[] = []): strin
 export interface XShard {
   key: string;
   mode: string;
+  /** The cadence its accounts share, in minutes (see adaptIntervals); a shard runs when any member is due. */
+  minutes: number;
   sourceIds: string[];
 }
 
 /**
- * Accounts that can share a search, per participation mode, in a stable order (by source id) and
- * packed into queries under the length limit. The same sources give the same shards, so a shard's
- * accounts stay together between runs; a source added or removed shifts only the shards after it.
+ * Accounts that can share a search, grouped by participation mode **and fetch cadence**, in a stable
+ * order (by source id) and packed into queries under the length limit. Grouping by cadence keeps a
+ * quiet account's slow interval from being pulled back to a busy neighbour's pace: a shard runs when
+ * any member is due. The same sources give the same shards, so a shard's accounts stay together
+ * between runs; a source added or removed shifts only the shards after it.
  */
-export function planXShards(sources: Array<Pick<SourceRow, "id" | "kind" | "config" | "cursor" | "participation_mode">>): XShard[] {
-  const byMode = new Map<string, Array<{ id: string; handle: string; selfThread: boolean }>>();
+export function planXShards(sources: Array<Pick<SourceRow, "id" | "kind" | "config" | "cursor" | "participation_mode" | "interval_minutes">>): XShard[] {
+  const groups = new Map<string, { mode: string; minutes: number; list: Array<{ id: string; handle: string; selfThread: boolean }> }>();
   for (const s of sources) {
     const handle = shardHandle(s);
-    if (handle) byMode.set(s.participation_mode, [...(byMode.get(s.participation_mode) ?? []), { id: s.id, handle, selfThread: !!selfThreadHandle(s) }]);
+    if (!handle) continue;
+    const minutes = Math.max(1, s.interval_minutes || 30);
+    const key = `${s.participation_mode}:${minutes}`;
+    const group = groups.get(key) ?? { mode: s.participation_mode, minutes, list: [] };
+    group.list.push({ id: s.id, handle, selfThread: !!selfThreadHandle(s) });
+    groups.set(key, group);
   }
   const shards: XShard[] = [];
-  for (const [mode, list] of [...byMode].sort(([a], [b]) => a.localeCompare(b))) {
+  for (const [groupKey, { mode, minutes, list }] of [...groups].sort(([a], [b]) => a.localeCompare(b))) {
     list.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
     let current: typeof list = [];
     const close = () => {
-      if (current.length) shards.push({ mode, sourceIds: current.map((c) => c.id), key: `${mode}:${sha256(current.map((c) => c.id).join(",")).slice(0, 12)}` });
+      if (current.length) {
+        shards.push({
+          mode, minutes,
+          sourceIds: current.map((c) => c.id),
+          key: `${groupKey}:${sha256(current.map((c) => c.id).join(",")).slice(0, 12)}`,
+        });
+      }
       current = [];
     };
     for (const s of list) {

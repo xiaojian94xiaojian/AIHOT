@@ -112,6 +112,15 @@ export interface WebModule {
   tabs?: Tab[];
   /** The 我的 page: rows ahead of the engine's tools. */
   tools?: Array<{ to: string; label: string; icon: ReactNode }>;
+  /**
+   * Its part of the admin (this deployment keeps the slot the engine dropped): navigation groups of its own,
+   * entries in 内容, and its section of the runs page.
+   */
+  admin?: {
+    groups?: Array<{ group: string; items: Array<{ to: string; label: string; count?: string; tone?: "bad" | "accent" }> }>;
+    content?: Array<{ to: string; label: string; count?: string; tone?: "bad" | "accent" }>;
+    runs?: Part<ComponentType<{ data: unknown }>>;
+  };
   /** Parts of every public page (root.tsx); the admin has its own chrome and gets none of them. */
   root?: {
     /** An inline script in <head>, after the theme's: it runs before the page paints. */

@@ -72,10 +72,11 @@ after(async () => {
 test("shards keep to the query length and account limits, per participation mode", () => {
   const long = Array.from({ length: 60 }, (_, i) => ({
     id: `s${String(i).padStart(2, "0")}`, kind: "x_search" as const, participation_mode: (i % 2 ? "hot_signal" : "editorial") as "hot_signal" | "editorial",
+    interval_minutes: 30,
     config: { query: `from:handle_${String(i).padStart(8, "0")} -filter:replies`, ...(i % 3 === 0 ? { publisherRole: "organization" } : {}) }, cursor: { lastTweetId: "1" },
   }));
-  const own = { id: "s99", kind: "x_search" as const, participation_mode: "editorial" as const, config: { query: "from:elonmusk -filter:replies (Grok OR xAI)" }, cursor: { lastTweetId: "1" } };
-  const fresh = { id: "s98", kind: "x_search" as const, participation_mode: "editorial" as const, config: { query: "from:newaccount -filter:replies" }, cursor: null };
+  const own = { id: "s99", kind: "x_search" as const, participation_mode: "editorial" as const, interval_minutes: 30, config: { query: "from:elonmusk -filter:replies (Grok OR xAI)" }, cursor: { lastTweetId: "1" } };
+  const fresh = { id: "s98", kind: "x_search" as const, participation_mode: "editorial" as const, interval_minutes: 30, config: { query: "from:newaccount -filter:replies" }, cursor: null };
   const shards = planXShards([...long, own, fresh]);
   assert.deepEqual(shards.flatMap((s) => s.sourceIds).sort(), long.map((s) => s.id).sort(), "a query of its own and a first fetch stay out");
   for (const s of shards) {
@@ -85,6 +86,16 @@ test("shards keep to the query length and account limits, per participation mode
     assert.ok(s.sourceIds.every((id) => long.find((l) => l.id === id)!.participation_mode === s.mode), "modes are not mixed");
   }
   assert.deepEqual(planXShards([...long].reverse()).map((s) => s.key), shards.map((s) => s.key), "the same sources give the same shards");
+});
+
+test("a quiet account keeps its own cadence instead of a busy neighbour's", () => {
+  const source = (id: string, interval_minutes: number) => ({
+    id, kind: "x_search" as const, participation_mode: "editorial" as const, interval_minutes,
+    config: { query: `from:${id} -filter:replies` }, cursor: { lastTweetId: "1" },
+  });
+  const shards = planXShards([source("busy_a", 30), source("busy_b", 30), source("quiet", 120)]);
+  const byCadence = shards.map((s) => [s.minutes, s.sourceIds.length]).sort((a, b) => Number(a[0]) - Number(b[0]));
+  assert.deepEqual(byCadence, [[30, 2], [120, 1]], "same-cadence accounts share a shard; the quiet one is separate");
 });
 
 test("one search reads a shard; each account gets its own posts, run and watermark", async () => {

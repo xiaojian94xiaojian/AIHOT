@@ -167,6 +167,9 @@ async function chatOnce<S extends z.ZodType>(opts: ChatJsonOptions<S>, circuit =
   if (!config.modelCallsEnabled) throw new ModelUnavailableError("Model calls are disabled (MODEL_CALLS_ENABLED=false)");
   const baseUrl = credential("models", spec.baseUrlEnv);
   const apiKey = credential("models", spec.apiKeyEnv);
+  // GO-GATEWAY PATCH: the OpenCode Go gateway routes by session. Optional, so other deployments are
+  // unaffected; see the header use below.
+  const sessionId = credential("models", "LLM_SESSION_ID");
   if (!baseUrl || !apiKey || !spec.model) throw new ModelUnavailableError(`Model ${opts.model} is not configured (${spec.baseUrlEnv}, ${spec.apiKeyEnv}${spec.key === "default" ? ", LLM_MODEL" : ""})`);
 
   const { request, temperature, maxTokens, userText } = requestFor(opts, spec);
@@ -195,7 +198,14 @@ async function chatOnce<S extends z.ZodType>(opts: ChatJsonOptions<S>, circuit =
       try {
         res = await fetch(`${baseUrl.replace(/\/$/, "")}/chat/completions`, {
           method: "POST",
-          headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` },
+          // GO-GATEWAY PATCH: the OpenCode Go gateway routes by session and answers
+          // "400 MissingSessionID" without this header; it is set here because it applies to every
+          // preset rather than to one model. Unset it and the calls go back to the plain OpenAI shape.
+          headers: {
+            "content-type": "application/json",
+            authorization: `Bearer ${apiKey}`,
+            ...(sessionId ? { "x-opencode-session": sessionId } : {}),
+          },
           body: JSON.stringify(body),
           signal: AbortSignal.timeout(timeoutMs),
         });

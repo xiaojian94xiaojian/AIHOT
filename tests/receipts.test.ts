@@ -255,8 +255,7 @@ test("concurrent distinct requests cannot both spend the last service budget slo
 
 // Failure modes: checking only the shortest window loses sustained-spend limits; counting expired
 // attempts never restores the allowance. Exercise each longer window without exhausting the others.
-for (const window of [
-  { name: "hour", insideMs: 2 * 60_000, expiredMs: 61 * 60_000, perHour: 1, perDay: 100 },
+for (const window of [  { name: "hour", insideMs: 2 * 60_000, expiredMs: 61 * 60_000, perHour: 1, perDay: 100 },
   { name: "day", insideMs: 2 * 3_600_000, expiredMs: 25 * 3_600_000, perHour: 100, perDay: 1 },
 ]) test(`the ${window.name} budget independently refuses a paid request until its attempt expires`, async () => {
   const service = `invariant-${window.name}-budget-${tag()}`;
@@ -275,6 +274,30 @@ for (const window of [
   const resumed = await paidRequest(next, send);
   assert.equal(resumed.reused, false);
   assert.equal(sent, 2, "an expired attempt no longer consumes the service allowance");
+});
+
+// A service billed per returned object (X search: per tweet) can burn far more than its request count
+// suggests; the spend cap stops the next call once the last 24 hours recorded reached it.
+test("a daily spend cap refuses paid requests before they are sent", async () => {
+  const service = `invariant-spend-budget-${tag()}`;
+  await sql`INSERT INTO budgets (service, per_minute, per_hour, per_day, per_day_usd) VALUES (${service}, 100, 100, 100, 0.50)`;
+  let sent = 0;
+  const send = async () => {
+    sent += 1;
+    return { response: { ok: true }, cost: { amount: 0.3, currency: "USD", basis: "actual" as const } };
+  };
+  await paidRequest({ service, purpose: "invariant_test", identity: "spend-1" }, send);
+  await paidRequest({ service, purpose: "invariant_test", identity: "spend-2" }, send);
+  assert.equal(sent, 2);
+  await assert.rejects(
+    paidRequest({ service, purpose: "invariant_test", identity: "spend-3" }, send),
+    (error: unknown) => error instanceof BudgetExceededError && error.message.includes("(spend)"));
+  assert.equal(sent, 2, "no request reaches the provider once the cap is reached");
+
+  // The cap frees as the day's earlier attempts leave the 24-hour window.
+  await sql`UPDATE receipt_attempts SET started_at = now() - interval '25 hours' WHERE service = ${service}`;
+  assert.equal((await paidRequest({ service, purpose: "invariant_test", identity: "spend-4" }, send)).reused, false);
+  assert.equal(sent, 3);
 });
 
 test("with the valve off nothing is sent", async () => {

@@ -10,6 +10,8 @@ const page = (module: string, p: ModulePage) => route(p.gray ? `preview/${p.path
 const modulePages: RouteConfigEntry[] = MODULES.flatMap((m) =>
   (m.pages ?? []).map((p) => ("layout" in p ? layout(file(m.name, p.layout), p.id ? { id: p.id } : {}, p.pages.map((c) => page(m.name, c))) : page(m.name, p))),
 );
+/** Admin pages a module adds under /admin (this deployment keeps the slot the engine dropped). */
+const moduleAdminPages: RouteConfigEntry[] = MODULES.flatMap((m) => (m.adminPages ?? []).map((p) => page(m.name, p)));
 
 export default [
   index("routes/home.tsx"),
@@ -55,5 +57,6 @@ export default [
     route("admin/selectbench/:runId", "routes/admin/selectbench-run.tsx"),
     route("admin/settings", "routes/admin/settings.tsx"),
     route("admin/audit", "routes/admin/audit.tsx"),
+    ...moduleAdminPages,
   ]),
 ] satisfies RouteConfig;

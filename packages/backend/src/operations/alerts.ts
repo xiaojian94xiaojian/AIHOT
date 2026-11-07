@@ -399,6 +399,25 @@ async function providerFindings(now: number, open: AlertState): Promise<Finding[
       detail: `24 小时内 ${c.used} 次，上限 ${c.per_day}（budgets 表）`,
     });
   }
+  // A service billed per returned object (X search: per tweet) can reach its spend cap while its request
+  // counts still look quiet; that is the cap doing its job, not a fault.
+  const spending = await sql<{ service: string; cap: number; spent: number }[]>`
+    SELECT b.service, b.per_day_usd::float8 AS cap, coalesce(sum(a.cost), 0)::float8 AS spent
+    FROM budgets b
+    JOIN receipt_attempts a ON a.service = b.service AND a.origin = 'live' AND a.started_at > now() - interval '1 day'
+    WHERE b.per_day_usd > 0
+    GROUP BY 1, 2 HAVING coalesce(sum(a.cost), 0) >= b.per_day_usd`;
+  for (const s of spending) {
+    out.push({
+      key: `budget.spend.${s.service}`,
+      level: "later",
+      title: `${providerName(s.service)} 过去 24 小时的花费到了上限`,
+      impact: "新的付费调用已暂停，直到早先的记录离开 24 小时窗口",
+      heals: "会，按 24 小时滚动恢复",
+      action: "这次不用处理；如果经常出现，再决定要不要调高花费上限",
+      detail: `24 小时内 $${s.spent.toFixed(2)}，上限 $${s.cap.toFixed(2)}（budgets 表）`,
+    });
+  }
   return out;
 }
 

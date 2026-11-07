@@ -475,6 +475,57 @@ export interface TopicsResponse {
   topics: TopicSummary[];
 }
 
+/**
+ * What a milestone is: a key of the industry pack's kinds (industry/chronicle.ts). In the AI demo pack a
+ * model release, a product launch, research, a company's own news (its topic page) or industry news.
+ */
+export type TopicMilestoneKind = string;
+
+/** How the pages show one kind of milestone. */
+export interface TopicKind {
+  label: string;
+  /** Its track lies above the axis, with the strongest mark (AI pack: models). */
+  above: boolean;
+  /** What a topic launches itself, with the accent mark (AI pack: models and products). */
+  launch: boolean;
+}
+
+/** One event of a topic's chronicle, from the report that heads it. */
+export interface TopicEvent {
+  id: string;
+  /** The report's headline. */
+  title: string;
+  /** The event's name in the chronicle: "Claude Opus 5.5 发布". */
+  label: string;
+  at: string;
+  kind: TopicMilestoneKind;
+  /** Its event page when it belongs to a public story, else the article page. */
+  href: string;
+}
+
+export interface TopicMonth {
+  /** Beijing calendar month, YYYY-MM. */
+  month: string;
+  events: TopicEvent[];
+}
+
+/** A milestone on a company's chronicle band: its curated history, then what the site picked up since. */
+export interface TopicMilestone {
+  /** "2022", "2022-11" or "2022-11-30", Beijing calendar. */
+  date: string;
+  kind: TopicMilestoneKind;
+  /** Its name in the chronicle: as curated, or the label of what the site picked up. */
+  title: string;
+  /** The headline of the report the site picked it up from; null for curated history. */
+  headline: string | null;
+  summary: string | null;
+  /** Its event page, its article page or (curated history) the original; null when it has none. */
+  href: string | null;
+  external: boolean;
+  /** A defining event of the curated history, its title set in bold; never set on what the site picked up. */
+  major: boolean;
+}
+
 /** Phone search only needs links, not the topic pages or full hot ranking. */
 export interface SearchSuggestions {
   topics: Array<TopicLink & { group: TopicGroupKey }>;
