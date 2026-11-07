@@ -281,6 +281,19 @@ export default function GrowthPage() {
         </div>
       </header>
 
+      {/* 新鲜度：先说清这是哪天的数、覆盖多少天，再让人看榜。 */}
+      <p
+        className={`mt-2 rounded-card border px-3 py-1.5 text-[11.5px] leading-relaxed ${
+          data.freshness.status === "normal"
+            ? "border-line-soft bg-bg-sunk/60 text-ink-3"
+            : "border-amber-500/30 bg-amber-500/[0.06] text-ink-2"
+        }`}
+      >
+        <b className="mr-1.5">{data.freshness.label}</b>
+        {data.freshness.note}
+        {data.freshness.since && <span className="text-ink-4">（快照从 {data.freshness.since} 起，共 {data.freshness.spanDays + 1} 天）</span>}
+      </p>
+
       {/* 查我的账号：?mine=handle 就是身份，不登录也能收藏这个链接；没收录可以直接申请。 */}
       <div className="mt-2.5 flex flex-col gap-2 rounded-card border border-line bg-surface px-3 py-2 sm:flex-row sm:items-center">
         <form

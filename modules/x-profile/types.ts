@@ -197,6 +197,17 @@ export interface XGrowthPrevRow {
   views: number;
 }
 
+export interface XFreshnessRecord {
+  status: "normal" | "delayed" | "insufficient" | "empty";
+  /** 短标签：正常 / 延迟 / 样本不足 / 还没有数据。 */
+  label: string;
+  latest: string | null;
+  since: string | null;
+  spanDays: number;
+  snapshots: number;
+  note: string;
+}
+
 export interface XGrowthResponse {
   /** 7 或 30。 */
   window: number;
@@ -204,6 +215,8 @@ export interface XGrowthResponse {
   /** 上周同一窗口的行（页面按当前筛选重排后，用它算每行的名次变化）。 */
   prev: XGrowthPrevRow[];
   generatedAt: string;
+  /** 这页数据的新鲜度：哪天的数、覆盖多少天、够不够下结论。 */
+  freshness: XFreshnessRecord;
   coverage: {
     /** 有快照的账号数。 */
     accounts: number;
@@ -221,6 +234,8 @@ export interface XGrowthResponse {
 
 /** 画像页上的粉丝与涨粉。 */
 export interface XPersonGrowth {
+  /** 这个账号粉丝快照的新鲜度。 */
+  freshness: XFreshnessRecord;
   /** 最近一次快照的粉丝数。 */
   followers: number;
   /** 最近一次快照的日期。 */

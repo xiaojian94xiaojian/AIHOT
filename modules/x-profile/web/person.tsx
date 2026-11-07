@@ -158,6 +158,12 @@ function GrowthBlock({ growth, person, structure, categories, formats }: { growt
         </span>
       </div>
 
+      {/* 新鲜度：快照几天、覆盖多久，先说清楚再让人信这张曲线。 */}
+      <p className={`mt-2 text-[11.5px] leading-relaxed ${growth.freshness.status === "normal" ? "text-ink-4" : "text-ink-2"}`}>
+        {growth.freshness.status !== "normal" && <b className="mr-1.5 rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] text-ink-2">{growth.freshness.label}</b>}
+        {growth.freshness.note}
+      </p>
+
       <div className="mt-3 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
         <div className="rounded-card border border-line px-3 py-2.5">
           <div className="text-[11.5px] text-ink-3">粉丝</div>

@@ -6,6 +6,7 @@
 //   读取（页面接口）按 7 天 / 30 天两种窗口找最近一次和窗口外最近的一次，算涨粉。
 // 快照时间跟着抓取走，不是每天定点：不发帖的账号就没有新快照，读取时会被“最近一次在窗口内”滤掉。
 import { sql } from "@aihot/backend/db";
+import { freshnessOf } from "./freshness.ts";
 import { cachedByKey } from "@aihot/backend/lib/cache";
 import { searchItems } from "@aihot/backend/publication/agent";
 import { beijingDate, BEIJING_TIMEZONE } from "@aihot/contracts/time";
@@ -414,8 +415,11 @@ export async function loadGrowth(window: number, now = new Date()): Promise<XGro
     };
   });
   const since = coverage?.since ?? null;
+  const coveredDays = coverage?.since && coverage?.latest ? Math.round((Date.parse(coverage.latest) - Date.parse(coverage.since)) / 86_400_000) + 1 : 0;
+  const freshness = freshnessOf({ latest: coverage?.latest ?? null, since, snapshots: coveredDays, now });
   return {
     window,
+    freshness,
     rows,
     prev,
     generatedAt: now.toISOString(),
@@ -485,7 +489,11 @@ export async function loadPersonGrowth(handle: string, now = new Date()): Promis
     : [];
   const perKMedian = peers.length ? peers[Math.floor(peers.length / 2)]! : null;
   const [topPosts, related] = await Promise.all([topPostsOf(key, now), relatedOf(weekRow?.name ?? weekRow?.screenName ?? handle, now)]);
+  const [allTime] = await sql<{ n: number; since: string | null }[]>`
+    SELECT count(*)::int AS n, to_char(min(captured_on), 'YYYY-MM-DD') AS since
+    FROM x_follower_snapshots WHERE handle = ${key}`;
   return {
+    freshness: freshnessOf({ latest: latest.on, since: allTime?.since ?? latest.on, snapshots: allTime?.n ?? snapshots.length, now }),
     followers: Number(latest.followers),
     updatedOn: latest.on,
     daily,

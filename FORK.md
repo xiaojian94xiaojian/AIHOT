@@ -31,6 +31,23 @@
 
 见 `deploy/release.sh`：拉镜像 → 把 `industry/ database/seeds/ scripts/` 同步成镜像里的版本（这几个目录在服务器上是挂载的）→ 跑迁移 → 重建 api / worker / web → 冒烟。
 
+## 这个仓库怎么更新
+
+公开的这个 fork 只放**上游公开历史 + 我们的一次性快照提交**，不放开发历史；完整历史在私有仓库里。所以更新分两步：
+
+```powershell
+# 1) 先合上游，再看一眼测试
+git fetch origin
+git merge origin/main
+npm run typecheck
+
+# 2) 把当前代码压成一个 sync 提交，推到 fork 的 main
+pwsh -NoProfile -File E:\cs\aihot-notes\publish-public.ps1
+```
+
+- 每次发布是一个普通提交（`sync: 2026-11-07 22:10`），diff 就是这次改了什么，不需要 force push；
+- **不要** `git push fork upgrade-4.0`：本地分支带完整历史，推上去等于把内部记录也公开了；
+- 要提 PR 给上游时，从 `main` 拉分支即可，这个 fork 和上游是同一条历史线。
 ## 代码位置
 
 ```
