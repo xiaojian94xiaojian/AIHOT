@@ -330,7 +330,7 @@ export default function GrowthPage() {
               <>
                 <span className="text-ok">已收录</span>
                 {myRank !== null && <span className="text-ink-3">当前筛选下第 <b className="num text-ink">{myRank}</b> 名</span>}
-                <Link to={`/x-people/${mine}`} className="rounded-full border border-accent/40 bg-accent/10 px-2.5 py-0.5 text-accent">
+                <Link prefetch="intent" to={`/x-people/${mine}`} className="rounded-full border border-accent/40 bg-accent/10 px-2.5 py-0.5 text-accent">
                   看我的画像 →
                 </Link>
                 <SubscribeButton handle={mine} label="订阅周报" className="text-ink-3 underline-offset-2 hover:text-ink hover:underline" />
@@ -546,7 +546,7 @@ export default function GrowthPage() {
                       ))}
                     </td>
                     <td className="px-3 py-2.5">
-                      <Link to={`/x-people/${row.handle}`} className="flex items-center gap-3">
+                      <Link prefetch="intent" to={`/x-people/${row.handle}`} className="flex items-center gap-3">
                         <Avatar row={row} />
                         <span className="min-w-0">
                           <span className="block truncate text-[13.5px] font-medium text-ink">{row.name ?? row.screenName}</span>

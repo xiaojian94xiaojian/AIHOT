@@ -161,7 +161,7 @@ export default function ComparePage() {
                 <th className="w-32 px-4 py-3 text-left text-[11px] font-normal text-ink-3">指标</th>
                 {chosen.map((p) => (
                   <th key={p.sourceId} className="px-4 py-3 text-left font-normal">
-                    <Link to={`/x-people/${p.handle}`} className="flex items-center gap-2.5">
+                    <Link prefetch="intent" to={`/x-people/${p.handle}`} className="flex items-center gap-2.5">
                       {p.avatar
                         ? <img src={p.avatar} alt="" width={34} height={34} className="size-[34px] rounded-full bg-bg-sunk object-cover" />
                         : <span className="grid size-[34px] place-items-center rounded-full bg-bg-sunk text-[13px] text-ink-3">{p.author.slice(0, 1)}</span>}

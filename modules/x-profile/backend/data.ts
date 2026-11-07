@@ -3,11 +3,11 @@
 // 互动的三个数（点赞、转发、浏览）是在采集那一刻记下的快照（articles.raw），不是帖子的最终值；
 // 所以它适合横向比较，不适合当“这条最终有多少赞”。时间一律按北京时间切分。
 import { sql } from "@aihot/backend/db";
-import { cached } from "@aihot/backend/lib/cache";
+import { cached, cachedByKey } from "@aihot/backend/lib/cache";
 import { BEIJING_TIMEZONE } from "@aihot/contracts/time";
 import { personKind, regionOf } from "./classify.ts";
 import { accountMeta } from "./meta.ts";
-import { structureMedians, structureVerdict } from "./structure.ts";
+import { structureMediansCached, structureVerdict } from "./structure.ts";
 import type { XPeopleResponse, XPersonResponse, XPersonSummary, XPost, XSeriesPoint } from "../types.ts";
 import { ageHours, breakoutRatio, projected24hViews } from "./insight.ts";
 
@@ -15,7 +15,7 @@ import { ageHours, breakoutRatio, projected24hViews } from "./insight.ts";
 const WINDOW_DAYS = 120;
 
 /** 每个账号的原始帖子行；列表与详情共用。 */
-export const posts = () => sql`
+export const posts = (sourceId?: string) => sql`
   SELECT a.source_id, a.id, a.published_at, a.discovered_at,
          a.x_post->>'handle' AS handle,
          a.x_post->>'authorName' AS author,
@@ -39,6 +39,7 @@ export const posts = () => sql`
     SELECT category, tags, score FROM analyses WHERE article_id = a.id ORDER BY id DESC LIMIT 1
   ) la ON true
   WHERE a.source_id LIKE 'x-account-%'
+    ${sourceId ? sql`AND a.source_id = ${sourceId}` : sql``}
     AND a.published_at > now() - make_interval(days => ${WINDOW_DAYS})
 `;
 
@@ -160,6 +161,9 @@ export async function listPeople(): Promise<XPeopleResponse> {
  */
 export const peoplePage = cached(queryPeople, { freshMs: 60_000, maxStaleMs: 600_000 });
 
+/** 画像页在进程里缓存一分钟：同一账号反复打开不重算，过期先返回旧的、后台刷新。 */
+export const personPage = cachedByKey<string, XPersonResponse | null>((handle) => handle.toLowerCase(), (handle) => loadPerson(handle), { freshMs: 60_000, maxStaleMs: 600_000, maxKeys: 500 });
+
 async function queryPeople(): Promise<XPeopleResponse> {
   const rows = await sql<SummaryRow[]>`
     WITH p AS (${posts()}),
@@ -263,9 +267,9 @@ export async function loadPerson(handle: string): Promise<XPersonResponse | null
   const resolvedHandle = who.handle ?? handle;
 
   const [[row], weekly, hours, weekdays, categories, tags, languages, media, topRows, heatRows, hitsRows, formats] = await Promise.all([
-    sql<SummaryRow[]>`WITH p AS (${posts()}) SELECT ${SUMMARY} FROM p WHERE source_id = ${id} GROUP BY source_id`,
+    sql<SummaryRow[]>`WITH p AS (${posts(id)}) SELECT ${SUMMARY} FROM p WHERE source_id = ${id} GROUP BY source_id`,
     sql<{ week: string; posts: number; med_views: string; likes: string; views: string }[]>`
-      WITH p AS (${posts()})
+      WITH p AS (${posts(id)})
       SELECT to_char(date_trunc('week', published_at AT TIME ZONE ${BEIJING_TIMEZONE}), 'YYYY-MM-DD') AS week,
              count(*)::int AS posts,
              round(percentile_cont(0.5) WITHIN GROUP (ORDER BY views)::numeric)::bigint AS med_views,
@@ -275,33 +279,33 @@ export async function loadPerson(handle: string): Promise<XPersonResponse | null
       GROUP BY 1 ORDER BY 1
     `,
     sql<{ hour: number; posts: number; med_views: string }[]>`
-      WITH p AS (${posts()})
+      WITH p AS (${posts(id)})
       SELECT extract(hour FROM published_at AT TIME ZONE ${BEIJING_TIMEZONE})::int AS hour,
              count(*)::int AS posts,
              round(percentile_cont(0.5) WITHIN GROUP (ORDER BY views)::numeric)::bigint AS med_views
       FROM p WHERE source_id = ${id} GROUP BY 1 ORDER BY 1
     `,
     sql<{ weekday: number; posts: number; med_views: string }[]>`
-      WITH p AS (${posts()})
+      WITH p AS (${posts(id)})
       SELECT extract(isodow FROM published_at AT TIME ZONE ${BEIJING_TIMEZONE})::int AS weekday,
              count(*)::int AS posts,
              round(percentile_cont(0.5) WITHIN GROUP (ORDER BY views)::numeric)::bigint AS med_views
       FROM p WHERE source_id = ${id} GROUP BY 1 ORDER BY 1
     `,
     sql<{ key: string; count: number }[]>`
-      WITH p AS (${posts()})
+      WITH p AS (${posts(id)})
       SELECT category AS key, count(*)::int AS count FROM p WHERE source_id = ${id} AND category IS NOT NULL GROUP BY 1 ORDER BY 2 DESC
     `,
     sql<{ key: string; count: number }[]>`
-      WITH p AS (${posts()})
+      WITH p AS (${posts(id)})
       SELECT tag AS key, count(*)::int AS count FROM p, unnest(tags) AS tag WHERE source_id = ${id} GROUP BY 1 ORDER BY 2 DESC LIMIT 12
     `,
     sql<{ key: string; count: number }[]>`
-      WITH p AS (${posts()})
+      WITH p AS (${posts(id)})
       SELECT coalesce(lang, '未知') AS key, count(*)::int AS count FROM p WHERE source_id = ${id} GROUP BY 1 ORDER BY 2 DESC
     `,
     sql<{ key: string; count: number }[]>`
-      WITH p AS (${posts()})
+      WITH p AS (${posts(id)})
       SELECT CASE WHEN media_count = 0 THEN '文字' ELSE coalesce(nullif(media_kind, ''), '媒体') END AS key,
              count(*)::int AS count
       FROM p WHERE source_id = ${id} GROUP BY 1 ORDER BY 2 DESC
@@ -312,7 +316,7 @@ export async function loadPerson(handle: string): Promise<XPersonResponse | null
       ORDER BY coalesce((a.raw->>'views')::bigint, 0) DESC LIMIT 12
     `,
     sql<{ weekday: number; hour: number; posts: number; med_views: string }[]>`
-      WITH p AS (${posts()})
+      WITH p AS (${posts(id)})
       SELECT extract(isodow FROM published_at AT TIME ZONE ${BEIJING_TIMEZONE})::int AS weekday,
              extract(hour FROM published_at AT TIME ZONE ${BEIJING_TIMEZONE})::int AS hour,
              count(*)::int AS posts,
@@ -320,7 +324,7 @@ export async function loadPerson(handle: string): Promise<XPersonResponse | null
       FROM p WHERE source_id = ${id} GROUP BY 1, 2
     `,
     sql<{ is_top: boolean; posts: number; media_pct: string; reply_pct: string; avg_len: number; med_views: string; avg_likes: string }[]>`
-      WITH p AS (${posts()}),
+      WITH p AS (${posts(id)}),
            q AS (SELECT percentile_cont(0.9) WITHIN GROUP (ORDER BY views)::numeric AS cut FROM p WHERE source_id = ${id}),
            labeled AS (SELECT *, views >= (SELECT cut FROM q) AS is_top FROM p WHERE source_id = ${id})
       SELECT is_top,
@@ -333,7 +337,7 @@ export async function loadPerson(handle: string): Promise<XPersonResponse | null
       FROM labeled GROUP BY 1
     `,
     sql<{ key: "media" | "text"; posts: number; med_views: string }[]>`
-      WITH p AS (${posts()})
+      WITH p AS (${posts(id)})
       SELECT CASE WHEN media_count > 0 THEN 'media' ELSE 'text' END AS key,
              count(*)::int AS posts,
              round(percentile_cont(0.5) WITHIN GROUP (ORDER BY views)::numeric)::bigint AS med_views
@@ -397,7 +401,7 @@ export async function loadPerson(handle: string): Promise<XPersonResponse | null
   const summary = toSummary(row);
   const [meta, median, snap] = await Promise.all([
     accountMeta([summary.handle]),
-    structureMedians(),
+    structureMediansCached(),
     sql<{ followers: string }[]>`SELECT followers::text AS followers FROM x_follower_snapshots WHERE handle = ${resolvedHandle} ORDER BY captured_on DESC LIMIT 1`,
   ]);
   // 破圈系数要粉丝数：优先用最新快照，没有快照时退回画像里的值。

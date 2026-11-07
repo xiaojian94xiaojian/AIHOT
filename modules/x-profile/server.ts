@@ -5,7 +5,7 @@ import type { ServerModule } from "@aihot/backend/modules";
 import { sql } from "@aihot/backend/db";
 import { sendJsonWithEtag, sendProblem } from "@aihot/backend/lib/http";
 import { actorOf, adminHandler } from "@aihot/backend/admin/auth";
-import { loadPerson, peoplePage } from "./backend/data.ts";
+import { peoplePage, personPage } from "./backend/data.ts";
 import { loadCompare } from "./backend/compare.ts";
 import { loadMethodology } from "./backend/methodology.ts";
 import { GROWTH_WINDOWS, growthBoard, loadPersonGrowth, scanFollowerSnapshots } from "./backend/followers.ts";
@@ -136,7 +136,7 @@ export const xProfileServerModule: ServerModule = {
     app.get("/api/site/x-people/:handle", guarded(async (req, reply) => {
       const handle = String((req.params as { handle?: string }).handle ?? "");
       if (!HANDLE.test(handle)) return sendProblem(req, reply, { status: 404, code: "not_found", detail: "no such account" });
-      const body = await loadPerson(handle);
+      const body = await personPage(handle);
       if (!body) return sendProblem(req, reply, { status: 404, code: "not_found", detail: "no such account" });
       const [growth, report] = await Promise.all([loadPersonGrowth(handle), latestReportFor(handle)]);
       if (growth && report) {

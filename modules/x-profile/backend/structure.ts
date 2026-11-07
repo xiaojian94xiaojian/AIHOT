@@ -3,6 +3,7 @@
 // 为什么比中位而不是比权重：X 公开的权重乘的是「预测概率」，不是互动计数，直接拿 5.0、0.708 比大小
 // 只会让人误读。读者真正能用的信息是「我的回复/引用占比，比同站账号高还是低」。
 import { sql } from "@aihot/backend/db";
+import { cached } from "@aihot/backend/lib/cache";
 
 export interface Structure {
   likes: number;
@@ -60,3 +61,8 @@ export function structureVerdict(mine: Structure, median: Structure = EMPTY): st
   }
   return `结构接近全站中位：每 1 个赞 ${ratio.toFixed(2)} 次回复/引用（中位 ${base.toFixed(2)}），点赞和讨论都有；想更快就往讨论侧偏一点。`;
 }
+
+
+/** 全站中位在进程里缓存 5 分钟：它只跟历史数据有关，画像页每次重算太贵。 */
+const medianCache = cached(structureMedians, { freshMs: 300_000, maxStaleMs: 3_600_000 });
+export const structureMediansCached = () => medianCache.get(undefined);

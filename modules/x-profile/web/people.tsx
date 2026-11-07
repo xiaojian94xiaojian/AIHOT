@@ -182,7 +182,7 @@ export default function PeoplePage() {
             {shown.map((p) => (
               <tr key={p.sourceId} className="transition-colors hover:bg-bg-sunk">
                 <td className="px-4 py-2.5">
-                  <Link to={`/x-people/${p.handle}`} className="flex items-center gap-3">
+                  <Link prefetch="intent" to={`/x-people/${p.handle}`} className="flex items-center gap-3">
                     <Avatar person={p} />
                     <span className="min-w-0">
                       <span className="block truncate text-[13.5px] font-medium text-ink">{p.author}</span>
