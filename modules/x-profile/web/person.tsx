@@ -312,6 +312,8 @@ function PostList({ posts }: { posts: XPost[] }) {  if (!posts.length) return <p
             <p className="line-clamp-2 break-words text-[13px] leading-relaxed text-ink">{post.text || "（无文字）"}</p>
             <div className="num mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-ink-3">
               <span className="text-ink-2">浏览 {compact(post.views)}</span>
+              {post.projected24h != null && <span title="按 X 热门池的 8 小时半衰模型，从采集那一刻反推">预计 24h {compact(post.projected24h)}</span>}
+              {post.breakout != null && post.breakout >= 1 && <span className="text-accent" title="浏览 ÷ 粉丝数：大于 1 说明看的人比粉丝还多">破圈 {post.breakout.toFixed(1)}×</span>}
               <span>赞 {compact(post.likes)}</span>
               <span>转 {compact(post.retweets)}</span>
               {post.replies > 0 && <span>评 {compact(post.replies)}</span>}

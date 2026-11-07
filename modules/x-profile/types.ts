@@ -106,6 +106,12 @@ export interface XPost {
   text: string;
   url: string;
   at: string;
+  /** 采集时间（帖子落库那一刻）；老数据可能没有。 */
+  capturedAt?: string | null;
+  /** 按 X 热门池的 8 小时半衰模型反推的 24 小时浏览。 */
+  projected24h?: number | null;
+  /** 浏览 ÷ max(粉丝, 500)：大于 1 说明推荐系统在往外推。 */
+  breakout?: number | null;
   views: number;
   likes: number;
   retweets: number;
@@ -391,6 +397,8 @@ export interface XCommentable {
   minutesAgo: number;
   /** 一句「接一句」的理由。 */
   reason: string;
+  /** 剩余机会分：窗口内预计剩余浏览 ÷（已有回复 + 平滑），越大越值得现在回。 */
+  opportunity?: number | null;
 }
 
 /** 今天发什么：一条可以现在写的选题（站内热度 + 48 小时里的 X 讨论量）。 */

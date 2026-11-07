@@ -3,6 +3,7 @@
 // 规则来自 X 公开的 For You 算法（2026-11 版）：帖子 48 小时后不再进推荐；回复/引用的权重是点赞的
 // 七倍多；外链的权重很低。所以这里不算「算法分」，只给三件事：话题热度、讨论量、怎么写。
 import { sql } from "@aihot/backend/db";
+import { replyOpportunity } from "./insight.ts";
 import { latestHotRanking } from "@aihot/backend/publication/hot";
 import type { XCommentable, XPost, XTodayResponse, XTodayTopic } from "../types.ts";
 
@@ -154,10 +155,13 @@ async function commentablesOf(storyIds: number[]): Promise<Map<number, XCommenta
       replies,
       likes: Number(row.likes),
       minutesAgo,
+      opportunity: replyOpportunity({ views: Number(row.views), age: minutesAgo / 60, replies })?.score ?? null,
       reason: commentReason({ minutesAgo, views: Number(row.views), replies }),
     });
     out.set(row.story_id, list);
   }
+  // 同一话题下的候选按「剩余机会」重排：回复少、还在涨的排前面。
+  for (const list of out.values()) list.sort((a, b) => (b.opportunity ?? 0) - (a.opportunity ?? 0));
   return out;
 }
 

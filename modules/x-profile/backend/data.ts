@@ -9,13 +9,14 @@ import { personKind, regionOf } from "./classify.ts";
 import { accountMeta } from "./meta.ts";
 import { structureMedians, structureVerdict } from "./structure.ts";
 import type { XPeopleResponse, XPersonResponse, XPersonSummary, XPost, XSeriesPoint } from "../types.ts";
+import { ageHours, breakoutRatio, projected24hViews } from "./insight.ts";
 
 /** 只看最近这些天：更早的帖子留作历史，不进画像。 */
 const WINDOW_DAYS = 120;
 
 /** 每个账号的原始帖子行；列表与详情共用。 */
 export const posts = () => sql`
-  SELECT a.source_id, a.id, a.published_at,
+  SELECT a.source_id, a.id, a.published_at, a.discovered_at,
          a.x_post->>'handle' AS handle,
          a.x_post->>'authorName' AS author,
          a.x_post->>'avatarUrl' AS avatar,
@@ -199,6 +200,7 @@ interface PostRow {
   text: string | null;
   tweet_id: string | null;
   published_at: Date;
+  discovered_at: Date | null;
   likes: string;
   retweets: string;
   replies: string;
@@ -209,12 +211,19 @@ interface PostRow {
   is_reply: boolean;
 }
 
+function withInsight(post: XPost, followers: number | null): XPost {
+  if (!post.capturedAt) return post;
+  const age = ageHours(post.at, post.capturedAt);
+  return { ...post, projected24h: projected24hViews(post.views, age), breakout: breakoutRatio(post.views, followers) };
+}
+
 function toPost(row: PostRow, handle: string): XPost {
   return {
     id: row.id,
     text: row.text ?? "",
     url: row.tweet_id ? `https://x.com/${handle}/status/${row.tweet_id}` : `https://x.com/${handle}`,
     at: new Date(row.published_at).toISOString(),
+    capturedAt: row.discovered_at ? new Date(row.discovered_at).toISOString() : null,
     views: Number(row.views),
     likes: Number(row.likes),
     retweets: Number(row.retweets),
@@ -227,7 +236,7 @@ function toPost(row: PostRow, handle: string): XPost {
 }
 
 const postColumns = sql`
-  a.id, a.x_post->>'text' AS text, a.x_post->>'tweetId' AS tweet_id, a.published_at,
+  a.id, a.x_post->>'text' AS text, a.x_post->>'tweetId' AS tweet_id, a.published_at, a.discovered_at,
   coalesce((a.raw->>'favorite')::bigint, 0) AS likes,
   coalesce((a.raw->>'retweet')::bigint, 0) AS retweets,
   coalesce((a.raw->>'reply')::bigint, 0) AS replies,
@@ -384,7 +393,13 @@ export async function loadPerson(handle: string): Promise<XPersonResponse | null
   ).flat();
 
   const summary = toSummary(row);
-  const [meta, median] = await Promise.all([accountMeta([summary.handle]), structureMedians()]);
+  const [meta, median, snap] = await Promise.all([
+    accountMeta([summary.handle]),
+    structureMedians(),
+    sql<{ followers: string }[]>`SELECT followers::text AS followers FROM x_follower_snapshots WHERE handle = ${resolvedHandle} ORDER BY captured_on DESC LIMIT 1`,
+  ]);
+  // 破圈系数要粉丝数：优先用最新快照，没有快照时退回画像里的值。
+  const followers = snap[0] ? Number(snap[0].followers) : summary.followers;
   const structure = { median, verdict: structureVerdict(summary.perK, median) };
   return {
     person: meta.get(summary.handle) ? { ...summary, kind: meta.get(summary.handle)!.kind, category: meta.get(summary.handle)!.category } : summary,
@@ -401,7 +416,7 @@ export async function loadPerson(handle: string): Promise<XPersonResponse | null
     tags,
     languages,
     media,
-    topPosts: topRows.map((r) => toPost(r, resolvedHandle)),
+    topPosts: topRows.map((r) => withInsight(toPost(r, resolvedHandle), followers)),
     // 粉丝快照在 followers.ts 里读：接口层把 loadPersonGrowth 的结果填进来。
     growth: null,
   };
