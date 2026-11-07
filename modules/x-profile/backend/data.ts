@@ -214,7 +214,9 @@ interface PostRow {
 function withInsight(post: XPost, followers: number | null): XPost {
   if (!post.capturedAt) return post;
   const age = ageHours(post.at, post.capturedAt);
-  return { ...post, projected24h: projected24hViews(post.views, age), breakout: breakoutRatio(post.views, followers) };
+  // 采集时已经过了 24 小时的帖子，预测值就是实际值，没必要显示。
+  const projected = age !== null && age < 24 ? projected24hViews(post.views, age) : null;
+  return { ...post, projected24h: projected, breakout: breakoutRatio(post.views, followers) };
 }
 
 function toPost(row: PostRow, handle: string): XPost {

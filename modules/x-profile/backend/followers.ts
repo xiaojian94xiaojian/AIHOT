@@ -8,7 +8,6 @@
 import { sql } from "@aihot/backend/db";
 import { freshnessOf } from "./freshness.ts";
 import { cachedByKey } from "@aihot/backend/lib/cache";
-import { searchItems } from "@aihot/backend/publication/agent";
 import { beijingDate, BEIJING_TIMEZONE } from "@aihot/contracts/time";
 import { regionOf } from "./classify.ts";
 import type { Region, XGrowthPrevRow, XGrowthResponse, XGrowthRow, XPersonGrowth, XPost } from "../types.ts";
@@ -488,7 +487,7 @@ export async function loadPersonGrowth(handle: string, now = new Date()): Promis
         .sort((a, b) => a - b)
     : [];
   const perKMedian = peers.length ? peers[Math.floor(peers.length / 2)]! : null;
-  const [topPosts, related] = await Promise.all([topPostsOf(key, now), relatedOf(weekRow?.name ?? weekRow?.screenName ?? handle, now)]);
+  const topPosts = await topPostsOf(key, now);
   const [allTime] = await sql<{ n: number; since: string | null }[]>`
     SELECT count(*)::int AS n, to_char(min(captured_on), 'YYYY-MM-DD') AS since
     FROM x_follower_snapshots WHERE handle = ${key}`;
@@ -518,7 +517,6 @@ export async function loadPersonGrowth(handle: string, now = new Date()): Promis
       ? { growth: monthRow.growth, pct: monthRow.growthPct, eligible: month.rows.length, enough: month.coverage.days >= 31 }
       : null,
     topPosts,
-    related,
     // 每周报告在 growth-report.ts 里读：接口层把 latestReportFor 的结果填进来。
     report: null,
   };
@@ -566,21 +564,4 @@ async function topPostsOf(handle: string, now: Date): Promise<XPost[]> {
   const picked = new Map<string, XPost>();
   for (const post of [...byViews, ...byRate]) if (!picked.has(post.id)) picked.set(post.id, post);
   return [...picked.values()].slice(0, 10);
-}
-
-/** 站内近 7 天的公开报道里提到这个账号的（按名字匹配），给品牌号的涨粉一个外部解释。 */
-async function relatedOf(name: string, _now: Date): Promise<Array<{ id: string; title: string; url: string; at: string }>> {
-  const query = name.trim();
-  if (query.length < 2) return [];
-  try {
-    const { res } = await searchItems(query, "7d", null, 5);
-    return res.items.map((item) => ({
-      id: item.id,
-      title: item.title,
-      url: item.links.original,
-      at: item.publishedAt ?? item.discoveredAt,
-    }));
-  } catch {
-    return [];
-  }
 }

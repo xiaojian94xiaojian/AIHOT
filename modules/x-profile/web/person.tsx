@@ -138,7 +138,7 @@ function copyNotes(person: XPersonResponse["person"], growth: XPersonGrowth, cat
   return notes.slice(0, 3);
 }
 
-/** 粉丝与涨粉：KPI、值得借鉴、每日涨粉、代表帖、同期报道和每周模型观察。 */
+/** 粉丝与涨粉：KPI、值得借鉴、每日涨粉、代表帖和每周模型观察。 */
 function GrowthBlock({ growth, person, structure, categories, formats }: { growth: XPersonGrowth; person: XPersonResponse["person"]; structure: XPersonResponse["structure"]; categories: XCount[]; formats: XFormat[] }) {
   const d7 = growth.d7;
   const d30 = growth.d30;
@@ -249,27 +249,12 @@ function GrowthBlock({ growth, person, structure, categories, formats }: { growt
         <DailyDeltas daily={growth.daily} />
       </div>
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+      <div className="mt-4">
         <div className="min-w-0">
           <h3 className="text-[12.5px] font-medium text-ink">近 7 日代表帖<span className="ml-1.5 text-[11px] font-normal text-ink-4">浏览前 5 + 互动率前 3，最多 10 条</span></h3>
           <div className="mt-2">
             {growth.topPosts.length ? <PostList posts={growth.topPosts} /> : <p className="text-[13px] text-ink-3">这一周还没有抓到它的帖子。</p>}
           </div>
-        </div>
-        <div className="min-w-0">
-          <h3 className="text-[12.5px] font-medium text-ink">同期站内报道里提到它</h3>
-          {growth.related.length ? (
-            <ul className="mt-2 space-y-2">
-              {growth.related.map((item) => (
-                <li key={item.id} className="text-[12.5px] leading-relaxed">
-                  <a href={item.url} target="_blank" rel="noreferrer" className="break-words text-ink hover:text-accent">{item.title}</a>
-                  <span className="num ml-1.5 text-[11px] text-ink-4">{monthDay(item.at.slice(0, 10))}</span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="mt-2 text-[13px] text-ink-3">近 7 天的公开报道里没有按名字提到它的。</p>
-          )}
         </div>
       </div>
 
@@ -313,7 +298,7 @@ function PostList({ posts }: { posts: XPost[] }) {  if (!posts.length) return <p
             <div className="num mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-ink-3">
               <span className="text-ink-2">浏览 {compact(post.views)}</span>
               {post.projected24h != null && <span title="按 X 热门池的 8 小时半衰模型，从采集那一刻反推">预计 24h {compact(post.projected24h)}</span>}
-              {post.breakout != null && post.breakout >= 1 && <span className="text-accent" title="浏览 ÷ 粉丝数：大于 1 说明看的人比粉丝还多">破圈 {post.breakout.toFixed(1)}×</span>}
+              {post.breakout != null && post.breakout >= 1.1 && (<span className="text-accent" title="看的人比关注它的人多：说明这条被推荐给了没关注它的人">浏览是粉丝的 {post.breakout.toFixed(1)} 倍</span>)}
               <span>赞 {compact(post.likes)}</span>
               <span>转 {compact(post.retweets)}</span>
               {post.replies > 0 && <span>评 {compact(post.replies)}</span>}

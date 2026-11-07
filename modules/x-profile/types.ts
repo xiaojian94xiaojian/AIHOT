@@ -276,8 +276,6 @@ export interface XPersonGrowth {
   } | null;
   /** 涨粉区间内浏览最高的几条帖子。 */
   topPosts: XPost[];
-  /** 站内近 7 天的报道里提到这个账号（按名字匹配）的前几条。 */
-  related: Array<{ id: string; title: string; url: string; at: string }>;
   /** 最近一期的模型观察（每周一次）；没有生成过时为 null。 */
   report: {
     conclusion: string;
