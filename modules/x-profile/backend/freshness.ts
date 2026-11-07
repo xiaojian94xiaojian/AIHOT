@@ -57,5 +57,5 @@ export function freshnessOf(input: {
   if (lag > staleDays) {
     return { status: "delayed", label: "延迟", latest, since, spanDays, snapshots, note: `最近一次快照是 ${lag} 天前（${latest}），这几天的涨粉还没进来。` };
   }
-  return { status: "normal", label: "正常", latest, since, spanDays, snapshots, note: `快照覆盖 ${Math.max(spanDays, 1)} 天，最近一次是${lag === 0 ? "今天" : lag === 1 ? "昨天" : `${lag} 天前`}（${latest}）。` };
+  return { status: "normal", label: "正常", latest, since, spanDays, snapshots, note: `快照从 ${since} 起，覆盖 ${spanDays + 1} 天，最近一次是${lag === 0 ? "今天" : lag === 1 ? "昨天" : `${lag} 天前`}（${latest}）。` };
 }

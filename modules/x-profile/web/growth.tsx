@@ -290,8 +290,7 @@ export default function GrowthPage() {
         }`}
       >
         <b className="mr-1.5">{data.freshness.label}</b>
-        {data.freshness.note}
-        {data.freshness.since && <span className="text-ink-4">（快照从 {data.freshness.since} 起，共 {data.freshness.spanDays + 1} 天）</span>}
+        {data.freshness.note}
       </p>
 
       {/* 查我的账号：?mine=handle 就是身份，不登录也能收藏这个链接；没收录可以直接申请。 */}
