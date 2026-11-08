@@ -72,7 +72,7 @@ export default function GrowthReportPage() {
               <div className="mt-3 grid gap-2.5 sm:grid-cols-2">
                 <div className="rounded-card border border-line px-3 py-2.5">
                   <div className="text-[11.5px] text-ink-3">冠军 · 涨粉最多</div>
-                  <Link prefetch="intent" to={`/x-people/${summary.champion.handle}`} className="mt-1 block truncate text-[15px] font-semibold text-ink hover:text-accent">
+                  <Link to={`/x-people/${summary.champion.handle}`} className="mt-1 block truncate text-[15px] font-semibold text-ink hover:text-accent">
                     {summary.champion.name}
                   </Link>
                   <div className="num mt-1 text-[12px] text-ink-3">+{compact(summary.champion.growth)} 粉 · 每千曝光 {summary.champion.perK ?? "—"}</div>
@@ -81,7 +81,7 @@ export default function GrowthReportPage() {
                   <div className="text-[11.5px] text-ink-3">黑马 · 同档效率最高</div>
                   {summary.darkHorse ? (
                     <>
-                      <Link prefetch="intent" to={`/x-people/${summary.darkHorse.handle}`} className="mt-1 block truncate text-[15px] font-semibold text-ink hover:text-accent">
+                      <Link to={`/x-people/${summary.darkHorse.handle}`} className="mt-1 block truncate text-[15px] font-semibold text-ink hover:text-accent">
                         {summary.darkHorse.name}
                       </Link>
                       <div className="num mt-1 text-[12px] text-ink-3">+{compact(summary.darkHorse.growth)} 粉 · 每千曝光 {summary.darkHorse.perK ?? "—"}</div>
@@ -128,7 +128,7 @@ export default function GrowthReportPage() {
                   ? <img src={report.avatarUrl} alt="" width={44} height={44} loading="lazy" className="size-11 shrink-0 rounded-full bg-bg-sunk object-cover" />
                   : <span className="grid size-11 shrink-0 place-items-center rounded-full bg-bg-sunk text-[15px] text-ink-3">{(report.name ?? report.screenName).slice(0, 1)}</span>}
                 <div className="min-w-0 flex-1">
-                  <Link prefetch="intent" to={`/x-people/${report.handle}`} className="block truncate text-[15px] font-semibold text-ink hover:text-accent">
+                  <Link to={`/x-people/${report.handle}`} className="block truncate text-[15px] font-semibold text-ink hover:text-accent">
                     {report.name ?? report.screenName}
                   </Link>
                   <div className="num text-[11.5px] text-ink-3">@{report.screenName}</div>

@@ -12,6 +12,7 @@ export const xProfileModule = defineModule({
     { path: "x-people/algorithm", file: "web/algorithm.tsx", id: "x-algorithm" },
     { path: "x-people/compare", file: "web/compare.tsx", id: "x-compare" },
     { path: "x-people/methodology", file: "web/methodology.tsx", id: "x-methodology" },
+    { path: "x-people/alerts", file: "web/alerts.tsx", id: "x-alerts" },
     { path: "x-people/:handle", file: "web/person.tsx", id: "x-person" },
   ],
   // 网页与 api 是两个进程：公开查询走 /api/site/x-people*，审核走 /api/admin/x-people*，都由 api 进程回答。

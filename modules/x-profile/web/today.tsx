@@ -109,6 +109,7 @@ export default function TodayPage() {
               <a href={card.links.reply} target="_blank" rel="noreferrer" className="rounded-full border border-line px-3 py-1 text-ink-2 hover:border-accent">去回 →</a>
             )}
             <Link to={card.topic.url} className="rounded-full border border-line px-3 py-1 text-ink-2 hover:border-accent">看事件</Link>
+            <Link to="/x-people/alerts" className="ml-auto text-ink-4 hover:text-accent">每天发到飞书 →</Link>
           </div>
         </section>
       )}

@@ -16,6 +16,8 @@ import { todaysTopics } from "./backend/today.ts";
 import { algorithmPage } from "./backend/algorithm.ts";
 import { loadDailyCard } from "./backend/card.ts";
 import { recentCollectStats, snapshotCollectStats } from "./backend/collect-stats.ts";
+import { config } from "@aihot/backend/config";
+import { AlertRejected, runDailyAlerts, runReplyAlerts, statusOf, subscribe, unsubscribe } from "./backend/alerts.ts";
 
 /** 画像按天变化，站点接口缓存五分钟、共享缓存十分钟。 */
 const CACHE = "public, max-age=300, s-maxage=600, stale-while-revalidate=900";
@@ -108,7 +110,41 @@ export const xProfileServerModule: ServerModule = {
         throw error;
       }
     }));
-    // 后台：采集成本看板（近 14 天，今天实时算）。
+    // 飞书提醒：绑定（先发测试消息）、查状态、退订。
+    app.post("/api/site/x-people/alerts", guarded(async (req, reply) => {
+      const body = (req.body ?? {}) as { webhook?: string; handle?: string; kinds?: string[] };
+      try {
+        const result = await subscribe({
+          webhook: String(body.webhook ?? ""),
+          handle: body.handle ?? null,
+          kinds: Array.isArray(body.kinds) ? body.kinds : undefined,
+          ip: req.ip,
+          siteUrl: config.siteUrl,
+        });
+        return reply.header("Cache-Control", "no-store").code(201).send(result);
+      } catch (error) {
+        if (error instanceof AlertRejected) {
+          return sendProblem(req, reply, { status: error.status, code: error.code, detail: error.message, retryAfter: error.retryAfter });
+        }
+        throw error;
+      }
+    }));
+    app.get("/api/site/x-people/alerts/status", guarded(async (req, reply) => {
+      const handle = String((req.query as { handle?: string }).handle ?? "");
+      const status = await statusOf(handle);
+      return reply.header("Cache-Control", "no-store").send(status ?? { active: false, kinds: [] });
+    }));
+    // 退订是点消息里的链接：给一个人看的 HTML，不进缓存。
+    app.get("/api/site/x-people/alerts/unsubscribe", async (req, reply) => {
+      const token = String((req.query as { token?: string }).token ?? "");
+      const ok = await unsubscribe(token);
+      return reply
+        .header("Cache-Control", "no-store")
+        .type("text/html; charset=utf-8")
+        .send(ok
+          ? '<!doctype html><meta charset="utf-8"><title>已退订</title><p style="font:15px/1.6 system-ui;padding:40px">已退订，不会再收到提醒了。</p>'
+          : '<!doctype html><meta charset="utf-8"><title>链接无效</title><p style="font:15px/1.6 system-ui;padding:40px">这个退订链接无效或已经用过。</p>');
+    });    // 后台：采集成本看板（近 14 天，今天实时算）。
     app.get("/api/admin/x-collect", adminHandler(async () => ({ days: await recentCollectStats(14) })));
     // 后台：待审列表与通过/驳回。
     app.get("/api/admin/x-people/requests", adminHandler(async (req) => {
