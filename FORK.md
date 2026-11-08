@@ -33,6 +33,22 @@
 
 ## 开发流程（本站约定）
 
+**每个任务一个分支，先提交再审查，审查 PASS 才合并。** 线上事故走热修例外（先合并部署，事后补审查）。
+
+```bash
+git switch -c task/<slug> upgrade-4.0      # 1. 开分支
+# 2. 动手改，改完必须提交（不留脏工作区）
+git commit -am "feat(...): ..."
+git diff upgrade-4.0...task/<slug>          # 3. 审查对象就是这个 diff（附 commit sha）
+# 4. 子 agent 审查；FAIL 就在同一分支继续提交
+npm run typecheck && npm test && npm run build -w @aihot/web
+git switch upgrade-4.0 && git merge --no-ff task/<slug>   # 5. 合并
+```
+
+- **并行任务才用 worktree**：`git worktree add .worktrees/<task> task/<slug>`，否则共用一个工作树没问题；
+- **迁移编号在合并前对一遍**：两个分支都用同一个编号时重命名，迁移按文件名排序，重命名无副作用；
+- **公开仓库不变**：分支只在本地/私有仓库，合并后仍用 `publish-public.ps1` 发快照。
+
 每个任务**做完、部署之前**，先让一个独立的审查 agent 看这次改动，审完再上线：
 
 1. 审查范围：`git diff <上一个已部署提交>..HEAD`，加上它碰到的现有代码；

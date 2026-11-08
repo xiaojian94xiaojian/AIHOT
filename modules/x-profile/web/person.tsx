@@ -8,9 +8,10 @@ import { edgeTtl, loadOr404 } from "@aihot/web/lib/api.server";
 import { pageMeta } from "@aihot/web/lib/seo";
 import { monthDay } from "@aihot/contracts/time";
 import { IconArrowUpRight, IconExternal } from "@aihot/web/components/icons";
+import { SourceAvatar } from "@aihot/web/components/ui/SourceAvatar";
 import { AreaChart, Bars, Heatmap, Rows, Spark } from "./charts";
 import { SubscribeButton } from "./subscribe";
-import { categoryName, compact, languageName, mediaName, percent, stamp } from "./format";
+import { categoryName, compact, languageName, mediaName, percent, signed, signedPercent, stamp } from "./format";
 
 export async function loader({ params, request }: { params: { handle?: string }; request: Request }) {
   const handle = params.handle ?? "";
@@ -32,7 +33,6 @@ export function headers() {
 }
 /** 手机底栏的「工具」标签：这几个页面都归在它下面。 */
 export const handle = { tab: "x-tools", name: "博主" } as const;
-
 
 const WEEKDAYS = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
 
@@ -57,7 +57,7 @@ function Kpi({ label, value, change, spark, footer }: {
         <span>{label}</span>
         {change && <span className={`num text-[11px] ${change.startsWith("↓") ? "text-ink-3" : "text-accent"}`}>{change}</span>}
       </div>
-      <div className="num mt-1.5 text-[30px] font-black leading-none tracking-[-0.03em] text-ink">{value}</div>
+      <div className="num mt-1.5 text-[28px] font-black leading-none tracking-[-0.03em] text-ink lg:text-[30px]">{value}</div>
       <div className="mt-2"><Spark points={spark} height={30} /></div>
       <div className="mt-1 text-[11px] text-ink-4">{footer}</div>
     </div>
@@ -79,8 +79,6 @@ function Section({ title, hint, children, className }: { title: string; hint?: s
   );
 }
 
-const signed = (n: number) => `${n > 0 ? "+" : n < 0 ? "-" : ""}${compact(Math.abs(n))}`;
-const signedPercent = (n: number) => `${n > 0 ? "+" : n < 0 ? "-" : ""}${Math.abs(n).toFixed(1).replace(/\.0$/, "")}%`;
 /** 标签在画像页上的短名，和榜单一致。 */
 const SIGNAL_NOTE = { quiet: "本期无发帖", thin: "发帖少", caution: "需核对" } as const;
 
@@ -93,7 +91,7 @@ function DailyDeltas({ daily }: { daily: XPersonGrowth["daily"] }) {
     <div>
       <div className="flex h-24 items-end gap-[3px]" role="img" aria-label="每日涨粉">
         {points.map((point) => (
-          <div key={point.on} className="flex h-full flex-1 items-end" title={`${point.on} ${point.delta >= 0 ? "+" : ""}${point.delta}`}>
+          <div key={point.on} className="flex h-full flex-1 items-end" title={`${point.on} ${signed(point.delta)}`}>
             <div
               className={`w-full rounded-t-mark ${point.delta >= 0 ? "bg-accent/70" : "bg-ink-4/40"}`}
               style={{ height: `${Math.max(3, (Math.abs(point.delta) / max) * 100)}%` }}
@@ -101,41 +99,42 @@ function DailyDeltas({ daily }: { daily: XPersonGrowth["daily"] }) {
           </div>
         ))}
       </div>
-      <div className="mt-1 flex justify-between text-[10.5px] text-ink-4">
-        <span>{points[0]!.on.slice(5)}</span>
-        <span>每日涨粉（{points.length} 次快照）</span>
-        <span>{points[points.length - 1]!.on.slice(5)}</span>
+      <div className="mt-1 flex justify-between text-[10px] text-ink-4 font-mono">
+        <span>{points[0]?.on.slice(5)}</span>
+        <span>近 {points.length} 次快照</span>
+        <span>{points[points.length - 1]?.on.slice(5)}</span>
       </div>
     </div>
   );
 }
 
-/** 值得借鉴：规则生成的三条，先讲内容结构，再讲效率对比，最后是标签提醒。 */
 function copyNotes(person: XPersonResponse["person"], growth: XPersonGrowth, categories: XCount[], formats: XFormat[]): string[] {
   const notes: string[] = [];
-  const total = categories.reduce((sum, item) => sum + item.count, 0);
-  const top = [...categories].sort((a, b) => b.count - a.count)[0];
-  const media = formats.find((format) => format.key === "media");
-  const text = formats.find((format) => format.key === "text");
-  const form = media && text ? (media.medViews >= text.medViews ? "带图/视频" : "纯文字") : null;
-  if (top && total > 0) {
-    notes.push(`近 30 天内容以「${categoryName(top.key)}」为主（${Math.round((top.count / total) * 100)}%）${form ? `，爆款样本偏「${form}」` : ""}。`);
-  } else if (person.mediaPct > 0 || person.replyPct > 0) {
-    // 没有分类数据（氛围源没有经过分析）时，用形式代替，别空着。
-    notes.push(`近 120 天带图或视频占 ${person.mediaPct}%、回复占 ${person.replyPct}%，形式以${person.mediaPct >= 50 ? "图文" : "纯文字"}为主。`);
+  // 徽标要有解释，否则读者只看到一个「需核对」。
+  if (growth.d7?.signal === "caution") {
+    notes.push("涨粉与曝光不匹配，可能含站外传播、活动或买粉因素，先人工核对。");
+  } else if (growth.d7?.signal === "quiet") {
+    notes.push("这一期没发帖，涨粉不代表内容表现。");
+  } else if (growth.d7?.signal === "thin") {
+    notes.push("样本偏少，结论先打个折。");
   }
-  const d7 = growth.d7;
-  if (d7?.perK != null) {
-    // 正好等于中位时说「持平」，别写成「高于」。
-    const compare = d7.perKMedian === null ? "" : d7.perK > d7.perKMedian ? "，高于中位" : d7.perK === d7.perKMedian ? "，与中位持平" : "，低于中位";
-    const peer = d7.perKMedian === null ? "" : `，同粉丝档（${d7.tier}）中位 ${d7.perKMedian}${compare}`;
-    notes.push(`每千曝光涨 ${d7.perK} 粉${peer}。`);
+  if (growth.d7 && growth.d7.perK !== null && growth.d7.perK >= 2) {
+    notes.push(`涨粉效率高：每千次曝光带来 ${growth.d7.perK.toFixed(1)} 个关注（只说明相关，不代表内容好坏）。`);
   }
-  if (d7?.signal === "caution") notes.push("涨粉可能含站外传播、活动或买粉因素，先人工核对，别急着当榜样。");
-  else if (d7?.signal === "quiet") notes.push("这一周没抓到它的帖子，涨粉来自外部，不能归因到内容。");
-  else if (d7?.signal === "thin") notes.push("这一周只发了 1–2 条，样本太少，只能当参考。");
-  else notes.push(`日均 ${person.postsPerDay} 条、浏览中位 ${compact(person.medViews)}，这个节奏可以照抄。`);
-  return notes.slice(0, 3);
+  if (person.postsPerDay >= 2 && person.medViews >= 1000) {
+    notes.push(`发帖节奏稳定在日均 ${person.postsPerDay} 条，且中位曝光保持在 ${compact(person.medViews)} 以上。`);
+  }
+  const topCat = categories[0];
+  if (topCat && topCat.count >= 5) {
+    notes.push(`题材聚焦：${categoryName(topCat.key)} 类内容占比最高（${topCat.count} 条）。`);
+  }
+  const textF = formats.find((f) => f.key === "text");
+  const mediaF = formats.find((f) => f.key === "media");
+  if (textF && mediaF) {
+    if (textF.medViews > mediaF.medViews * 1.2) notes.push("纯文字帖子中位曝光明显高于带图推文，长文类的浏览中位更高。");
+    else if (mediaF.medViews > textF.medViews * 1.2) notes.push("带图/视频推文的浏览中位更高。");
+  }
+  return notes.length ? notes : ["持续积累发帖数据中，样本足够后将自动生成打法借鉴。"];
 }
 
 /** 粉丝与涨粉：KPI、值得借鉴、每日涨粉、代表帖和每周模型观察。 */
@@ -158,9 +157,9 @@ function GrowthBlock({ growth, person, structure, categories, formats }: { growt
         </span>
       </div>
 
-      {/* 新鲜度：快照几天、覆盖多久，先说清楚再让人信这张曲线。 */}
+      {/* 新鲜度 */}
       <p className={`mt-2 text-[11.5px] leading-relaxed ${growth.freshness.status === "normal" ? "text-ink-4" : "text-ink-2"}`}>
-        {growth.freshness.status !== "normal" && <b className="mr-1.5 rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] text-ink-2">{growth.freshness.label}</b>}
+        {growth.freshness.status !== "normal" && <b className="mr-1.5 rounded-full bg-amber-soft px-2 py-0.5 text-[11px] text-amber-ink">{growth.freshness.label}</b>}
         {growth.freshness.note}
       </p>
 
@@ -185,13 +184,13 @@ function GrowthBlock({ growth, person, structure, categories, formats }: { growt
         </div>
         <div className="rounded-card border border-line px-3 py-2.5">
           <div className="text-[11.5px] text-ink-3">每帖涨粉</div>
-          <div className="num mt-1 text-[22px] font-black leading-none tracking-[-0.02em] text-ink">{d7?.perPost == null ? "—" : `+${compact(d7.perPost)}`}</div>
+          <div className="num mt-1 text-[22px] font-black leading-none tracking-[-0.02em] text-ink">{d7?.perPost == null ? "—" : signed(d7.perPost)}</div>
           {d7 && <div className="mt-1 text-[11px] text-ink-4">窗口内 {d7.posts} 条原创帖</div>}
         </div>
         <div className="rounded-card border border-line px-3 py-2.5">
           <div className="text-[11.5px] text-ink-3">每千曝光</div>
           <div className={`num mt-1 text-[22px] font-black leading-none tracking-[-0.02em] ${d7?.perK != null ? "text-accent" : "text-ink"}`}>
-            {d7?.perK == null ? "—" : d7.perK}
+            {d7?.perK == null ? "—" : d7.perK.toFixed(1)}
           </div>
           {d7 && <div className="mt-1 text-[11px] text-ink-4">{d7.perKMedian === null ? `同档（${d7.tier}）暂无可比样本` : `同档（${d7.tier}）中位 ${d7.perKMedian}`}</div>}
         </div>
@@ -204,7 +203,7 @@ function GrowthBlock({ growth, person, structure, categories, formats }: { growt
         </div>
       </div>
 
-      {/* 互动结构：每千次曝光里各动作多少次，和全站中位比。权重只留一句解释，不给读者看数字。 */}
+      {/* 互动结构 */}
       <div className="mt-3 rounded-card border border-line px-3 py-2.5">
         <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
           <h3 className="text-[12.5px] font-medium text-ink">
@@ -219,7 +218,7 @@ function GrowthBlock({ growth, person, structure, categories, formats }: { growt
             ["回复", person.perK.replies, structure.median.replies, true],
             ["引用", person.perK.quotes, structure.median.quotes, true],
           ] as const).map(([label, value, median, counts]) => (
-            <div key={label} className={`rounded-card px-1.5 py-1.5 ${counts ? "bg-accent/5 ring-1 ring-accent/20" : "bg-bg-sunk/60"}`}>
+            <div key={label} className={`rounded-card px-1.5 py-1.5 ${counts ? "bg-accent-soft ring-1 ring-accent/20" : "bg-bg-sunk/60"}`}>
               <div className={`num text-[15px] font-semibold ${counts ? "text-accent" : "text-ink"}`}>{value.toFixed(1)}</div>
               <div className="text-[10.5px] text-ink-3">{label}</div>
               <div className="text-[10px] text-ink-4">中位 {median.toFixed(1)}</div>
@@ -228,12 +227,12 @@ function GrowthBlock({ growth, person, structure, categories, formats }: { growt
         </div>
         <p className="mt-2 rounded-card bg-bg-sunk/50 px-2.5 py-1.5 text-[12px] leading-relaxed text-ink-2">{structure.verdict}</p>
         <p className="mt-1.5 text-[11px] leading-relaxed text-ink-4">
-          「中位」是站内所有账号同一口径的中位数。X 的排序里，回复和引用（高亮的两项）比点赞值钱得多——
+          「中位」是站内所有账号同一口径的中位数。X 的排序里，回复和引用（高亮的两项）比点赞权重大得多——
           所以看的是它们相对点赞有多少，而不是绝对值大小。
         </p>
       </div>
 
-      <div className="mt-4 rounded-card border border-accent/25 bg-accent/5 p-3.5">
+      <div className="mt-4 rounded-card border border-accent/25 bg-accent-soft p-3.5">
         <h3 className="text-[12.5px] font-medium text-accent">值得借鉴</h3>
         <ul className="mt-2 space-y-1.5 text-[12.5px] leading-relaxed text-ink-2">
           {notes.map((note, index) => (
@@ -287,18 +286,19 @@ function GrowthBlock({ growth, person, structure, categories, formats }: { growt
   );
 }
 
-function PostList({ posts }: { posts: XPost[] }) {  if (!posts.length) return <p className="text-[13px] text-ink-3">暂无。</p>;
+function PostList({ posts }: { posts: XPost[] }) {
+  if (!posts.length) return <p className="text-[13px] text-ink-3">暂无。</p>;
   return (
     <ol className="divide-y divide-line-soft">
       {posts.map((post, index) => (
         <li key={post.id} className="flex gap-3 py-3 first:pt-0 last:pb-0">
           <span className="num mt-0.5 w-5 shrink-0 text-[12px] text-ink-4">{index + 1}</span>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="line-clamp-2 break-words text-[13px] leading-relaxed text-ink">{post.text || "（无文字）"}</p>
             <div className="num mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-ink-3">
               <span className="text-ink-2">浏览 {compact(post.views)}</span>
               {post.projected24h != null && <span title="按 X 热门池的 8 小时半衰模型，从采集那一刻反推">预计 24h {compact(post.projected24h)}</span>}
-              {post.breakout != null && post.breakout >= 1.1 && (<span className="text-accent" title="看的人比关注它的人多：说明这条被推荐给了没关注它的人">浏览是粉丝的 {post.breakout.toFixed(1)} 倍</span>)}
+              {post.breakout != null && post.breakout >= 1.1 && (<span className="text-accent font-medium" title="看的人比关注它的人多：说明这条被推荐给了没关注它的人">浏览是粉丝的 {post.breakout.toFixed(1)} 倍</span>)}
               <span>赞 {compact(post.likes)}</span>
               <span>转 {compact(post.retweets)}</span>
               {post.replies > 0 && <span>评 {compact(post.replies)}</span>}
@@ -317,7 +317,7 @@ function PostList({ posts }: { posts: XPost[] }) {  if (!posts.length) return <p
 }
 
 export default function PersonPage() {
-  const { person, structure, weekly, trend, heatmap, formats, hits, best, categories, tags, languages, media, topPosts, growth } = useLoaderData<typeof loader>();
+  const { person, structure, weekly, trend, hours, weekdays, heatmap, formats, hits, best, categories, tags, languages, media, topPosts, growth } = useLoaderData<typeof loader>();
   const [heatMetric, setHeatMetric] = useState<"medViews" | "posts">("medViews");
   const hasTrend = person.days >= 56;
   const mediaFormat = formats.find((f) => f.key === "media");
@@ -335,17 +335,15 @@ export default function PersonPage() {
 
       <header className="mt-3 overflow-hidden rounded-card border border-line bg-surface">
         <div className="flex flex-wrap items-center gap-4 p-4 lg:p-5">
-          {person.avatar
-            ? <img src={person.avatar} alt="" width={64} height={64} className="size-16 shrink-0 rounded-full bg-bg-sunk object-cover" />
-            : <span className="grid size-16 shrink-0 place-items-center rounded-full bg-bg-sunk text-[22px] text-ink-3">{person.author.slice(0, 1)}</span>}
+          <SourceAvatar name={person.author} avatarUrl={person.avatar} size={64} />
           <div className="min-w-0 flex-1">
-            <h1 className="truncate text-[24px] font-black tracking-[-0.02em] text-ink lg:text-[30px]">{person.author}</h1>
+            <h1 className="truncate text-[24px] font-black tracking-[-0.02em] text-ink lg:text-[28px]">{person.author}</h1>
             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-ink-3">
-              <span className="num">@{person.handle}</span>
+              <span className="num font-mono">@{person.handle}</span>
               <span className="rounded-full bg-bg-sunk px-2 py-0.5 text-[11px] text-ink-2">{REGION_LABEL[person.region]}</span>
               <span className="rounded-full bg-bg-sunk px-2 py-0.5 text-[11px] text-ink-2">{KIND_LABEL[person.kind]}</span>
               {person.category && <span className="rounded-full bg-bg-sunk px-2 py-0.5 text-[11px] text-ink-2">{CATEGORY_LABEL[person.category]}</span>}
-              <a href={`https://x.com/${person.handle}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 hover:text-ink">
+              <a href={`https://x.com/${person.handle}`} target="_blank" rel="noreferrer" className="inline-flex min-h-[28px] items-center gap-0.5 hover:text-ink">
                 X 主页 <IconArrowUpRight size={12} />
               </a>
               <SubscribeButton handle={person.handle} label="订阅周报" className="hover:text-ink" />
@@ -355,7 +353,7 @@ export default function PersonPage() {
               <span>数据 {stamp(person.firstAt)} — {stamp(person.lastAt)}</span>
             </div>
           </div>
-          {/* 手机上这三个数单独一行：否则它们会把标题挤成一条竖线。 */}
+          {/* 手机上这三个数单独一行 */}
           <div className="num flex w-full flex-wrap gap-x-5 gap-y-1 text-[11.5px] text-ink-3 lg:w-auto lg:text-right">
             <span><span className="text-ink-4">日均 </span>{person.postsPerDay} 条</span>
             <span><span className="text-ink-4">活跃 </span>{person.activeDays} 天</span>
@@ -415,16 +413,22 @@ export default function PersonPage() {
             {better && <span className="rounded-full bg-bg-sunk px-2 py-0.5">更优形式 {better}</span>}
           </div>
           <div className="flex gap-1 text-[11.5px]">
-            {([["medViews", "中位浏览"], ["posts", "帖子数"]] as const).map(([key, label]) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setHeatMetric(key)}
-                className={`rounded-full px-2.5 py-0.5 transition-colors ${heatMetric === key ? "bg-accent text-white" : "text-ink-3 hover:text-ink"}`}
-              >
-                {label}
-              </button>
-            ))}
+            {([["medViews", "中位浏览"], ["posts", "帖子数"]] as const).map(([key, label]) => {
+              const active = heatMetric === key;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setHeatMetric(key)}
+                  aria-pressed={active}
+                  className={`min-h-[28px] rounded-full px-3 py-0.5 transition-colors ${
+                    active ? "bg-accent text-accent-contrast font-medium" : "text-ink-3 hover:text-ink bg-bg-sunk/60"
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
           </div>
         </div>
         <Heatmap cells={heatmap} metric={heatMetric} format={compact} />
@@ -453,10 +457,12 @@ export default function PersonPage() {
         <Section title="打法建议" hint="只陈述相关性">
           <ul className="space-y-2.5 text-[12.5px] leading-relaxed text-ink-2">
             {best.hour !== null && (
-              <li className="border-l-2 border-accent/40 pl-3">互动最好的时段是 <span className="num text-ink">{String(best.hour).padStart(2, "0")}:00</span> 前后（北京时间），中位浏览 {compact(bestHourViews(best.hour, heatmap))}。</li>
+              <li className="border-l-2 border-accent/40 pl-3">
+                互动最好的时段是 <span className="num text-ink">{String(best.hour).padStart(2, "0")}:00</span> 前后（北京时间），中位浏览 {compact(hours.find((h) => h.hour === best.hour)?.medViews ?? 0)}。
+              </li>
             )}
             {best.weekday !== null && (
-              <li className="border-l-2 border-accent/40 pl-3">一周里 <span className="text-ink">{WEEKDAYS[best.weekday - 1]}</span> 的中位浏览最高。</li>
+              <li className="border-l-2 border-accent/40 pl-3">一周里 <span className="text-ink">{WEEKDAYS[best.weekday - 1]}</span> 的中位浏览最高（{compact(weekdays.find((w) => w.weekday === best.weekday)?.medViews ?? 0)}）。</li>
             )}
             {better && (
               <li className="border-l-2 border-accent/40 pl-3">形式上 <span className="text-ink">{better}</span> 的中位浏览更高（{mediaFormat ? `${compact(mediaFormat.medViews)} vs ${compact(textFormat?.medViews ?? 0)}` : ""}）。</li>
@@ -469,6 +475,7 @@ export default function PersonPage() {
 
       <div className="mt-3 grid gap-3 lg:grid-cols-2">
         <Section title="内容结构" hint="按本站分析的分类（近 120 天）">
+          <p className="mb-2 text-[11.5px] text-ink-4">近 120 天内容结构与题材偏好：</p>
           {categories.length ? <Rows data={categories.slice(0, 8).map((c) => ({ label: categoryName(c.key), value: c.count }))} /> : <p className="text-[13px] text-ink-3">还没有分类分析。</p>}
           {tags.length > 0 && (
             <div className="mt-4 flex flex-wrap gap-1.5">
@@ -491,7 +498,7 @@ export default function PersonPage() {
         </Section>
       </div>
 
-      <Section className="mt-3" title="互动最高的帖子" hint="按浏览排序">
+      <Section className="mt-3" title="浏览最高的帖子" hint="按浏览排序">
         <PostList posts={topPosts} />
       </Section>
 
@@ -501,12 +508,4 @@ export default function PersonPage() {
       </p>
     </div>
   );
-}
-
-/** 热力图里最佳小时的中位浏览（best.hour 已保证样本足够）。 */
-function bestHourViews(hour: number, cells: Array<{ weekday: number; hour: number; posts: number; medViews: number }>): number {
-  const views = cells.filter((c) => c.hour === hour && c.posts > 0).map((c) => c.medViews);
-  if (!views.length) return 0;
-  const sorted = [...views].sort((a, b) => a - b);
-  return sorted[Math.floor(sorted.length / 2)] ?? 0;
 }

@@ -8,6 +8,20 @@ export function compact(n: number): string {
 
 export const percent = (n: number) => `${n.toFixed(1).replace(/\.0$/, "")}%`;
 
+/** 带正负号的数字：正数带 +，负数带 -，不出现 +-，0 显式输出 0 */
+export function signed(n: number): string {
+  if (!Number.isFinite(n)) return "—";
+  if (n === 0) return "0";
+  return `${n > 0 ? "+" : "-"}${compact(Math.abs(n))}`;
+}
+
+/** 带正负号的百分比 */
+export function signedPercent(n: number): string {
+  if (!Number.isFinite(n)) return "—";
+  if (n === 0) return "0%";
+  return `${n > 0 ? "+" : "-"}${Math.abs(n).toFixed(1).replace(/\.0$/, "")}%`;
+}
+
 /** 北京时间：由 contracts/time.ts 统一转换。 */
 export { beijingStamp as stamp } from "@aihot/contracts/time";
 

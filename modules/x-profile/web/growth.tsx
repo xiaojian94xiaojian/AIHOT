@@ -2,14 +2,17 @@
 // 粉丝数只出现在采集回执里，后端每五分钟把新回执记成当天的快照（backend/followers.ts），
 // 这里把两个窗口一起取回来，切换只改显示。名次按当前筛选重排；箭头和「上周同一筛选」比。
 // 排序在表头上（数据站的通用心智），地区与窗口常驻，粉丝门槛与「显示需核对」收进筛选。
-import { useEffect, useMemo, useState } from "react";
-import { Link, useLoaderData, useSearchParams, type ShouldRevalidateFunction } from "react-router";
+import { memo, useEffect, useMemo, useState } from "react";
+import { Link, useLoaderData, useSearchParams } from "react-router";
 import type { Region, XGrowthPrevRow, XGrowthResponse, XGrowthRow } from "../types";
 import { REGION_LABEL } from "../types";
 import { edgeTtl, loadOr404 } from "@aihot/web/lib/api.server";
 import { pageMeta } from "@aihot/web/lib/seo";
 import { beijingDay } from "@aihot/contracts/time";
-import { compact, stamp } from "./format";
+import { pageReuse } from "@aihot/web/lib/page-reuse";
+import { SourceAvatar } from "@aihot/web/components/ui/SourceAvatar";
+import { PillTabs } from "@aihot/web/components/ui/Tabs";
+import { compact, signed, signedPercent, stamp } from "./format";
 import { SubscribeButton } from "./subscribe";
 
 export async function loader({ request }: { request: Request }) {
@@ -29,11 +32,10 @@ export function meta() {
 }
 
 /**
- * 涨粉榜的数据不依赖查询参数（?mine= 只在客户端查），同路径导航不必重跑 loader：
- * 否则每次输入「我的账号」都要等一次 SSR 请求。
+ * 涨粉榜数据不依赖查询参数，使用规范 pageReuse 统一处理同路径与下拉刷新支持
  */
-export const shouldRevalidate: ShouldRevalidateFunction = ({ currentUrl, nextUrl, defaultShouldRevalidate }) =>
-  currentUrl.pathname === nextUrl.pathname ? false : defaultShouldRevalidate;
+export const { clientLoader, shouldRevalidate } = pageReuse<Awaited<ReturnType<typeof loader>>>(() => "/x-people/growth");
+
 export function headers() {
   return edgeTtl(300);
 }
@@ -69,23 +71,25 @@ const METRIC_LABEL: Record<Metric, string> = {
   followers: "按粉丝", posts: "按帖数", growth: "涨粉数榜", growthPct: "涨粉率榜", perPost: "按每帖", perK: "效率榜",
 };
 
-/** 带正负号的数：涨粉数用「万」，小的保留千分位。 */
-function signed(n: number): string {
-  if (!n) return "0";
-  return `${n > 0 ? "+" : "-"}${compact(Math.abs(n))}`;
-}
-const signedPercent = (n: number) => `${n > 0 ? "+" : n < 0 ? "-" : ""}${Math.abs(n).toFixed(1).replace(/\.0$/, "")}%`;
-const tint = (n: number) => (n > 0 ? "text-accent" : "text-ink-3");
+const tint = (n: number) => (n > 0 ? "text-accent font-medium" : "text-ink-3");
 
-const SIGNAL: Record<NonNullable<XGrowthRow["signal"]>, { label: string; title: string; tone: string }> = {
-  quiet: { label: "本期无发帖", title: "这一周没抓到它的帖子：涨粉只能来自外部事件、产品发布或其他渠道，无法用内容解释。", tone: "text-ink-4" },
-  thin: { label: "发帖少", title: "这一周只有 1–2 条帖子，样本太少，看不出内容与涨粉的关系。", tone: "text-ink-4" },
+const getSignalInfo = (windowDays: number): Record<NonNullable<XGrowthRow["signal"]>, { label: string; title: string; tone: string }> => ({
+  quiet: {
+    label: "本期无发帖",
+    title: `这 ${windowDays} 天没抓到它的帖子：涨粉只能来自外部事件、产品发布或其他渠道，无法用内容解释。`,
+    tone: "text-ink-4",
+  },
+  thin: {
+    label: "发帖少",
+    title: `这 ${windowDays} 天帖子太少，样本不足，看不出内容与涨粉的关系。`,
+    tone: "text-ink-4",
+  },
   caution: {
     label: "需核对",
-    title: "涨粉远高于同期曝光，或一周涨跌幅超过 30%：可能是一次站外传播、抽奖或买粉，建议核对，不是定论。",
-    tone: "text-amber",
+    title: `涨粉远高于同期曝光，或 ${windowDays} 日涨跌幅超过 30%：可能是一次站外传播、抽奖或买粉，建议核对，不是定论。`,
+    tone: "text-amber-ink",
   },
-};
+});
 
 interface Sortable {
   handle: string;
@@ -121,61 +125,53 @@ function rankRows<T extends Sortable>(list: T[], metric: Metric, dir: Dir): { or
   return { ordered: [...ranked, ...rest], rank: new Map(ranked.map((row, index) => [row.handle, index + 1])) };
 }
 
-function Pill({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded-full px-3 py-1 text-[12.5px] transition-colors ${active ? "bg-ink text-bg" : "bg-bg-sunk text-ink-2 hover:text-ink"}`}
-    >
-      {children}
-    </button>
-  );
-}
-
-function Avatar({ row }: { row: XGrowthRow }) {
-  return row.avatarUrl ? (
-    <img src={row.avatarUrl} alt="" width={36} height={36} loading="lazy" className="size-9 shrink-0 rounded-full bg-bg-sunk object-cover" />
-  ) : (
-    <span className="grid size-9 shrink-0 place-items-center rounded-full bg-bg-sunk text-[13px] text-ink-3">{(row.name ?? row.screenName).slice(0, 1)}</span>
-  );
-}
-
-/** 表头里的排序按钮：点一次按这一列排，再点一次换方向。 */
-function SortHead({ label, metric, sort, onSort, align = "right" }: { label: string; metric: Metric; sort: { metric: Metric; dir: Dir }; onSort: (metric: Metric) => void; align?: "left" | "right" }) {
+/** 表头里的排序按钮：点一次按这一列排，再点一次换方向。自带 aria-sort */
+function SortHead({
+  label,
+  metric,
+  sort,
+  onSort,
+  align = "right",
+}: {
+  label: string;
+  metric: Metric;
+  sort: { metric: Metric; dir: Dir };
+  onSort: (metric: Metric) => void;
+  align?: "left" | "right";
+}) {
   const active = sort.metric === metric;
   return (
     <button
       type="button"
       onClick={() => onSort(metric)}
       title={`按${label}排序（再点一次换方向）`}
-      className={`inline-flex items-center gap-0.5 ${align === "right" ? "justify-end" : ""} ${active ? "font-semibold text-accent" : "hover:text-ink"}`}
+      className={`inline-flex min-h-[32px] items-center gap-0.5 text-[12px] ${align === "right" ? "justify-end" : ""} ${
+        active ? "font-bold text-accent" : "text-ink-3 hover:text-ink"
+      }`}
     >
-      {label}
-      <span className={`text-[10px] ${active ? "opacity-100" : "opacity-0"}`}>{sort.dir === "desc" ? "↓" : "↑"}</span>
+      <span>{label}</span>
+      <span className={`text-[10px] ${active ? "opacity-100" : "opacity-0"}`} aria-hidden="true">
+        {sort.dir === "desc" ? "↓" : "↑"}
+      </span>
     </button>
   );
 }
 
-export default function GrowthPage() {
-  const { seven, thirty } = useLoaderData<typeof loader>();
-  const [window, setWindow] = useState<Window>(7);
-  const [sort, setSort] = useState<{ metric: Metric; dir: Dir }>({ metric: "perK", dir: "desc" });
-  const [region, setRegion] = useState<Region | "all">("zh");
-  const [tierKey, setTierKey] = useState("all");
-  const [showCaution, setShowCaution] = useState(false);
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  const data = window === 7 ? seven : thirty;
-  const label = window === 7 ? "7 日" : "30 日";
-
-  // 「我的账号」：?mine=handle 就是身份，不用登录；查本地库看有没有收录，没有就提交申请。
-  const [params, setParams] = useSearchParams();
-  const mine = (params.get("mine") ?? "").replace(/^@/, "").toLowerCase() || null;
+/** 独立拆解的“查我的账号”表单组件，输入不重渲染整个账号列表 */
+const MineSearchForm = memo(function MineSearchForm({
+  mine,
+  onSetMine,
+}: {
+  mine: string | null;
+  onSetMine: (handle: string) => void;
+}) {
   const [mineInput, setMineInput] = useState(mine ?? "");
   const [mineState, setMineState] = useState<null | { tracked: boolean; path: string | null; request: string | null }>(null);
   const [applying, setApplying] = useState(false);
   const [applied, setApplied] = useState<string | null>(null);
+
   useEffect(() => {
+    setMineInput(mine ?? "");
     if (!mine) { setMineState(null); setApplied(null); return; }
     let alive = true;
     fetch(`/api/site/x-people/lookup?handle=${encodeURIComponent(mine)}`)
@@ -184,12 +180,7 @@ export default function GrowthPage() {
       .catch(() => undefined);
     return () => { alive = false; };
   }, [mine]);
-  const setMine = (handle: string) => {
-    const next = new URLSearchParams(params);
-    if (handle) next.set("mine", handle);
-    else next.delete("mine");
-    setParams(next, { replace: true });
-  };
+
   const applyForMine = async () => {
     if (!mine || applying) return;
     setApplying(true);
@@ -206,6 +197,100 @@ export default function GrowthPage() {
     } finally {
       setApplying(false);
     }
+  };
+
+  return (
+    <div className="mt-2.5 flex flex-col gap-2 rounded-card border border-line bg-surface px-3 py-2 sm:flex-row sm:items-center">
+      <form
+        className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5"
+        onSubmit={(event) => {
+          event.preventDefault();
+          onSetMine(mineInput.trim().replace(/^@/, "").toLowerCase());
+        }}
+      >
+        <label htmlFor="x-mine-input" className="text-[12.5px] font-medium text-ink-3">查我的账号</label>
+        <span className="flex min-w-0 items-center rounded-control border border-line px-2 bg-bg-sunk/40">
+          <span className="text-[13px] text-ink-4">@</span>
+          <input
+            id="x-mine-input"
+            value={mineInput}
+            onChange={(event) => setMineInput(event.target.value)}
+            placeholder="your_handle"
+            aria-label="你的 X 账号"
+            className="num h-8 w-36 min-w-0 bg-transparent text-[13px] text-ink outline-none placeholder:text-ink-4"
+          />
+        </span>
+        <button type="submit" className="min-h-[32px] rounded-control border border-line bg-surface px-3 py-1 text-[12px] font-medium text-ink-2 transition-colors hover:border-accent hover:text-accent">
+          查一下
+        </button>
+        {mine && (
+          <button
+            type="button"
+            onClick={() => { onSetMine(""); setMineInput(""); }}
+            className="min-h-[32px] px-2 text-[12px] text-ink-4 transition-colors hover:text-ink-2"
+          >
+            清除
+          </button>
+        )}
+      </form>
+      {mine && (
+        <div className="flex flex-wrap items-center gap-2 text-[12.5px]">
+          {mineState === null ? (
+            <span className="text-ink-4">查询中…</span>
+          ) : mineState.tracked ? (
+            <>
+              <span className="text-ok font-semibold">已收录</span>
+              <Link to={`/x-people/${mine}`} className="rounded-control border border-accent/40 bg-accent-soft px-2.5 py-1 text-accent font-medium">
+                看我的画像 →
+              </Link>
+              <SubscribeButton handle={mine} label="订阅周报" className="text-ink-3 underline-offset-2 hover:text-ink hover:underline" />
+            </>
+          ) : applied === "tracked" ? (
+            <span className="text-ok font-semibold">已收录</span>
+          ) : applied === "pending" || mineState.request === "pending" ? (
+            <span className="text-ink-3">已提交，等审核；通过后会出现在榜单和画像里。</span>
+          ) : applied ? (
+            <span className="text-ink-3">{applied}</span>
+          ) : mineState.request === "rejected" ? (
+            <span className="text-ink-4">之前的申请没通过，可以补一句介绍再提交。</span>
+          ) : (
+            <>
+              <span className="text-ink-3">还没收录</span>
+              <button type="button" onClick={applyForMine} disabled={applying} className="min-h-[32px] rounded-control bg-ink px-3 py-1 text-bg disabled:opacity-60">
+                {applying ? "提交中…" : "申请收录"}
+              </button>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+});
+
+export default function GrowthPage() {
+  const { seven, thirty } = useLoaderData<typeof loader>();
+  const [window, setWindow] = useState<Window>(7);
+  const [sort, setSort] = useState<{ metric: Metric; dir: Dir }>({ metric: "perK", dir: "desc" });
+  // 表头用：当前排序列标 ascending/descending，其余不写。
+  const ariaSort = (metric: Metric) =>
+    sort.metric === metric ? (sort.dir === "asc" ? ("ascending" as const) : ("descending" as const)) : undefined;
+  const [region, setRegion] = useState<Region | "all">("zh");
+  const [tierKey, setTierKey] = useState("all");
+  const [showCaution, setShowCaution] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const data = window === 7 ? seven : thirty;
+  const label = window === 7 ? "7 日" : "30 日";
+  const signalMap = useMemo(() => getSignalInfo(window), [window]);
+
+  // 「我的账号」：?mine=handle 就是身份，不用登录
+  const [params, setParams] = useSearchParams();
+  const mine = (params.get("mine") ?? "").replace(/^@/, "").toLowerCase() || null;
+
+  const setMine = (handle: string) => {
+    const next = new URLSearchParams(params);
+    if (handle) next.set("mine", handle);
+    else next.delete("mine");
+    setParams(next, { replace: true });
   };
 
   const onSort = (metric: Metric) =>
@@ -228,7 +313,14 @@ export default function GrowthPage() {
     () => data.rows.filter((row) => inTier(row) && (region === "all" || row.region === region)),
     [data.rows, tierKey, region],
   );
+
+  const cautionCountInScope = useMemo(
+    () => inScope.filter((row) => row.signal === "caution").length,
+    [inScope],
+  );
+
   const shown = useMemo(() => inScope.filter((row) => showCaution || row.signal !== "caution"), [inScope, showCaution]);
+
   const regionCounts = useMemo(() => {
     const pool = data.rows.filter((row) => inTier(row));
     const count = (value: Region) => pool.filter((row) => row.region === value).length;
@@ -236,12 +328,19 @@ export default function GrowthPage() {
   }, [data.rows, tierKey]);
 
   const { ordered, rank } = useMemo(() => rankRows(shown, sort.metric, sort.dir), [shown, sort.metric, sort.dir]);
-  // 「我的账号」在当前筛选下的名次（不在筛选里就是 null）。
+
+  // 计算用于表格数据条图形化展示的最大每千曝光值
+  const maxPerK = useMemo(() => {
+    const vals = ordered.map((r) => r.perK ?? 0);
+    return Math.max(1, ...vals);
+  }, [ordered]);
+
+  // 「我的账号」在当前筛选下的真正排名（若无资格排名的行不显示为下标名次，避免 bug 2）
   const myRank = useMemo(() => {
     if (!mine) return null;
-    const index = ordered.findIndex((row) => row.handle.toLowerCase() === mine);
-    return index >= 0 ? index + 1 : null;
-  }, [ordered, mine]);
+    return rank.get(mine) ?? null;
+  }, [rank, mine]);
+
   const prevOrder = useMemo(() => {
     const pool = prevRows.filter((row) => inTier(row) && (region === "all" || row.region === region));
     return rankRows(pool, sort.metric, sort.dir).rank;
@@ -261,16 +360,16 @@ export default function GrowthPage() {
   const filtersActive = tierKey !== "all" || showCaution;
 
   return (
-    <div className="mx-auto max-w-5xl px-4 pb-16 pt-4 lg:px-6">
-      <nav className="mt-1 text-[12px] text-ink-3">
+    <div className="mx-auto max-w-5xl px-4 pb-16 pt-4 lg:px-6 space-y-4">
+      <nav className="text-[12px] text-ink-3">
         <Link to="/x-people" className="hover:text-ink">博主画像</Link>
         <span className="mx-1.5 text-ink-4">/</span>
         <span className="text-ink-2">涨粉榜</span>
       </nav>
 
-      <header className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+      <header className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <h1 className="text-[24px] font-black tracking-[-0.02em] text-ink lg:text-[28px]">X 涨粉榜</h1>
-        <span className="rounded-full bg-accent/10 px-2.5 py-0.5 text-[12px] text-accent">
+        <span className="rounded-full bg-accent-soft px-2.5 py-0.5 text-[12px] text-accent font-semibold border border-accent/20">
           {regionLabel} · {label} · {METRIC_LABEL[sort.metric]}{sort.dir === "asc" ? "（升序）" : ""}
         </span>
         <p className="text-[13px] text-ink-3">中文 AI 圈 · 涨粉值不值得学</p>
@@ -281,119 +380,99 @@ export default function GrowthPage() {
         </div>
       </header>
 
-      {/* 新鲜度：先说清这是哪天的数、覆盖多少天，再让人看榜。 */}
+      {/* 视觉升级：本期效率领奖台 Top 3 Podiums (突出重点，直观见效) */}
+      {chips.length > 0 && (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 pt-1">
+          {chips.map((row, idx) => (
+            <div
+              key={row.handle}
+              className={`p-3.5 rounded-card border bg-surface space-y-2 relative transition ${
+                idx === 0 ? "border-accent/40 bg-accent-softer shadow-sm" : "border-line"
+              }`}
+            >
+              <div className="flex items-center justify-between text-xs font-mono">
+                <span className={`px-2 py-0.2 rounded-full font-bold text-[10.5px] ${idx === 0 ? "bg-accent text-accent-contrast" : "bg-bg-sunk text-ink-3"}`}>
+                  TOP {idx + 1} 效率
+                </span>
+                <span className={row.perK != null && row.perK >= 0 ? "text-accent font-bold" : "text-ink-3 font-bold"}>每千曝光 {row.perK != null ? `${row.perK >= 0 ? "+" : ""}${row.perK.toFixed(1)}` : "—"}</span>
+              </div>
+              <Link to={`/x-people/${row.handle}`} className="flex items-center gap-2.5 pt-0.5">
+                <SourceAvatar name={row.name ?? row.screenName} avatarUrl={row.avatarUrl} size={34} />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate font-bold text-sm text-ink">{row.name ?? row.screenName}</div>
+                  <div className="num truncate text-[11px] text-ink-3">@{row.screenName} · {compact(row.followers)} 粉</div>
+                </div>
+              </Link>
+              <div className="flex items-center justify-between pt-1 border-t border-line-soft text-[11px] text-ink-4 num">
+                <span>{label} 净增 <strong className={row.growth > 0 ? "text-accent font-bold" : "text-ink-3 font-bold"}>{signed(row.growth)}</strong></span>
+                <span>发帖 {row.posts} 条</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* 新鲜度 */}
       <p
-        className={`mt-2 rounded-card border px-3 py-1.5 text-[11.5px] leading-relaxed ${
+        className={`rounded-card border px-3 py-1.5 text-[11.5px] leading-relaxed ${
           data.freshness.status === "normal"
             ? "border-line-soft bg-bg-sunk/60 text-ink-3"
-            : "border-amber-500/30 bg-amber-500/[0.06] text-ink-2"
+            : "border-amber/30 bg-amber-soft text-amber-ink"
         }`}
       >
         <b className="mr-1.5">{data.freshness.label}</b>
-        {data.freshness.note}
+        {data.freshness.note}
       </p>
 
-      {/* 查我的账号：?mine=handle 就是身份，不登录也能收藏这个链接；没收录可以直接申请。 */}
-      <div className="mt-2.5 flex flex-col gap-2 rounded-card border border-line bg-surface px-3 py-2 sm:flex-row sm:items-center">
-        <form
-          className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5"
-          onSubmit={(event) => {
-            event.preventDefault();
-            setMine(mineInput.trim().replace(/^@/, "").toLowerCase());
-          }}
-        >
-          <span className="text-[12.5px] text-ink-3">查我的账号</span>
-          <span className="flex min-w-0 items-center rounded-full border border-line px-2">
-            <span className="text-[13px] text-ink-4">@</span>
-            <input
-              value={mineInput}
-              onChange={(event) => setMineInput(event.target.value)}
-              placeholder="your_handle"
-              aria-label="你的 X 账号"
-              className="num h-7 w-36 min-w-0 bg-transparent text-[13px] text-ink outline-none placeholder:text-ink-4"
-            />
-          </span>
-          <button type="submit" className="rounded-full border border-line px-2.5 py-0.5 text-[12px] text-ink-2 transition-colors hover:border-accent hover:text-accent">
-            查一下
-          </button>
-          {mine && (
-            <button type="button" onClick={() => { setMine(""); setMineInput(""); }} className="text-[12px] text-ink-4 transition-colors hover:text-ink-2">
-              清除
-            </button>
-          )}
-        </form>
-        {mine && (
-          <div className="flex flex-wrap items-center gap-2 text-[12.5px]">
-            {mineState === null ? (
-              <span className="text-ink-4">查询中…</span>
-            ) : mineState.tracked ? (
-              <>
-                <span className="text-ok">已收录</span>
-                {myRank !== null && <span className="text-ink-3">当前筛选下第 <b className="num text-ink">{myRank}</b> 名</span>}
-                <Link to={`/x-people/${mine}`} className="rounded-full border border-accent/40 bg-accent/10 px-2.5 py-0.5 text-accent">
-                  看我的画像 →
-                </Link>
-                <SubscribeButton handle={mine} label="订阅周报" className="text-ink-3 underline-offset-2 hover:text-ink hover:underline" />
-              </>
-            ) : applied === "tracked" ? (
-              <span className="text-ok">已收录</span>
-            ) : applied === "pending" || mineState.request === "pending" ? (
-              <span className="text-ink-3">已提交，等审核；通过后会出现在榜单和画像里。</span>
-            ) : applied ? (
-              <span className="text-ink-3">{applied}</span>
-            ) : mineState.request === "rejected" ? (
-              <span className="text-ink-4">之前的申请没通过，可以补一句介绍再提交。</span>
-            ) : (
-              <>
-                <span className="text-ink-3">还没收录</span>
-                <button type="button" onClick={applyForMine} disabled={applying} className="rounded-full bg-ink px-2.5 py-0.5 text-bg disabled:opacity-60">
-                  {applying ? "提交中…" : "申请收录"}
-                </button>
-              </>
-            )}
-          </div>
-        )}
+      {/* 查我的账号 */}
+      <MineSearchForm mine={mine} onSetMine={setMine} />
+
+      {myRank !== null && mine && (
+        <div className="rounded-card border border-accent-soft bg-accent-soft/30 px-3 py-2 text-xs text-ink-2 flex items-center justify-between">
+          <span>当前在 <b className="text-ink">{regionLabel} · {label}</b> 筛选下，你的账号 @{mine} 位列 <b className="num text-accent font-bold text-sm">#{myRank}</b> 名（按{(METRIC_LABEL[sort.metric] ?? "每千曝光").replace(/^按/, "")}）。</span>
+          <Link to={`/x-people/${mine}`} className="text-accent underline hover:opacity-80 font-medium">查看完整画像 →</Link>
+        </div>
+      )}
+
+      {/* 看法切换分段控件：使用通用 PillTabs */}
+      <div className="pt-1">
+        <PillTabs
+          layoutId="x-growth-views"
+          size="sm"
+          active={sort.metric}
+          items={VIEWS.map((v) => ({ key: v.key, label: v.label }))}
+          onSelect={(key) => setSort({ metric: key as Metric, dir: "desc" })}
+        />
       </div>
 
-      {/* 看法切换单独一行，做成分段控件：手机上三等分，桌面上靠左排。 */}
-      <div className="mt-3 flex w-full rounded-full bg-bg-sunk p-1 sm:w-auto sm:inline-flex">
-        {VIEWS.map((view) => {
-          const active = sort.metric === view.key;
-          return (
-            <button
-              key={view.key}
-              type="button"
-              onClick={() => setSort({ metric: view.key, dir: "desc" })}
-              aria-pressed={active}
-              className={`flex-1 rounded-full px-5 py-1.5 text-[13.5px] transition-colors sm:flex-none ${active ? "bg-surface font-semibold text-ink shadow-[0_1px_2px_rgba(0,0,0,0.08)]" : "text-ink-3 hover:text-ink"}`}
-            >
-              {view.label}
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="mt-2 flex flex-wrap items-center gap-1.5">
-        {WINDOWS.map((value) => (
-          <Pill key={value} active={window === value} onClick={() => setWindow(value)}>{value} 天</Pill>
-        ))}
-        <span className="mx-1 h-4 w-px bg-line" />
-        {REGIONS.map((value) => (
-          <button
-            key={value}
-            type="button"
-            onClick={() => setRegion(value)}
-            className={`rounded-full border px-2.5 py-0.5 text-[11.5px] transition-colors ${region === value ? "border-accent bg-accent/10 text-accent" : "border-line text-ink-3 hover:text-ink"}`}
-          >
-            {value === "all" ? "全部地区" : REGION_LABEL[value]}
-            <span className="num ml-1 text-[10.5px] text-ink-4">{regionCounts[value]}</span>
-          </button>
-        ))}
-        <span className="mx-1 h-4 w-px bg-line" />
+      {/* 筛选条：窗口、地区、粉丝门槛 */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <PillTabs
+          layoutId="x-growth-windows"
+          size="xs"
+          active={String(window)}
+          items={WINDOWS.map((v) => ({ key: String(v), label: `${v} 天` }))}
+          onSelect={(v) => setWindow(Number(v) as Window)}
+        />
+        <span className="mx-1 h-4 w-px bg-line" aria-hidden="true" />
+        <PillTabs
+          layoutId="x-growth-regions"
+          size="xs"
+          active={region}
+          items={REGIONS.map((v) => ({
+            key: v,
+            label: v === "all" ? "全部地区" : REGION_LABEL[v],
+            count: regionCounts[v],
+          }))}
+          onSelect={(v) => setRegion(v as Region | "all")}
+        />
+        <span className="mx-1 h-4 w-px bg-line" aria-hidden="true" />
         <button
           type="button"
           onClick={() => setFiltersOpen((open) => !open)}
-          className={`ml-auto rounded-full border px-2.5 py-0.5 text-[11.5px] transition-colors ${filtersActive ? "border-accent bg-accent/10 text-accent" : "border-line text-ink-3 hover:text-ink"}`}
+          className={`ml-auto flex min-h-[32px] items-center rounded-full border px-3 py-0.5 text-[11.5px] transition-colors ${
+            filtersActive ? "border-accent bg-accent-soft text-accent font-semibold" : "border-line text-ink-3 hover:text-ink"
+          }`}
           aria-expanded={filtersOpen}
         >
           筛选{filtersActive ? " ·" : ""} {filtersOpen ? "▴" : "▾"}
@@ -401,37 +480,24 @@ export default function GrowthPage() {
       </div>
 
       {filtersOpen && (
-        <div className="mt-2 flex flex-wrap items-center gap-1.5 rounded-card border border-line-soft bg-bg-sunk/40 px-2.5 py-2">
+        <div className="flex flex-wrap items-center gap-1.5 rounded-card border border-line-soft bg-bg-sunk/40 p-2.5">
+          <span className="text-[11.5px] text-ink-4 mr-1">粉丝规模:</span>
           {TIERS.map((option) => (
             <button
               key={option.key}
               type="button"
               onClick={() => setTierKey(option.key)}
-              className={`rounded-full border px-2.5 py-0.5 text-[11.5px] transition-colors ${tierKey === option.key ? "border-accent bg-accent/10 text-accent" : "border-line text-ink-3 hover:text-ink"}`}
+              className={`min-h-[28px] rounded-full border px-2.5 py-0.5 text-[11.5px] transition-colors ${
+                tierKey === option.key ? "border-accent bg-accent-soft text-accent font-semibold" : "border-line text-ink-3 hover:text-ink"
+              }`}
             >
               {option.label}
             </button>
           ))}
-          <label className="ml-1 flex cursor-pointer items-center gap-1.5 text-[11.5px] text-ink-3">
-            <input type="checkbox" checked={showCaution} onChange={(event) => setShowCaution(event.target.checked)} className="size-3.5" />
-            显示需核对
+          <label className="ml-2 flex min-h-[28px] cursor-pointer items-center gap-1.5 text-[11.5px] text-ink-3 hover:text-ink">
+            <input type="checkbox" checked={showCaution} onChange={(event) => setShowCaution(event.target.checked)} className="size-3.5 rounded-mark" />
+            显示需核对 {cautionCountInScope > 0 && !showCaution && <span className="text-ink-4">（已隐 {cautionCountInScope} 个）</span>}
           </label>
-        </div>
-      )}
-
-      {chips.length > 0 && (
-        <div className="mt-2.5 flex flex-wrap items-center gap-2 rounded-card border border-accent/25 bg-accent/5 px-3 py-2">
-          <span className="text-[12px] font-medium text-accent">本周效率信号</span>
-          <span className="hidden text-[12.5px] text-ink-2 sm:inline">{label}每千曝光涨粉最高的三个账号，值得先拆：</span>
-          {chips.map((row) => (
-            <Link
-              key={row.handle}
-              to={`/x-people/${row.handle}`}
-              className="rounded-full border border-line bg-surface px-2.5 py-0.5 text-[12px] text-ink hover:border-accent hover:text-accent"
-            >
-              {row.name ?? row.screenName} · {row.perK}/千曝光
-            </Link>
-          ))}
         </div>
       )}
 
@@ -448,19 +514,25 @@ export default function GrowthPage() {
         </div>
       ) : (
         <>
-          {/* 手机：卡片列表，一屏能读完账号和效率，不用横滑。 */}
-          <div className="mt-2.5 space-y-2 md:hidden">
+          {/* 手机端的轻量级卡片流（lg:hidden） */}
+          <div className="mt-2.5 space-y-2 lg:hidden">
             {ordered.map((row) => {
-              const signal = row.signal ? SIGNAL[row.signal] : null;
+              const signal = row.signal ? signalMap[row.signal] : null;
               const rankNow = rank.get(row.handle);
               const rankPrev = prevOrder.get(row.handle) ?? null;
               const efficiency = sort.metric === "perK" || sort.metric === "perPost";
               const eligible = !efficiency || effEligible(row);
               const isMine = mine !== null && row.handle.toLowerCase() === mine;
               return (
-                <Link key={row.handle} to={`/x-people/${row.handle}`} className={`block rounded-card border bg-surface px-3 py-2.5 transition-colors active:bg-bg-sunk ${isMine ? "border-accent ring-1 ring-accent/30" : "border-line"}`}>
+                <Link
+                  key={row.handle}
+                  to={`/x-people/${row.handle}`}
+                  className={`block rounded-card border bg-surface px-3 py-2.5 transition-colors active:bg-bg-sunk ${
+                    isMine ? "border-accent bg-accent-soft/20 ring-1 ring-accent-soft" : "border-line"
+                  }`}
+                >
                   <div className="flex items-start gap-2.5">
-                    <span className="num w-7 shrink-0 pt-1 text-[12px] text-ink-4">
+                    <span className="num w-7 shrink-0 pt-1 text-[12px] text-ink-4 font-bold">
                       {rankNow ?? "—"}
                       {rankNow && (rankPrev === null ? (
                         <span className="ml-0.5 text-[10px] text-accent">新</span>
@@ -470,27 +542,27 @@ export default function GrowthPage() {
                         </span>
                       ))}
                     </span>
-                    <Avatar row={row} />
+                    <SourceAvatar name={row.name ?? row.screenName} avatarUrl={row.avatarUrl} size={36} />
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[14px] font-medium text-ink">{row.name ?? row.screenName}</span>
+                      <span className="block truncate text-[14px] font-bold text-ink">{row.name ?? row.screenName}</span>
                       <span className="num block truncate text-[11.5px] text-ink-3">@{row.screenName} · {REGION_LABEL[row.region]}</span>
                     </span>
                     <span className="shrink-0 text-right">
-                      <span className={`num block text-[15px] font-semibold leading-tight ${eligible ? "text-accent" : "text-ink-4"}`}>
+                      <span className={`num block text-[15px] font-black leading-tight ${eligible ? "text-accent" : "text-ink-4"}`}>
                         {row.perK === null ? "—" : row.perK.toFixed(1)}
                       </span>
                       <span className="text-[10px] text-ink-4">每千曝光</span>
                     </span>
                   </div>
-                  <div className="num mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 pl-[38px] text-[11.5px] text-ink-3">
+                  <div className="num mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 pl-[46px] text-[11.5px] text-ink-3">
                     <span className={tint(row.growth)}>{signed(row.growth)} 粉</span>
                     <span>{signedPercent(row.growthPct)}</span>
                     <span>{row.posts} 帖</span>
-                    <span>{row.perPost === null ? "" : `每帖 +${compact(row.perPost)}`}</span>
+                    <span>{row.perPost === null ? "" : `每帖 ${signed(row.perPost)}`}</span>
                     <span className="text-ink-4">{compact(row.followers)} 粉</span>
                   </div>
                   {(signal || (efficiency && !eligible)) && (
-                    <div className="mt-1 flex flex-wrap gap-1 pl-[38px]">
+                    <div className="mt-1 flex flex-wrap gap-1 pl-[46px]">
                       {signal && <span className={`rounded-full bg-bg-sunk px-2 py-0.5 text-[10.5px] ${signal.tone}`}>{signal.label}</span>}
                       {efficiency && !eligible && <span className="rounded-full bg-bg-sunk px-2 py-0.5 text-[10.5px] text-ink-4">样本小</span>}
                     </div>
@@ -500,107 +572,132 @@ export default function GrowthPage() {
             })}
           </div>
 
-          {/* 桌面：表格，列多但一屏能横向扫完。 */}
-          <div className="mt-2.5 hidden overflow-x-auto rounded-card border border-line bg-surface md:block">
+          {/* 桌面端：标准表格（hidden lg:block）带进度条与高亮 */}
+          <div className="hidden overflow-x-auto rounded-card border border-line bg-surface lg:block shadow-sm">
             <table className="w-full min-w-[920px] border-collapse text-left text-[13px]">
+              <caption className="sr-only">X 创作者涨粉榜单，默认按每千曝光效率排序</caption>
               <thead>
-                <tr className="border-b border-line text-[12px] text-ink-3">
-                  <th className="w-16 px-3 py-2.5 font-normal">#</th>
-                  <th className="px-3 py-2.5 font-normal">账号</th>
-                  <th className="px-3 py-2.5 text-right font-normal"><SortHead label="粉丝" metric="followers" sort={sort} onSort={onSort} /></th>
-                  <th className="px-3 py-2.5 text-right font-normal">
+                <tr className="border-b border-line bg-bg-sunk/40 text-[12px] text-ink-3">
+                  <th scope="col" className="w-16 px-3 py-2.5 font-normal">#</th>
+                  <th scope="col" className="px-3 py-2.5 font-normal">账号</th>
+                  <th scope="col" aria-sort={ariaSort("followers")} className="px-3 py-2.5 text-right font-normal">
+                    <SortHead label="粉丝" metric="followers" sort={sort} onSort={onSort} />
+                  </th>
+                  <th scope="col" aria-sort={ariaSort("growth") ?? ariaSort("growthPct")} className="px-3 py-2.5 text-right font-normal">
                     <span className="inline-flex items-center gap-1">
                       <SortHead label="涨粉" metric="growth" sort={sort} onSort={onSort} />
                       <span className="text-ink-4">/</span>
                       <SortHead label="率" metric="growthPct" sort={sort} onSort={onSort} />
                     </span>
                   </th>
-                  <th className="px-3 py-2.5 text-right font-normal"><SortHead label="帖" metric="posts" sort={sort} onSort={onSort} /></th>
-                  <th className="px-3 py-2.5 text-right font-normal"><SortHead label="每帖" metric="perPost" sort={sort} onSort={onSort} /></th>
-                  <th className="px-3 py-2.5 text-right font-normal"><SortHead label="每千曝光" metric="perK" sort={sort} onSort={onSort} /></th>
-                  <th className="px-3 py-2.5 font-normal">标签</th>
-                  <th className="px-3 py-2.5 text-right font-normal">数据日</th>
+                  <th scope="col" aria-sort={ariaSort("posts")} className="px-3 py-2.5 text-right font-normal">
+                    <SortHead label="帖" metric="posts" sort={sort} onSort={onSort} />
+                  </th>
+                  <th scope="col" aria-sort={ariaSort("perPost")} className="px-3 py-2.5 text-right font-normal">
+                    <SortHead label="每帖" metric="perPost" sort={sort} onSort={onSort} />
+                  </th>
+                  <th scope="col" aria-sort={ariaSort("perK")} className="px-3 py-2.5 text-right font-normal w-44">
+                    <SortHead label="每千曝光" metric="perK" sort={sort} onSort={onSort} />
+                  </th>
+                  <th scope="col" className="px-3 py-2.5 font-normal">标签</th>
+                  <th scope="col" className="px-3 py-2.5 text-right font-normal">数据日</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line-soft">
-              {ordered.map((row) => {
-                const signal = row.signal ? SIGNAL[row.signal] : null;
-                const rankNow = rank.get(row.handle);
-                const rankPrev = prevOrder.get(row.handle) ?? null;
-                const efficiency = sort.metric === "perK" || sort.metric === "perPost";
-                const eligible = !efficiency || effEligible(row);
-                const active = sort.metric;
-                const isMine = mine !== null && row.handle.toLowerCase() === mine;
-                return (
-                  <tr key={row.handle} className={`transition-colors hover:bg-bg-sunk ${isMine ? "bg-accent/5" : ""}`}>
-                    <td className="num px-3 py-2.5 text-[12px] text-ink-4" title={rankPrev === null ? "上周同一筛选下不在榜上" : `上周同一筛选下第 ${rankPrev} 名`}>
-                      {rankNow ?? "—"}
-                      {rankNow && (rankPrev === null ? (
-                        <span className="ml-0.5 text-[10px] text-accent">新</span>
-                      ) : rankPrev - rankNow === 0 ? (
-                        <span className="ml-0.5 text-[10px] text-ink-4">—</span>
-                      ) : (
-                        <span className={`ml-0.5 text-[10px] ${rankPrev > rankNow ? "text-accent" : "text-ink-3"}`}>
-                          {rankPrev > rankNow ? "▲" : "▼"}{Math.abs(rankPrev - rankNow)}
-                        </span>
-                      ))}
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <Link to={`/x-people/${row.handle}`} className="flex items-center gap-3">
-                        <Avatar row={row} />
-                        <span className="min-w-0">
-                          <span className="block truncate text-[13.5px] font-medium text-ink">{row.name ?? row.screenName}</span>
-                          <span className="num block truncate text-[11.5px] text-ink-3">@{row.screenName} · {REGION_LABEL[row.region]}</span>
-                        </span>
-                      </Link>
-                    </td>
-                    <td className={`num px-3 py-2.5 text-right ${active === "followers" ? "font-semibold text-ink" : "text-ink-2"}`} title={`基线 ${row.baseline.toLocaleString("en-US")}（${row.spanDays} 天前）`}>
-                      {compact(row.followers)}
-                    </td>
-                    <td className={`num px-3 py-2.5 text-right ${active === "growth" || active === "growthPct" ? "font-semibold" : ""}`}>
-                      <span className={tint(row.growth)}>{signed(row.growth)}</span>
-                      <span className={`ml-1 text-[11px] ${tint(row.growthPct)}`}>{signedPercent(row.growthPct)}</span>
-                    </td>
-                    <td className={`num px-3 py-2.5 text-right ${active === "posts" ? "font-semibold text-ink" : "text-ink-2"}`} title={`同期浏览合计 ${row.views.toLocaleString("en-US")}`}>{row.posts}</td>
-                    <td className={`num px-3 py-2.5 text-right ${active === "perPost" ? "font-semibold text-ink" : "text-ink-3"}`}>{row.perPost === null ? "—" : `+${compact(row.perPost)}`}</td>
-                    <td className={`num px-3 py-2.5 text-right ${active === "perK" ? "font-semibold text-ink" : eligible ? "text-ink-3" : "text-ink-4"}`}>
-                      {row.perK === null ? "—" : row.perK.toFixed(1)}
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <span className="flex flex-wrap gap-1">
-                        {signal && <span className={`rounded-full bg-bg-sunk px-2 py-0.5 text-[10.5px] ${signal.tone}`} title={signal.title}>{signal.label}</span>}
-                        {efficiency && !eligible && (
-                          <span className="rounded-full bg-bg-sunk px-2 py-0.5 text-[10.5px] text-ink-4" title={`窗口内曝光不足 ${EFF_MIN_VIEWS.toLocaleString("en-US")} 次或没有发帖：分母太小，不进效率名次`}>
-                            样本小
+                {ordered.map((row) => {
+                  const signal = row.signal ? signalMap[row.signal] : null;
+                  const rankNow = rank.get(row.handle);
+                  const rankPrev = prevOrder.get(row.handle) ?? null;
+                  const efficiency = sort.metric === "perK" || sort.metric === "perPost";
+                  const eligible = !efficiency || effEligible(row);
+                  const active = sort.metric;
+                  const isMine = mine !== null && row.handle.toLowerCase() === mine;
+                  const barPct = row.perK != null && row.perK > 0 ? Math.min(100, Math.round((row.perK / maxPerK) * 100)) : 0;
+                  return (
+                    <tr key={row.handle} className={`transition-colors hover:bg-bg-sunk ${isMine ? "bg-accent-soft/40 border-l-4 border-accent font-medium" : ""}`}>
+                      <td className="num px-3 py-2.5 text-[12px] text-ink-4" title={rankPrev === null ? "上周期同一筛选下不在榜上" : `上周期同一筛选下第 ${rankPrev} 名`}>
+                        {rankNow ?? "—"}
+                        {rankNow && (rankPrev === null ? (
+                          <span className="ml-0.5 text-[10px] text-accent">新</span>
+                        ) : rankPrev - rankNow === 0 ? (
+                          <span className="ml-0.5 text-[10px] text-ink-4">—</span>
+                        ) : (
+                          <span className={`ml-0.5 text-[10px] ${rankPrev > rankNow ? "text-accent" : "text-ink-3"}`}>
+                            {rankPrev > rankNow ? "▲" : "▼"}{Math.abs(rankPrev - rankNow)}
                           </span>
-                        )}
-                      </span>
-                    </td>
-                    <td className="num px-3 py-2.5 text-right text-[12px] text-ink-4" title={row.updatedOn}>{row.updatedOn.slice(5)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                        ))}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <Link to={`/x-people/${row.handle}`} className="flex items-center gap-3">
+                          <SourceAvatar name={row.name ?? row.screenName} avatarUrl={row.avatarUrl} size={36} />
+                          <span className="min-w-0">
+                            <span className="block truncate text-[13.5px] font-bold text-ink">
+                              {row.name ?? row.screenName}
+                              {isMine && <span className="ml-1.5 text-[10px] px-1 rounded-mark bg-accent text-accent-contrast">ME</span>}
+                            </span>
+                            <span className="num block truncate text-[11.5px] text-ink-3">@{row.screenName} · {REGION_LABEL[row.region]}</span>
+                          </span>
+                        </Link>
+                      </td>
+                      <td className={`num px-3 py-2.5 text-right ${active === "followers" ? "font-semibold text-ink" : "text-ink-2"}`} title={`基线 ${row.baseline.toLocaleString("en-US")}（${row.spanDays} 天前）`}>
+                        {compact(row.followers)}
+                      </td>
+                      <td className={`num px-3 py-2.5 text-right ${active === "growth" || active === "growthPct" ? "font-semibold" : ""}`}>
+                        <span className={tint(row.growth)}>{signed(row.growth)}</span>
+                        <span className={`ml-1 text-[11px] ${tint(row.growthPct)}`}>{signedPercent(row.growthPct)}</span>
+                      </td>
+                      <td className={`num px-3 py-2.5 text-right ${active === "posts" ? "font-semibold text-ink" : "text-ink-2"}`} title={`同期浏览合计 ${row.views.toLocaleString("en-US")}`}>{row.posts}</td>
+                      <td className={`num px-3 py-2.5 text-right ${active === "perPost" ? "font-semibold text-ink" : "text-ink-3"}`}>{row.perPost === null ? "—" : signed(row.perPost)}</td>
+                      
+                      {/* 每千曝光带微型进度条，数据一目了然！ */}
+                      <td className="num px-3 py-2.5 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          {eligible && row.perK != null && (
+                            <span className="w-16 h-1.5 rounded-full bg-bg-sunk overflow-hidden hidden sm:block">
+                              <span className="block h-full bg-accent rounded-full" style={{ width: `${barPct}%` }} />
+                            </span>
+                          )}
+                          <span className={`font-bold ${active === "perK" ? "text-accent" : eligible ? "text-ink" : "text-ink-4"}`}>
+                            {row.perK === null ? "—" : row.perK.toFixed(1)}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <span className="flex flex-wrap gap-1">
+                          {signal && <span className={`rounded-full bg-bg-sunk px-2 py-0.5 text-[10.5px] ${signal.tone}`} title={signal.title}>{signal.label}</span>}
+                          {efficiency && !eligible && (
+                            <span className="rounded-full bg-bg-sunk px-2 py-0.5 text-[10.5px] text-ink-4" title={`窗口内曝光不足 ${EFF_MIN_VIEWS.toLocaleString("en-US")} 次或没有发帖：分母太小，不进效率名次`}>
+                              样本小
+                            </span>
+                          )}
+                        </span>
+                      </td>
+                      <td className="num px-3 py-2.5 text-right text-[12px] text-ink-4" title={row.updatedOn}>{row.updatedOn.slice(5)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         </>
       )}
 
+      {/* 说明区 */}
       <div className="mt-4 rounded-card border border-line-soft bg-bg-sunk/60 p-4 text-[12px] leading-relaxed text-ink-3">
         <p>
           共 {data.coverage.accounts} 个账号有粉丝快照，{label}榜里 {data.coverage.eligible} 个账号有两次相隔 {window} 天以上的快照；
-          当前筛选（{regionLabel}{tierKey !== "all" ? ` · 粉丝 ${tier.label}` : ""}{showCaution ? " · 含需核对" : " · 隐藏需核对"}）下 {shown.length} 个。
+          当前筛选（{regionLabel}{tierKey !== "all" ? ` · 粉丝 ${tier.label}` : ""}{showCaution ? " · 含需核对" : ` · 已隐藏 ${cautionCountInScope} 个需核对`}）下 {shown.length} 个。
           {data.coverage.latest && <> 最近一次快照 {beijingDay(data.coverage.latest)}。</>}
         </p>
         <p className="mt-2">
-          名次是<b>筛后重排</b>的：换地区、粉丝门槛或排序，名次会跟着变；箭头是同一筛选下和上周比。
+          名次是<b>筛后重排</b>的：换地区、粉丝门槛或排序，名次会跟着变；箭头是同一筛选下和上一对应周期比。
           上面三个按钮是三种常用看法（效率榜 / 涨粉数榜 / 涨粉率榜），点表头还能按粉丝、帖数、每帖排（再点一次换方向）。
           效率榜只有窗口内曝光 ≥ {EFF_MIN_VIEWS.toLocaleString("en-US")} 次且发过帖的行参与名次，
           其余标「样本小」——分母太小时效率会虚高，看起来像黑马，其实只是没人看到。
         </p>
         <p className="mt-2">
           涨粉 = 最近快照 − {label}之外最近的一次快照，基线更早时按天数折算到 {label}；粉丝快照跟着采集走，不发帖就没有新快照。
-          「本期无发帖」说明这一周没抓到它的帖子，涨粉只能来自外部；「需核对」表示涨粉远高于曝光或一周涨跌幅超过 30%，
+          「本期无发帖」说明这 {window} 天没抓到它的帖子，涨粉只能来自外部；「需核对」表示涨粉远高于曝光或 {window} 日涨跌幅超过 30%，
           可能是一次站外传播、抽奖或买粉，建议核对，不是定论。
         </p>
       </div>

@@ -6,6 +6,7 @@ import { KIND_LABEL, REGION_LABEL } from "../types";
 import { edgeTtl, loadOr404 } from "@aihot/web/lib/api.server";
 import { pageMeta } from "@aihot/web/lib/seo";
 import { IconSearch } from "@aihot/web/components/icons";
+import { SourceAvatar } from "@aihot/web/components/ui/SourceAvatar";
 import { Spark } from "./charts";
 import { categoryName, compact, percent } from "./format";
 
@@ -42,9 +43,9 @@ export function headers() {
 /** 手机底栏的「工具」标签：这几个页面都归在它下面。 */
 export const handle = { tab: "x-tools", name: "账号对比" } as const;
 
-
 const ROWS: Array<{ label: string; value: (person: XCompareResponse["people"][number]) => string }> = [
   { label: "语言区 / 类型", value: (p) => `${REGION_LABEL[p.region]} · ${KIND_LABEL[p.kind]}` },
+  { label: "粉丝", value: (p) => (p.followers === null ? "—" : compact(p.followers)) },
   { label: "帖子", value: (p) => compact(p.posts) },
   { label: "日均发帖", value: (p) => String(p.postsPerDay) },
   { label: "中位浏览", value: (p) => compact(p.medViews) },
@@ -98,8 +99,8 @@ export default function ComparePage() {
       </nav>
 
       <header className="mt-2">
-        <h1 className="text-[26px] font-black tracking-[-0.02em] text-ink lg:text-[32px]">账号对比</h1>
-        <p className="mt-2 max-w-2xl text-[13.5px] leading-relaxed text-ink-2">
+        <h1 className="text-[24px] font-black tracking-[-0.02em] text-ink lg:text-[28px]">账号对比</h1>
+        <p className="mt-1.5 max-w-2xl text-[13.5px] leading-relaxed text-ink-2">
           选 2–3 个账号并排看：发帖节奏、互动水平、内容结构与近 12 周趋势。选择会写进地址，可直接分享。
         </p>
       </header>
@@ -109,11 +110,9 @@ export default function ComparePage() {
           const person = chosen.find((p) => p.handle.toLowerCase() === handle.toLowerCase());
           return (
             <span key={handle} className="inline-flex items-center gap-2 rounded-full border border-line bg-surface py-1 pl-1 pr-2.5 text-[12.5px]">
-              {person?.avatar
-                ? <img src={person.avatar} alt="" width={22} height={22} className="size-[22px] rounded-full object-cover" />
-                : <span className="grid size-[22px] place-items-center rounded-full bg-bg-sunk text-[10px] text-ink-3">{(person?.author ?? handle).slice(0, 1)}</span>}
-              <span className="text-ink">{person?.author ?? `@${handle}`}</span>
-              <button type="button" onClick={() => remove(handle)} className="text-ink-4 hover:text-ink" aria-label={`移除 ${handle}`}>×</button>
+              <SourceAvatar name={person?.author ?? handle} avatarUrl={person?.avatar} size={22} />
+              <span className="text-ink font-medium">{person?.author ?? `@${handle}`}</span>
+              <button type="button" onClick={() => remove(handle)} className="text-ink-4 hover:text-ink text-sm leading-none" aria-label={`移除 ${handle}`}>×</button>
             </span>
           );
         })}
@@ -125,8 +124,10 @@ export default function ComparePage() {
       {selected.length < 3 && (
         <div className="mt-3 rounded-card border border-line bg-surface p-3">
           <div className="flex items-center gap-2 rounded-control bg-bg-sunk px-3 py-1.5">
-            <IconSearch size={15} className="shrink-0 text-ink-4" />
+            <label htmlFor="compare-search-input" className="sr-only">搜索并添加账号</label>
+            <IconSearch size={15} className="shrink-0 text-ink-4" aria-hidden="true" />
             <input
+              id="compare-search-input"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="搜索并添加账号"
@@ -142,7 +143,7 @@ export default function ComparePage() {
                 key={p.sourceId}
                 type="button"
                 onClick={() => add(p.handle)}
-                className="inline-flex items-center gap-1.5 rounded-full border border-line px-2 py-0.5 text-[12px] text-ink-2 hover:border-accent hover:text-ink"
+                className="inline-flex min-h-[30px] items-center gap-1.5 rounded-full border border-line px-2.5 py-1 text-[12px] text-ink-2 hover:border-accent hover:text-ink transition-colors"
               >
                 @{p.handle}
                 <span className="text-[10.5px] text-ink-4">{compact(p.posts)} 帖</span>
@@ -156,15 +157,14 @@ export default function ComparePage() {
       {chosen.length >= 2 ? (
         <div className="mt-4 overflow-x-auto rounded-card border border-line bg-surface">
           <table className="w-full min-w-[640px] border-collapse text-[13px]">
+            <caption className="sr-only">已选账号的多维指标横向对比表格</caption>
             <thead>
               <tr className="border-b border-line-soft">
-                <th className="w-32 px-4 py-3 text-left text-[11px] font-normal text-ink-3">指标</th>
+                <th scope="col" className="w-32 px-4 py-3 text-left text-[11px] font-normal text-ink-3">指标</th>
                 {chosen.map((p) => (
-                  <th key={p.sourceId} className="px-4 py-3 text-left font-normal">
+                  <th key={p.sourceId} scope="col" className="px-4 py-3 text-left font-normal">
                     <Link to={`/x-people/${p.handle}`} className="flex items-center gap-2.5">
-                      {p.avatar
-                        ? <img src={p.avatar} alt="" width={34} height={34} className="size-[34px] rounded-full bg-bg-sunk object-cover" />
-                        : <span className="grid size-[34px] place-items-center rounded-full bg-bg-sunk text-[13px] text-ink-3">{p.author.slice(0, 1)}</span>}
+                      <SourceAvatar name={p.author} avatarUrl={p.avatar} size={34} />
                       <span className="min-w-0">
                         <span className="block truncate text-[13.5px] font-medium text-ink">{p.author}</span>
                         <span className="num block truncate text-[11px] text-ink-3">@{p.handle}</span>

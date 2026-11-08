@@ -26,6 +26,13 @@ export async function loadCompare(handles: string[]): Promise<XCompareResponse> 
   ]);
 
   const summaries = rows.map(toSummary);
+  // SUMMARY 里没有粉丝列：补一次最近快照，别让对比页的「粉丝」永远是「—」。
+  const snaps = await sql<{ handle: string; followers: string }[]>`
+    SELECT DISTINCT ON (handle) handle, followers::text AS followers
+    FROM x_follower_snapshots WHERE handle = ANY(${wanted}::text[])
+    ORDER BY handle, captured_on DESC`;
+  const followerOf = new Map(snaps.map((row) => [row.handle.toLowerCase(), Number(row.followers)]));
+  for (const person of summaries) person.followers = followerOf.get(person.handle.toLowerCase()) ?? null;
   const byHandle = new Map(summaries.map((s) => [s.handle.toLowerCase(), s]));
   const spark = new Map<string, number[]>();
   for (const row of weeks) {
