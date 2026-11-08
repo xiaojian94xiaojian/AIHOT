@@ -40,7 +40,7 @@ async function decayRows(): Promise<DecayRow[]> {
       SELECT a.source_id,
              coalesce((a.raw->>'views')::bigint, 0) AS views,
              row_number() OVER (
-               PARTITION BY a.source_id, (a.published_at AT TIME ZONE )::date
+               PARTITION BY a.source_id, (a.published_at AT TIME ZONE ${BEIJING_TIMEZONE})::date
                ORDER BY a.published_at
              ) AS seq
       FROM articles a
@@ -155,7 +155,17 @@ export function discussVerdict(stats: { accounts: number; corr: number; high: { 
   summary: string;
 } {
   if (stats.accounts < 30) return { verdict: "看不清", summary: "能算的账号太少，先不下结论。" };
-  if (Math.abs(stats.corr) < 0.2) {
+  if (!Number.isFinite(stats.corr)) {
+    return { verdict: "看不清", summary: `相关系数算不出来（${stats.accounts} 个账号里有人涨粉或讨论率完全没变化），先不下结论。` };
+  }
+  // 说法是方向性的「讨论多 → 涨粉快」，负相关不能算成立。
+  if (stats.corr <= -0.2) {
+    return {
+      verdict: "不成立",
+      summary: `讨论率和涨粉是负相关（${stats.corr}，${stats.accounts} 个账号）：讨论多的组涨 ${stats.high.median}%、少的组 ${stats.low.median}%——至少在这批账号里，讨论多并没带来更多粉丝。`,
+    };
+  }
+  if (stats.corr < 0.2) {
     return {
       verdict: "看不清",
       summary: `讨论率和涨粉的相关只有 ${stats.corr}（${stats.accounts} 个账号）：讨论多的组涨 ${stats.high.median}%、少的组 ${stats.low.median}%，差得不多——回复、引用在排序里值钱，但不等于涨粉捷径。`,

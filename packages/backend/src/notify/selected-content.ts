@@ -35,7 +35,7 @@ interface Row {
 const published = (at: Date) => `${beijingDay(at)}发布`;
 
 /** Model-written words go into card markdown: its markup characters are shown as written. */
-const literal = (text: string) => text.replace(/[&<>*_~`[\]]/g, (c) => `&#${c.charCodeAt(0)};`);
+export const literal = (text: string) => text.replace(/[&<>*_~`[\]]/g, (c) => `&#${c.charCodeAt(0)};`);
 
 const link = (label: string, url: string, type: string) => ({
   tag: "column", width: "auto",

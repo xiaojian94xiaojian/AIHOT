@@ -3,7 +3,7 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
 import type { ServerModule } from "@aihot/backend/modules";
 import { sql } from "@aihot/backend/db";
-import { sendJsonWithEtag, sendProblem } from "@aihot/backend/lib/http";
+import { clientIp, sendJsonWithEtag, sendProblem } from "@aihot/backend/lib/http";
 import { actorOf, adminHandler } from "@aihot/backend/admin/auth";
 import { peoplePage, personPage } from "./backend/data.ts";
 import { loadCompare } from "./backend/compare.ts";
@@ -17,7 +17,7 @@ import { algorithmPage } from "./backend/algorithm.ts";
 import { loadDailyCard } from "./backend/card.ts";
 import { recentCollectStats, snapshotCollectStats } from "./backend/collect-stats.ts";
 import { config } from "@aihot/backend/config";
-import { AlertRejected, runDailyAlerts, runReplyAlerts, statusOf, subscribe, unsubscribe } from "./backend/alerts.ts";
+import { AlertRejected, runDailyAlerts, runReplyAlerts, subscribe, unsubscribe } from "./backend/alerts.ts";
 
 /** 画像按天变化，站点接口缓存五分钟、共享缓存十分钟。 */
 const CACHE = "public, max-age=300, s-maxage=600, stale-while-revalidate=900";
@@ -101,7 +101,7 @@ export const xProfileServerModule: ServerModule = {
     app.post("/api/site/x-people/requests", guarded(async (req, reply) => {
       const body = (req.body ?? {}) as { handle?: string; note?: string; contact?: string };
       try {
-        const result = await submitRequest({ handle: String(body.handle ?? ""), note: body.note ?? null, contact: body.contact ?? null, ip: req.ip });
+        const result = await submitRequest({ handle: String(body.handle ?? ""), note: body.note ?? null, contact: body.contact ?? null, ip: clientIp(req) });
         return reply.header("Cache-Control", "no-store").code(201).send(result);
       } catch (error) {
         if (error instanceof RequestRejected) {
@@ -116,9 +116,9 @@ export const xProfileServerModule: ServerModule = {
       try {
         const result = await subscribe({
           webhook: String(body.webhook ?? ""),
-          handle: body.handle ?? null,
+          handle: typeof body.handle === "string" ? body.handle : null,
           kinds: Array.isArray(body.kinds) ? body.kinds : undefined,
-          ip: req.ip,
+          ip: clientIp(req),
           siteUrl: config.siteUrl,
         });
         return reply.header("Cache-Control", "no-store").code(201).send(result);
@@ -129,22 +129,19 @@ export const xProfileServerModule: ServerModule = {
         throw error;
       }
     }));
-    app.get("/api/site/x-people/alerts/status", guarded(async (req, reply) => {
-      const handle = String((req.query as { handle?: string }).handle ?? "");
-      const status = await statusOf(handle);
-      return reply.header("Cache-Control", "no-store").send(status ?? { active: false, kinds: [] });
-    }));
-    // 退订是点消息里的链接：给一个人看的 HTML，不进缓存。
+    // 退订：GET 只出确认页，POST 才真的退。链接预览、安全扫描抓 GET 不会误退订。
     app.get("/api/site/x-people/alerts/unsubscribe", async (req, reply) => {
       const token = String((req.query as { token?: string }).token ?? "");
-      const ok = await unsubscribe(token);
-      return reply
-        .header("Cache-Control", "no-store")
-        .type("text/html; charset=utf-8")
-        .send(ok
-          ? '<!doctype html><meta charset="utf-8"><title>已退订</title><p style="font:15px/1.6 system-ui;padding:40px">已退订，不会再收到提醒了。</p>'
-          : '<!doctype html><meta charset="utf-8"><title>链接无效</title><p style="font:15px/1.6 system-ui;padding:40px">这个退订链接无效或已经用过。</p>');
-    });    // 后台：采集成本看板（近 14 天，今天实时算）。
+      const body = token && token.length <= 100 ? confirmationPage(token) : invalidPage();
+      return reply.header("Cache-Control", "no-store").type("text/html; charset=utf-8").send(body);
+    });
+    app.post("/api/site/x-people/alerts/unsubscribe", guarded(async (req, reply) => {
+      const body = (req.body ?? {}) as { token?: string };
+      const ok = await unsubscribe(typeof body.token === "string" ? body.token : "");
+      return reply.header("Cache-Control", "no-store").send({ ok });
+    }));
+
+    // 后台：采集成本看板（近 14 天，今天实时算）。
     app.get("/api/admin/x-collect", adminHandler(async () => ({ days: await recentCollectStats(14) })));
     // 后台：待审列表与通过/驳回。
     app.get("/api/admin/x-people/requests", adminHandler(async (req) => {
@@ -208,6 +205,22 @@ export const xProfileServerModule: ServerModule = {
   },
 
   schedules: [
+    // 北京时间 08:00–08:50 每十分钟跑一次：发成功就记 card:<day>，失败的下一轮自然重试。
+    // 只在生产环境外发（预发/本地 worker 不该往读者群里推）。
+    {
+      name: "x-alert.daily",
+      cron: "0,10,20,30,40,50 8 * * *",
+      missed: "once",
+      when: () => config.environmentName === "production",
+      run: () => runDailyAlerts(config.siteUrl),
+    },
+    // 回复机会每半小时看一次（错开 5 分，避免和每日卡抢同一次计数）；没有订阅者直接返回。
+    {
+      name: "x-alert.reply",
+      cron: "5,35 * * * *",
+      when: () => config.environmentName === "production",
+      run: () => runReplyAlerts(config.siteUrl),
+    },
     // 每五分钟把新回执里的粉丝数记成当天的快照；一次最多二十秒，回填没追完的下一轮接着来。
     { name: "x-followers.scan", cron: "*/5 * * * *", run: () => scanFollowerSnapshots() },
     // 每天把前一天的采集账记一行（成本看板）；排在 04:20 的分档之后，看到的是调完档的结果。
@@ -225,3 +238,21 @@ export const xProfileServerModule: ServerModule = {
     },
   ],
 };
+
+/** 退订页：只要一个按钮，确认后才 POST。 */
+function pageOf(title: string, body: string, script = "") {
+  return `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title><div style="font:15px/1.7 system-ui;padding:40px;max-width:520px">${body}</div>${script}`;
+}
+
+function confirmationPage(token: string) {
+  const safe = token.replace(/[^A-Za-z0-9_-]/g, "");
+  return pageOf(
+    "退订提醒",
+    '<p>要退订本站的飞书提醒吗？</p><p><button id="ok" style="font:15px system-ui;padding:8px 16px;border:1px solid #ccc;border-radius:6px;background:#111;color:#fff;cursor:pointer">确认退订</button></p><p id="msg" style="color:#666"></p>',
+    `<script>document.getElementById('ok').onclick=async()=>{const r=await fetch(location.pathname,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({token:${JSON.stringify(safe)}})});const d=await r.json().catch(()=>({ok:false}));document.getElementById('msg').textContent=d.ok?'已退订，不会再收到提醒了。':'链接已失效或已经用过。';document.getElementById('ok').disabled=true;};</script>`,
+  );
+}
+
+function invalidPage() {
+  return pageOf("链接无效", '<p>这个退订链接无效或已经用过。</p>');
+}

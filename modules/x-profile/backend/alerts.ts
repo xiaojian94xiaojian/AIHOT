@@ -6,7 +6,11 @@
 // - webhook 加密存库，接口永不回显；
 // - 每人每天最多 5 条，绑定每人每天最多 5 次。
 import { sql } from "@aihot/backend/db";
+import { beijingDate, beijingDay } from "@aihot/contracts/time";
+import { lookupAccount, RequestRejected } from "./requests.ts";
 import { credential } from "@aihot/backend/config";
+import { literal } from "@aihot/backend/notify/selected-content";
+import { hashIp, SECRET_MIN, webhookHashOf } from "./hash.ts";
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 import { loadDailyCard } from "./card.ts";
 import { replyOpportunity } from "./insight.ts";
@@ -49,7 +53,7 @@ export function parseWebhook(raw: string): string | null {
 /** 加密密钥：由 SESSION_SECRET 派生，避免再引入一个必须运维的密钥。 */
 function keyOf(): Buffer | null {
   const secret = credential("auth", "SESSION_SECRET");
-  if (!secret || secret.length < 16) return null;
+  if (!secret || secret.length < SECRET_MIN) return null;
   return createHash("sha256").update(`x-alert-webhook|${secret}`).digest();
 }
 
@@ -91,10 +95,12 @@ const button = (text: string, url: string, type: "primary" | "default" = "defaul
 });
 
 /** 每天一张卡：选择题、怎么写、两个数字、现在能接一句的帖。 */
-export function dailyCard(card: XDailyCard, unsubscribeUrl: string): FeishuCard {
+export function dailyCard(card: XDailyCard, unsubscribeUrl: string, siteUrl: string): FeishuCard {
+  // 选题链接是站内相对路径，飞书按钮和 markdown 只认绝对地址。
+  const absolute = (value: string) => (/^https?:\/\//.test(value) ? value : `${siteUrl}${value.startsWith("/") ? "" : "/"}${value}`);
   const elements: Array<Record<string, unknown>> = [
-    { tag: "div", text: { tag: "lark_md", content: `**[${card.topic.title}](${card.topic.url})**` } },
-    { tag: "div", text: { tag: "lark_md", content: `**怎么写**　${card.angle}` } },
+    { tag: "div", text: { tag: "lark_md", content: `**[${literal(card.topic.title)}](${absolute(card.topic.url)})**` } },
+    { tag: "div", text: { tag: "lark_md", content: `**怎么写**　${literal(card.angle)}` } },
     {
       tag: "div",
       text: { tag: "lark_md", content: card.numbers.map((n) => `${n.label} **${n.value}**`).join("　·　") },
@@ -107,7 +113,7 @@ export function dailyCard(card: XDailyCard, unsubscribeUrl: string): FeishuCard 
       tag: "div",
       text: {
         tag: "lark_md",
-        content: `**现在能接一句** · @${c.handle}\n${c.text.slice(0, 160)}\n浏览 ${c.views} · 回复 ${c.replies}`,
+        content: `**现在能接一句** · @${c.handle}\n${literal(c.text.slice(0, 160))}\n浏览 ${c.views} · 回复 ${c.replies}`,
       },
     });
   }
@@ -120,15 +126,15 @@ export function dailyCard(card: XDailyCard, unsubscribeUrl: string): FeishuCard 
   elements.push({
     tag: "action",
     actions: [
-      button("去发", card.links.post, "primary"),
-      ...(card.links.reply ? [button("去回", card.links.reply)] : []),
-      button("看事件", card.links.story),
+      button("去发", absolute(card.links.post), "primary"),
+      ...(card.links.reply ? [button("去回", absolute(card.links.reply))] : []),
+      button("看事件", absolute(card.links.story)),
     ],
   });
   elements.push({ tag: "note", elements: [{ tag: "plain_text", content: `退订：${unsubscribeUrl}` }] });
   return {
     config: { wide_screen_mode: true },
-    header: { title: { tag: "plain_text", content: `今天写这条 · ${card.generatedAt.slice(5, 10)}` }, template: "blue" },
+    header: { title: { tag: "plain_text", content: `今天写这条 · ${beijingDay(card.generatedAt)}` }, template: "blue" },
     elements,
   };
 }
@@ -151,7 +157,7 @@ export function opportunityCard(item: Opportunity, unsubscribeUrl: string): Feis
     config: { wide_screen_mode: true },
     header: { title: { tag: "plain_text", content: `现在能接一句 · @${item.handle}` }, template: "orange" },
     elements: [
-      { tag: "div", text: { tag: "lark_md", content: item.text.slice(0, 200) } },
+      { tag: "div", text: { tag: "lark_md", content: literal(item.text.slice(0, 200)) } },
       {
         tag: "div",
         text: {
@@ -177,8 +183,8 @@ export function testCard(handle: string | null, unsubscribeUrl: string): FeishuC
         text: {
           tag: "lark_md",
           content: handle
-            ? `已绑定 **@${handle}**。每天 08:30 发一张「今天写这条」，有值得回的帖时会单独推。`
-            : "群版已绑定：每天 08:30 发一张「今天写什么」，不绑定账号。",
+            ? `已绑定 **@${handle}**。每天早上发一张「今天写这条」，有值得回的帖时会单独推。`
+            : "群版已绑定：每天早上发一张「今天写什么」，不绑定账号。",
         },
       },
       { tag: "note", elements: [{ tag: "plain_text", content: `退订：${unsubscribeUrl}` }] },
@@ -187,17 +193,21 @@ export function testCard(handle: string | null, unsubscribeUrl: string): FeishuC
 }
 
 async function send(webhook: string, card: FeishuCard): Promise<{ ok: boolean; error?: string }> {
+  // 发送前再校验一次：库里的地址也不全信（防篡改、防历史脏数据）。
+  const url = parseWebhook(webhook);
+  if (!url) return { ok: false, error: "webhook 地址不合法" };
   try {
-    const res = await fetch(webhook, {
+    const res = await fetch(url, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ msg_type: "interactive", card }),
       signal: AbortSignal.timeout(10_000),
     });
     const body = (await res.json().catch(() => null)) as { code?: number; msg?: string; StatusCode?: number } | null;
-    const code = body?.code ?? body?.StatusCode ?? -1;
+    if (!body) return { ok: false, error: `HTTP ${res.status}，返回不是 JSON（可能被代理拦了）` };
+    const code = body.code ?? body.StatusCode ?? -1;
     if (code === 0) return { ok: true };
-    return { ok: false, error: body?.msg ?? `HTTP ${res.status}` };
+    return { ok: false, error: body.msg ?? `HTTP ${res.status}` };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : String(error) };
   }
@@ -214,66 +224,126 @@ export async function subscribe(input: {
   const webhook = parseWebhook(input.webhook);
   if (!webhook) throw new AlertRejected(400, "bad_webhook", "只支持飞书自定义机器人的 webhook（https://open.feishu.cn/open-apis/bot/v2/hook/…）。");
   const secret = encryptWebhook(webhook);
-  if (!secret) throw new AlertRejected(503, "not_configured", "服务端还没配置密钥，暂时不能用。");
+  if (!secret) throw new AlertRejected(503, "not_configured", "服务端密钥没配置或长度不足，暂时不能用。");
 
   const handle = input.handle?.trim().replace(/^@/, "").toLowerCase() || null;
   if (handle && !/^[a-z0-9_]{1,30}$/.test(handle)) throw new AlertRejected(400, "bad_handle", "账号格式不对。");
 
   if (handle) {
-    const [row] = await sql<{ n: number }[]>`SELECT count(*)::int AS n FROM articles WHERE source_id = ${`x-account-${handle}`} LIMIT 1`;
-    if (!row || row.n === 0) throw new AlertRejected(400, "not_tracked", "这个账号还没有进我们的采集，先去「提交收录申请」。");
+    // 用收录申请同一个判定（sources 表 + id 归一化），不要自己拼 source_id：
+    // 有的账号 id 把下划线换成了连字符，直接拼会误拒。
+    let tracked = false;
+    try {
+      tracked = (await lookupAccount(handle)).tracked;
+    } catch (error) {
+      // 只把「handle 不合法」翻成 400；数据库故障要照常抛成 503。
+      if (error instanceof RequestRejected) throw new AlertRejected(400, "bad_handle", "账号格式不对。");
+      throw error;
+    }
+    if (!tracked) throw new AlertRejected(400, "not_tracked", "这个账号还没有进我们的采集，先去「提交收录申请」。");
   }
 
-  const ipHash = input.ip ? createHash("sha256").update(`${input.ip}|x-alert`).digest("hex") : null;
+  // 先校验参数，再占额度：漏勾提醒不该烧掉今天的绑定次数。
+  const kinds = (input.kinds ?? []).filter((kind) => ["card", "reply"].includes(kind));
+  if (kinds.length === 0) throw new AlertRejected(400, "no_kinds", "至少选一种提醒。");
+
+  const ipHash = input.ip ? hashIp(input.ip, "x-alert") : null;
+  // 先占额度再发测试消息：失败、重复绑定都算一次，否则这个开关只是个文案。
   if (ipHash) {
     const [row] = await sql<{ n: number }[]>`
-      SELECT count(*)::int AS n FROM x_alert_subscriptions
+      SELECT count(*)::int AS n FROM x_alert_attempts
       WHERE ip_hash = ${ipHash} AND created_at > now() - interval '24 hours'`;
     if (row && row.n >= MAX_PER_IP_PER_DAY) throw new AlertRejected(429, "rate_limited", "绑定太频繁了，明天再试。", 3600);
+    await sql`INSERT INTO x_alert_attempts (ip_hash) VALUES (${ipHash})`;
   }
 
-  const kinds = (input.kinds?.length ? input.kinds : ["card"]).filter((kind) => ["card", "reply"].includes(kind));
-  const token = randomBytes(16).toString("base64url");
+  const webhookHash = webhookHashOf(webhook);
+
+  // 先判占用再发消息：否则群里会先收到一张「绑定成功」，而调用方拿到 409。
+  await assertHandleClaimable(handle, webhookHash);
+
+  // 还在生效的订阅沿用旧 token：重绑时测试卡里的退订链接必须真的能用。
+  // 同一 webhook 并发重绑时后写者保留先写者的 token，前者的测试卡链接可能失效（双击级，可接受）。
+  const token = (await activeTokenFor(webhookHash)) ?? randomBytes(16).toString("base64url");
   const unsubscribeUrl = `${input.siteUrl}/api/site/x-people/alerts/unsubscribe?token=${encodeURIComponent(token)}`;
 
   const test = await send(webhook, testCard(handle, unsubscribeUrl));
   if (!test.ok) throw new AlertRejected(400, "webhook_failed", `测试消息没发出去：${test.error ?? "未知原因"}`);
-
-  // 同一个账号再绑一次，替换旧地址（旧订阅标记为退订，保留记录）。
-  if (handle) {
-    await sql`UPDATE x_alert_subscriptions SET status = 'unsubscribed' WHERE handle = ${handle} AND status = 'active'`;
-  }
-  const [row] = await sql<{ id: string }[]>`
-    INSERT INTO x_alert_subscriptions (handle, webhook, kinds, token, ip_hash)
-    VALUES (${handle}, ${secret}, ${kinds}, ${token}, ${ipHash})
-    RETURNING id`;
-  return { id: Number(row!.id), status: "active" };
+  return claimSubscription({ handle, secret, webhookHash, kinds, token });
 }
 
+/**
+ * 落库：身份是 webhook 指纹（同一个机器人再绑就更新那一行），账号只是附属。
+ * 账号已经被别的机器人占了就 409，绝不改写别人的订阅。
+ */
+export async function assertHandleClaimable(handle: string | null, webhookHash: string): Promise<void> {
+  if (!handle) return;
+  const [owner] = await sql<{ webhook_hash: string | null }[]>`
+    SELECT webhook_hash FROM x_alert_subscriptions WHERE handle = ${handle} AND status = 'active' LIMIT 1`;
+  if (owner && owner.webhook_hash !== webhookHash) {
+    throw new AlertRejected(409, "handle_taken", "这个账号已经绑定了别的飞书群；先让那边退订，或者换一个账号。");
+  }
+}
+
+export async function claimSubscription(input: {
+  handle: string | null;
+  secret: string;
+  webhookHash: string;
+  kinds: string[];
+  token: string;
+}): Promise<{ id: number; status: "active" }> {
+  const { handle, secret, webhookHash, kinds, token } = input;
+  await assertHandleClaimable(handle, webhookHash);
+  try {
+    const [row] = await sql<{ id: string }[]>`
+      INSERT INTO x_alert_subscriptions (handle, webhook, webhook_hash, kinds, token)
+      VALUES (${handle}, ${secret}, ${webhookHash}, ${kinds}, ${token})
+      ON CONFLICT (webhook_hash) WHERE webhook_hash IS NOT NULL DO UPDATE
+        SET handle = EXCLUDED.handle,
+            webhook = EXCLUDED.webhook,
+            kinds = EXCLUDED.kinds,
+            -- 活跃订阅保留旧 token（重绑卡里的链接才不会失效）；退订过的换新 token，旧链接永久作废。
+            token = CASE WHEN x_alert_subscriptions.status = 'active' THEN x_alert_subscriptions.token ELSE EXCLUDED.token END,
+            status = 'active'
+      RETURNING id`;
+    return { id: Number(row!.id), status: "active" };
+  } catch (error) {
+    // 并发下 handle 唯一索引仍可能被另一个请求先占：翻成人话。
+    if (typeof error === "object" && error && "code" in error && (error as { code?: string }).code === "23505") {
+      throw new AlertRejected(409, "handle_taken", "这个账号刚刚被绑定了；先让那边退订，或者换一个账号。");
+    }
+    throw error;
+  }
+}
 export async function unsubscribe(token: string): Promise<boolean> {
   if (!token || token.length > 100) return false;
+  // 退订：释放 handle、清掉群凭证、换新 token（用过的链接永久失效）。
   const rows = await sql<{ id: string }[]>`
-    UPDATE x_alert_subscriptions SET status = 'unsubscribed'
+    UPDATE x_alert_subscriptions
+    SET status = 'unsubscribed', handle = NULL, webhook = '', token = ${randomBytes(16).toString("base64url")}
     WHERE token = ${token} AND status = 'active' RETURNING id`;
   return rows.length > 0;
 }
 
-export async function statusOf(handle: string): Promise<{ active: boolean; kinds: string[] } | null> {
-  const clean = handle.trim().replace(/^@/, "").toLowerCase();
-  const [row] = await sql<{ kinds: string[] }[]>`
-    SELECT kinds FROM x_alert_subscriptions WHERE handle = ${clean} AND status = 'active' LIMIT 1`;
-  return row ? { active: true, kinds: row.kinds } : null;
-}
-
 /** 每日一张卡：给每个绑了账号的订阅发一条，发过就跳过（同一订阅同一天只发一次）。 */
 export async function runDailyAlerts(siteUrl: string, now = new Date()): Promise<{ sent: number; skipped: number; failed: number }> {
-  const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai" }).format(now);
+  const day = beijingDate(now);
+  // 顺手清掉 30 天前的去重记录：它只用来防重发，不需要长期留着。
+  await sql`DELETE FROM x_alert_sent WHERE created_at IS NULL OR created_at < now() - interval '30 days'`;
+  await sql`DELETE FROM x_alert_attempts WHERE created_at < now() - interval '2 days'`;
   const subs = await sql<{ id: string; handle: string | null; webhook: string; token: string }[]>`
     SELECT id, handle, webhook, token FROM x_alert_subscriptions
-    WHERE status = 'active' AND 'card' = ANY(kinds) LIMIT 500`;
+    WHERE status = 'active' AND 'card' = ANY(kinds) ORDER BY id LIMIT 500`;
   let sent = 0;
   let skipped = 0;
   let failed = 0;
+  // 同一个选题/账号的卡片只算一次：群里绑同一个 handle 的人多时不用重复查库。
+  const cards = new Map<string, Awaited<ReturnType<typeof loadDailyCard>>>();
+  const cardFor = async (handle: string | null) => {
+    const key = handle ?? "";
+    if (!cards.has(key)) cards.set(key, await loadDailyCard(handle));
+    return cards.get(key) ?? null;
+  };
   for (const sub of subs) {
     const key = `card:${day}`;
     const [already] = await sql<{ n: number }[]>`
@@ -281,38 +351,45 @@ export async function runDailyAlerts(siteUrl: string, now = new Date()): Promise
     if (already && already.n > 0) { skipped += 1; continue; }
     const webhook = decryptWebhook(sub.webhook);
     if (!webhook) { failed += 1; continue; }
-    const card = await loadDailyCard(sub.handle);
+    const card = await cardFor(sub.handle);
     if (!card) { skipped += 1; continue; }
     const unsubscribeUrl = `${siteUrl}/api/site/x-people/alerts/unsubscribe?token=${encodeURIComponent(sub.token)}`;
-    const result = await send(webhook, dailyCard(card, unsubscribeUrl));
+    const result = await send(webhook, dailyCard(card, unsubscribeUrl, siteUrl));
     if (result.ok) {
       sent += 1;
-      await sql`INSERT INTO x_alert_sent (subscription_id, key) VALUES (${Number(sub.id)}, ${key}) ON CONFLICT DO NOTHING`;
-      await sql`UPDATE x_alert_subscriptions SET last_sent_at = now(), sent_on = ${day}::date, sent_count = CASE WHEN sent_on = ${day}::date THEN sent_count + 1 ELSE 1 END WHERE id = ${Number(sub.id)}`;
+      await sql`INSERT INTO x_alert_sent (subscription_id, key, created_at) VALUES (${Number(sub.id)}, ${key}, now()) ON CONFLICT DO NOTHING`;
+      await sql`UPDATE x_alert_subscriptions SET sent_on = ${day}::date, sent_count = CASE WHEN sent_on = ${day}::date THEN sent_count + 1 ELSE 1 END WHERE id = ${Number(sub.id)}`;
     } else {
       failed += 1;
     }
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    await new Promise((resolve) => setTimeout(resolve, 600));
   }
   return { sent, skipped, failed };
 }
 
 /** 回复机会：每半小时扫一次最近 3 小时的帖，给订阅了 reply 的人各发一条（每人每天最多 5 条）。 */
 export async function runReplyAlerts(siteUrl: string, now = new Date()): Promise<{ sent: number; failed: number }> {
+  // 没人订阅回复机会时，连「找机会」的查询都不跑（它每半小时一次，扫的是全站帖）。
+  const [wanted] = await sql<{ n: number }[]>`
+    SELECT count(*)::int AS n FROM x_alert_subscriptions WHERE status = 'active' AND 'reply' = ANY(kinds)`;
+  if (!wanted || wanted.n === 0) return { sent: 0, failed: 0 };
   const items = await findOpportunities();
   if (items.length === 0) return { sent: 0, failed: 0 };
-  const subs = await sql<{ id: string; handle: string | null; webhook: string; token: string; sent_on: string | null; sent_count: number }[]>`
-    SELECT id, handle, webhook, token, to_char(sent_on, 'YYYY-MM-DD') AS sent_on, sent_count
-    FROM x_alert_subscriptions WHERE status = 'active' AND 'reply' = ANY(kinds) LIMIT 500`;
-  const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai" }).format(now);
+  const subs = await sql<{ id: string; webhook: string; token: string; sent_on: string | null; sent_count: number }[]>`
+    SELECT id, webhook, token, to_char(sent_on, 'YYYY-MM-DD') AS sent_on, sent_count
+    FROM x_alert_subscriptions WHERE status = 'active' AND 'reply' = ANY(kinds) ORDER BY id LIMIT 500`;
+  const day = beijingDate(now);
   let sent = 0;
   let failed = 0;
   for (const sub of subs) {
-    if (sub.sent_on === day && sub.sent_count >= MAX_PER_DAY_PER_SUB) continue;
+    // 上限按条计：每发一条前复查一次，避免「进来时 4 条、一次再发 3 条」冲到 7 条。
+    let count = sub.sent_on === day ? sub.sent_count : 0;
+    if (count >= MAX_PER_DAY_PER_SUB) continue;
     const webhook = decryptWebhook(sub.webhook);
     if (!webhook) { failed += 1; continue; }
     const unsubscribeUrl = `${siteUrl}/api/site/x-people/alerts/unsubscribe?token=${encodeURIComponent(sub.token)}`;
     for (const item of items.slice(0, 3)) {
+      if (count >= MAX_PER_DAY_PER_SUB) break;
       const key = `reply:${item.id}`;
       const [already] = await sql<{ n: number }[]>`
         SELECT count(*)::int AS n FROM x_alert_sent WHERE subscription_id = ${Number(sub.id)} AND key = ${key}`;
@@ -320,9 +397,10 @@ export async function runReplyAlerts(siteUrl: string, now = new Date()): Promise
       const result = await send(webhook, opportunityCard(item, unsubscribeUrl));
       if (!result.ok) { failed += 1; break; }
       sent += 1;
-      await sql`INSERT INTO x_alert_sent (subscription_id, key) VALUES (${Number(sub.id)}, ${key}) ON CONFLICT DO NOTHING`;
-      await sql`UPDATE x_alert_subscriptions SET last_sent_at = now(), sent_on = ${day}::date, sent_count = CASE WHEN sent_on = ${day}::date THEN sent_count + 1 ELSE 1 END WHERE id = ${Number(sub.id)}`;
-      await new Promise((resolve) => setTimeout(resolve, 200));
+      count += 1;
+      await sql`INSERT INTO x_alert_sent (subscription_id, key, created_at) VALUES (${Number(sub.id)}, ${key}, now()) ON CONFLICT DO NOTHING`;
+      await sql`UPDATE x_alert_subscriptions SET sent_on = ${day}::date, sent_count = CASE WHEN sent_on = ${day}::date THEN sent_count + 1 ELSE 1 END WHERE id = ${Number(sub.id)}`;
+      await new Promise((resolve) => setTimeout(resolve, 600));
     }
   }
   return { sent, failed };
@@ -360,4 +438,11 @@ async function findOpportunities(): Promise<Opportunity[]> {
       ageHours: (now - new Date(row.published_at).getTime()) / 3_600_000,
       median: Math.round(Number(row.median)),
     }));
+}
+
+/** 这个机器人还在生效的退订 token；没有就返回 null。 */
+export async function activeTokenFor(webhookHash: string): Promise<string | null> {
+  const [row] = await sql<{ token: string }[]>`
+    SELECT token FROM x_alert_subscriptions WHERE webhook_hash = ${webhookHash} AND status = 'active' LIMIT 1`;
+  return row?.token ?? null;
 }

@@ -9,7 +9,7 @@ export const handle = { tab: "x-tools", name: "飞书提醒" } as const;
 export function meta() {
   return pageMeta({
     title: "飞书提醒：每天一张卡推到手边",
-    description: "绑定飞书自定义机器人，每天 08:30 收到一张「今天写这条」，有值得回的帖时再单独推一条。",
+    description: "绑定飞书自定义机器人，每天早上收到一张「今天写这条」，有值得回的帖时再单独推一条。",
     path: "/x-people/alerts",
   });
 }
@@ -58,7 +58,7 @@ export default function AlertsPage() {
       <header className="mt-2">
         <h1 className="text-[24px] font-black tracking-[-0.02em] text-ink lg:text-[28px]">飞书提醒</h1>
         <p className="mt-1 text-[13px] leading-relaxed text-ink-3">
-          每天 08:30 给你发一张「今天写这条」；有值得接一句的帖时，单独推一条。绑定不需要账号，退订在每条消息底部。
+          每天早上给你发一张「今天写这条」；有值得接一句的帖时，单独推一条。绑定不需要账号，退订在每条消息底部。
         </p>
       </header>
 
@@ -100,7 +100,7 @@ export default function AlertsPage() {
           <legend className="text-[12.5px] text-ink-2">要哪些提醒</legend>
           <label className="flex items-center gap-2 text-[12.5px] text-ink-2">
             <input type="checkbox" checked={kinds.includes("card")} onChange={() => toggle("card")} />
-            每天 08:30 一张卡
+            每天早上 8 点一张卡
           </label>
           <label className="flex items-center gap-2 text-[12.5px] text-ink-2">
             <input type="checkbox" checked={kinds.includes("reply")} onChange={() => toggle("reply")} />

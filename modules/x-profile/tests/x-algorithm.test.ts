@@ -3,7 +3,7 @@ import "../../../tests/setup.ts";
 import assert from "node:assert/strict";
 import { after, test } from "node:test";
 import { closeDb } from "@aihot/backend/db";
-import { decayVerdict, discussVerdict, linkVerdict } from "../backend/algorithm.ts";
+import { algorithmPage, decayVerdict, discussVerdict, linkVerdict } from "../backend/algorithm.ts";
 
 after(closeDb);
 
@@ -25,4 +25,17 @@ test("讨论率与涨粉：相关很弱时写「看不清」，样本不够也�
   assert.equal(weak.verdict, "看不清");
   assert.match(weak.summary, /3.22%/);
   assert.equal(discussVerdict({ accounts: 10, corr: 0.5, high: { accounts: 5, median: 1 }, low: { accounts: 5, median: 1 } }).verdict, "看不清");
+});
+
+test("讨论率与涨粉：负相关不能写成「成立」", () => {
+  const negative = discussVerdict({ accounts: 91, corr: -0.45, high: { accounts: 20, median: 1 }, low: { accounts: 60, median: 3 } });
+  assert.equal(negative.verdict, "不成立");
+  assert.match(negative.summary, /负相关/);
+});
+
+// 这条跑真 SQL：2026-11 有过一次 `AT TIME ZONE` 参数丢失，页面 503 而单元测试全绿。
+test("算法视角的 SQL 能跑完并返回三个结论", async () => {
+  const page = await algorithmPage.get(undefined);
+  assert.equal(page.checks.length, 3);
+  for (const check of page.checks) assert.ok(["成立", "不成立", "看不清"].includes(check.verdict));
 });

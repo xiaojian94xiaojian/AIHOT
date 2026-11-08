@@ -4,7 +4,7 @@
 // hot_signal 源，审计与去重都留在那一处。查询只读本地的 sources，不调任何付费接口。
 import { sql } from "@aihot/backend/db";
 import { createSource } from "@aihot/backend/admin/sources";
-import { sha256 } from "@aihot/backend/lib/ids";
+import { hashIp } from "./hash.ts";
 import type { XAccountLookup, XAccountRequest, XAccountRequestList } from "../types.ts";
 
 /** X 的 handle：字母、数字、下划线，最长 30。 */
@@ -82,7 +82,7 @@ export async function submitRequest(input: SubmitRequestInput): Promise<{ status
   if (existing && existing.status !== "rejected") return { status: existing.status };
   if (existing && Date.now() - existing.created_at.getTime() < REAPPLY_AFTER_MS) return { status: "rejected" };
 
-  const ipHash = input.ip ? sha256(`${input.ip}|x-account-request`) : null;
+  const ipHash = input.ip ? hashIp(input.ip, "x-account-request") : null;
   if (ipHash) {
     const [{ n }] = await sql<{ n: number }[]>`
       SELECT count(*)::int AS n FROM x_account_requests
