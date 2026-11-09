@@ -23,13 +23,42 @@ test("weeks are follower counts at each Sunday, minus the Sunday before", () => 
   ];
   const weeks = weeksFrom(points, "2026-11-05");
   assert.deepEqual(weeks, [
-    { start: "2026-10-19", end: "2026-10-25", followers: 950, growth: 70 },
-    { start: "2026-10-26", end: "2026-11-01", followers: 1000, growth: 50 },
+    { start: "2026-10-19", end: "2026-10-25", followers: 950, baselineOn: "2026-10-18", growth: 70 },
+    { start: "2026-10-26", end: "2026-11-01", followers: 1000, baselineOn: "2026-10-25", growth: 50 },
   ], "the running week is not reported; each item counts from the Sunday before its Monday");
   assert.deepEqual(weeksFrom(points, "2026-11-05", 1), weeks.slice(1), "only the weeks asked for, still in order");
   assert.deepEqual(weeksFrom([{ day: "2026-10-28", followers: 900 }], "2026-11-05"), [], "a week with no baseline is not invented");
 });
 
+test("a week with no snapshot inside is skipped, not reported as +0", () => {
+  const points = [
+    { day: "2026-09-20", followers: 500 },
+    { day: "2026-11-01", followers: 900 },
+  ];
+  const weeks = weeksFrom(points, "2026-11-05");
+  assert.equal(weeks.length, 1, "only the week that actually has a snapshot");
+  assert.equal(weeks[0].start, "2026-10-26");
+  assert.equal(weeks[0].baselineOn, "2026-09-20", "基线是哪天就写哪天，不假装是上周");
+  assert.equal(weeks[0].growth, 400);
+});
+test("a snapshot on Monday alone still counts as a sampled week", () => {
+  const mondayOnly = [
+    { day: "2026-10-18", followers: 800 },
+    { day: "2026-10-19", followers: 810 },
+  ];
+  const weeks = weeksFrom(mondayOnly, "2026-11-05");
+  assert.equal(weeks.length, 1, "周一那条快照让 10-19 那周成立（>= start，不是 > start）");
+  assert.deepEqual(weeks[0], { start: "2026-10-19", end: "2026-10-25", followers: 810, baselineOn: "2026-10-18", growth: 10 });
+
+  const fullWeek = [
+    { day: "2026-10-18", followers: 800 },
+    { day: "2026-10-19", followers: 810 },
+    { day: "2026-10-25", followers: 900 },
+  ];
+  const week = weeksFrom(fullWeek, "2026-11-05")[0];
+  assert.equal(week.followers, 900);
+  assert.equal(week.growth, 100);
+});
 test("the feed is RSS with one item per finished week, and escapes what readers show", async () => {
   const handle = `feed_digest_${Date.now().toString(36)}`;
   for (const [day, followers] of [["2026-10-25", 950], ["2026-11-01", 1000]] as const) {

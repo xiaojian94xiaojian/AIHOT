@@ -3,7 +3,8 @@
 // 一张卡只回答一个问题：「今天写什么」。其他页面继续负责「看大盘」。
 import { sql } from "@aihot/backend/db";
 import { cached } from "@aihot/backend/lib/cache";
-import { projected24hViews, replyOpportunity } from "./insight.ts";
+import { replyOpportunity } from "./insight.ts";
+import { sourceIdsOfHandle } from "./followers.ts";
 import { structureMedians, structureVerdict } from "./structure.ts";
 import { todaysTopics } from "./today.ts";
 import type { XCommentable, XDailyCard, XTodayTopic } from "../types.ts";
@@ -20,6 +21,9 @@ function opportunity(post: XCommentable, now: number) {
 
 /** 你最近 120 天的互动结构（轻量版，只为了给一句诊断）。 */
 async function myStructure(handle: string) {
+  // 源 id 不一定是 x-account-<handle>：历史源会把下划线换成连字符，必须查表。
+  const ids = (await sourceIdsOfHandle(handle)).filter((id) => id.startsWith("x-account-"));
+  if (ids.length === 0) return null;
   const [row] = await sql<{ likes: string | null; reposts: string | null; replies: string | null; quotes: string | null; followers: string | null; posts120d: number; views120d: string; posts7d: number }[]>`
     WITH p AS (
       SELECT coalesce((a.raw->>'views')::bigint, 0) AS views,
@@ -29,7 +33,7 @@ async function myStructure(handle: string) {
              coalesce((a.raw->>'quote')::bigint, 0) AS quotes,
              a.published_at
       FROM articles a
-      WHERE a.source_id = ${`x-account-${handle}`}
+      WHERE a.source_id IN ${sql(ids)}
         AND a.published_at > now() - interval '120 days'
         AND NOT (a.x_post->'replyTo' IS NOT NULL AND a.x_post->'replyTo' <> 'null'::jsonb)
     )
@@ -91,7 +95,7 @@ export async function loadDailyCard(handle?: string | null): Promise<DailyCard |
     commentable: commentable
       ? {
           ...commentable,
-          remainingViews: commentable.views > 0 ? projected24hViews(commentable.views, (now - new Date(commentable.at).getTime()) / 3_600_000) : null,
+          // 12 小时窗口的剩余浏览已在 pickCommentable 里算好，别再覆盖成 24 小时预测。
         }
       : null,
     me: clean

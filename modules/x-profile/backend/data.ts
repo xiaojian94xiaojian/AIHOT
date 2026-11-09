@@ -4,7 +4,7 @@
 // 所以它适合横向比较，不适合当“这条最终有多少赞”。时间一律按北京时间切分。
 import { sql } from "@aihot/backend/db";
 import { cached, cachedByKey } from "@aihot/backend/lib/cache";
-import { BEIJING_TIMEZONE } from "@aihot/contracts/time";
+import { BEIJING_TIMEZONE, beijingDate } from "@aihot/contracts/time";
 import { personKind, regionOf } from "./classify.ts";
 import { accountMeta } from "./meta.ts";
 import { structureMediansCached, structureVerdict } from "./structure.ts";
@@ -49,7 +49,7 @@ export const SUMMARY = sql`
   max(author) AS author,
   max(avatar) AS avatar,
   count(*)::int AS posts,
-  count(DISTINCT published_at::date)::int AS active_days,
+  count(DISTINCT (published_at AT TIME ZONE ${BEIJING_TIMEZONE})::date)::int AS active_days,
   min(published_at) AS first_at,
   max(published_at) AS last_at,
   round(avg(views))::bigint AS avg_views,
@@ -110,7 +110,9 @@ const round2 = (value: number) => Math.round(value * 100) / 100;
 export function toSummary(row: SummaryRow): XPersonSummary {
   const first = new Date(row.first_at).getTime();
   const last = new Date(row.last_at).getTime();
-  const days = Math.max(1, Math.ceil((last - first) / 86_400_000) + 1);
+  // 按北京时间的「自然日」数，不是按毫秒向上取整：同一天发 5 条不能算 2 天。
+  const dayOf = (at: Date) => Date.parse(`${beijingDate(at)}T00:00:00Z`) / 86_400_000;
+  const days = Math.max(1, dayOf(new Date(last)) - dayOf(new Date(first)) + 1);
   return {
     sourceId: row.source_id,
     handle: row.handle ?? row.source_id.replace(/^x-account-/, ""),
@@ -402,10 +404,11 @@ export async function loadPerson(handle: string): Promise<XPersonResponse | null
   const [meta, median, snap] = await Promise.all([
     accountMeta([summary.handle]),
     structureMediansCached(),
-    sql<{ followers: string }[]>`SELECT followers::text AS followers FROM x_follower_snapshots WHERE handle = ${resolvedHandle} ORDER BY captured_on DESC LIMIT 1`,
+    sql<{ followers: string }[]>`SELECT followers::text AS followers FROM x_follower_snapshots WHERE handle = lower(${resolvedHandle}) ORDER BY captured_on DESC LIMIT 1`,
   ]);
   // 破圈系数要粉丝数：优先用最新快照，没有快照时退回画像里的值。
   const followers = snap[0] ? Number(snap[0].followers) : summary.followers;
+  summary.followers = followers ?? null;
   const structure = { median, verdict: structureVerdict(summary.perK, median) };
   return {
     person: meta.get(summary.handle) ? { ...summary, kind: meta.get(summary.handle)!.kind, category: meta.get(summary.handle)!.category } : summary,

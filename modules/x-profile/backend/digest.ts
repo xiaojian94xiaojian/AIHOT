@@ -15,7 +15,9 @@ export interface DigestWeek {
   end: string;
   /** 周日那天（或之前最近一天）的粉丝数。 */
   followers: number;
-  /** 相对上周同一天的净增。 */
+  /** 基线取的是哪一天的快照（稀疏快照时可能远早于上周同日）。 */
+  baselineOn: string;
+  /** 相对 baselineOn 那天的净增。 */
   growth: number;
 }
 
@@ -30,12 +32,12 @@ export function weekStartOf(day: string): string {
   return addDays(day, -((weekday + 6) % 7));
 }
 
-/** 某天的粉丝数：取这一天或之前最近一次快照。 */
-function atOrBefore(points: readonly Point[], day: string): number | null {
-  let found: number | null = null;
+/** 某天或之前最近一次快照（返回整点，用来记录基线日期）；没有就 null。 */
+function pointAtOrBefore(points: readonly Point[], day: string): Point | null {
+  let found: Point | null = null;
   for (const point of points) {
     if (point.day > day) break;
-    found = point.followers;
+    found = point;
   }
   return found;
 }
@@ -50,9 +52,13 @@ export function weeksFrom(points: readonly Point[], today: string, weeks = DEFAU
   for (let i = 0; i < weeks; i += 1) {
     const end = addDays(start, 6);
     const before = addDays(start, -1);
-    const closed = atOrBefore(points, end);
-    const baseline = atOrBefore(points, before);
-    if (closed !== null && baseline !== null) out.push({ start, end, followers: closed, growth: closed - baseline });
+    // 这一周里一次快照都没有：前后两点会算出一个假的 0，跳过不写。
+    const sampled = points.some((point) => point.day >= start && point.day <= end);
+    const closed = pointAtOrBefore(points, end);
+    const baseline = pointAtOrBefore(points, before);
+    if (sampled && closed && baseline) {
+      out.push({ start, end, followers: closed.followers, baselineOn: baseline.day, growth: closed.followers - baseline.followers });
+    }
     start = addDays(start, -7);
   }
   return out.reverse();
@@ -87,7 +93,7 @@ export async function growthDigest(handle: string, today = beijingDate(new Date(
     .reverse()
     .map((week) => {
       const title = `${week.end} 那周：${signed(week.growth)} 粉，共 ${week.followers.toLocaleString("en-US")} 粉`;
-      const description = `${label} 在 ${week.start} 至 ${week.end} 的七天里净增 ${signed(week.growth)} 粉，`
+      const description = `${label} 从 ${week.baselineOn} 到 ${week.end} 净增 ${signed(week.growth)} 粉，`
         + `到周日累计 ${week.followers.toLocaleString("en-US")} 粉。名次与每千曝光见 <a href="${escapeXml(pageUrl)}">画像页</a>。`;
       return `    <item>
       <title>${escapeXml(title)}</title>

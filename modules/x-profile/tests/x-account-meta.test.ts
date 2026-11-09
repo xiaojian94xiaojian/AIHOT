@@ -64,4 +64,13 @@ test("the model's labels override the code's kind table on the list and the prof
   const person = await loadPerson("LabA");
   assert.equal(person?.person.kind, "builder");
   assert.equal(person?.person.category, "product");
+
+  // 快照表只存小写 handle：混合大小写的账号也要能查到粉丝数。
+  await sql`DELETE FROM x_follower_snapshots WHERE handle = 'laba'`;
+  await sql`
+    INSERT INTO x_follower_snapshots (handle, captured_on, screen_name, followers, captured_at, receipt_id)
+    VALUES ('laba', '2026-11-01', 'LabA', 1234, '2026-11-01T12:00:00+08:00', 0)`;
+  const withFollowers = await loadPerson("LabA");
+  assert.equal(withFollowers?.person.followers, 1234, "lower(handle) 之后混合大小写也能查到快照");
+  await sql`DELETE FROM x_follower_snapshots WHERE handle = 'laba'`;
 });

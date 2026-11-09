@@ -45,6 +45,12 @@ test("每千曝光的互动结构按官方动作拆开，保留一位小数", ()
   assert.deepEqual(summary.perK, { likes: 10.4, reposts: 2.6, replies: 1.5, quotes: 0.4 }, "each action is counted per 1,000 views");
 });
 
+test("同一天发多条只算 1 天，跨北京时间的零点才不会多算", () => {
+  const sameDay = toSummary(row({ first_at: new Date("2026-11-01T01:00:00Z"), last_at: new Date("2026-11-01T10:00:00Z"), posts: 5 }));
+  assert.equal(sameDay.days, 1, "09:00 和 18:00（北京时间）是同一天");
+  const acrossMidnight = toSummary(row({ first_at: new Date("2026-11-01T15:30:00Z"), last_at: new Date("2026-11-01T16:30:00Z") }));
+  assert.equal(acrossMidnight.days, 2, "北京时间 23:30 与次日 00:30 是两天");
+});
 test("没有浏览数据的账号结构全是 0，不会出现 NaN", () => {
   const summary = toSummary(row({ like_per_k: null, repost_per_k: null, reply_per_k: null, quote_per_k: null }));
   assert.deepEqual(summary.perK, { likes: 0, reposts: 0, replies: 0, quotes: 0 });
