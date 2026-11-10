@@ -54,6 +54,17 @@ export default function AlgorithmPage() {
           <span>只算原创帖</span>
           <Link to="/x-people/methodology#algorithm" className="ml-auto text-accent hover:underline font-medium">官方权重表 →</Link>
         </div>
+        <div className="mt-3 flex flex-wrap gap-2 text-[12px]">
+          <Link to="/x-people/methodology#algorithm" className="min-h-[32px] inline-flex items-center rounded-full border border-line px-3 py-1 text-ink-2 transition-colors hover:border-accent hover:text-ink">
+            返回方法论
+          </Link>
+          <Link to="/x-people" className="min-h-[32px] inline-flex items-center rounded-full border border-line px-3 py-1 text-ink-2 transition-colors hover:border-accent hover:text-ink">
+            博主列表
+          </Link>
+          <Link to="/x-people/growth" className="min-h-[32px] inline-flex items-center rounded-full border border-line px-3 py-1 text-ink-2 transition-colors hover:border-accent hover:text-ink">
+            涨粉榜
+          </Link>
+        </div>
       </header>
 
       {/* 结构化卡片排版，带醒目量化数据 */}

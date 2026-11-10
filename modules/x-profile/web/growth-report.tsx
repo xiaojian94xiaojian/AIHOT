@@ -5,7 +5,9 @@ import type { XGrowthReportResponse } from "../types";
 import { edgeTtl, loadOr404 } from "@aihot/web/lib/api.server";
 import { pageMeta } from "@aihot/web/lib/seo";
 import { monthDay } from "@aihot/contracts/time";
+import { SourceAvatar } from "@aihot/web/components/ui/SourceAvatar";
 import { signed, stamp } from "./format";
+import { IconAlertTriangle, IconTrophy, IconZap } from "./icons";
 
 export async function loader({ request }: { request: Request }) {
   return loadOr404<XGrowthReportResponse>("/api/site/x-people/growth/report", { signal: request.signal });
@@ -66,32 +68,34 @@ export default function GrowthReportPage() {
           {summary && (
             <div className="rounded-card border border-line-soft bg-bg-sunk/60 p-4 text-[13px] leading-relaxed text-ink-2">
               <h2 className="text-[13px] font-semibold text-ink">本周大盘速览</h2>
-              <div className="mt-2 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-[12.5px]">
-                <span>
-                  <span className="text-ink-4">冠军 </span>
-                  <Link to={`/x-people/${summary.champion.handle}`} className="text-ink hover:text-accent">
+              <div className="mt-2.5 flex flex-wrap items-center gap-2 text-[12px]">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-accent/25 bg-accent-soft/40 px-2.5 py-1">
+                  <IconTrophy size={13} className="text-accent shrink-0" />
+                  <b className="text-ink">冠军</b>
+                  <Link to={`/x-people/${summary.champion.handle}`} className="font-bold text-accent hover:underline">
                     {summary.champion.name}
                   </Link>
-                  <span className="num ml-1 text-ink-3">{signed(summary.champion.growth)} 粉 · 每千曝光 {summary.champion.perK ?? "—"}</span>
+                  <span className="num text-ink-3">{signed(summary.champion.growth)} 粉 · 每千曝光 {summary.champion.perK ?? "—"}</span>
                 </span>
                 {summary.darkHorse && (
-                  <span>
-                    <span className="text-ink-4">黑马 </span>
-                    <Link to={`/x-people/${summary.darkHorse.handle}`} className="text-ink hover:text-accent">
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface px-2.5 py-1">
+                    <IconZap size={13} className="text-accent shrink-0" />
+                    <b className="text-ink">黑马</b>
+                    <Link to={`/x-people/${summary.darkHorse.handle}`} className="font-bold text-ink hover:text-accent">
                       {summary.darkHorse.name}
                     </Link>
-                    <span className="num ml-1 text-ink-3">{signed(summary.darkHorse.growth)} 粉 · 每千曝光 {summary.darkHorse.perK ?? "—"}</span>
+                    <span className="num text-ink-3">{signed(summary.darkHorse.growth)} 粉 · 每千曝光 {summary.darkHorse.perK ?? "—"}</span>
                   </span>
                 )}
                 {summary.cautions.length > 0 && (
-                  <>
-                    <span className="text-ink-3">另有 {summary.cautions.length} 个账号需核对：</span>
+                  <div className="mt-1 flex w-full flex-wrap items-center gap-1.5 pt-1 text-ink-3">
+                    <span className="inline-flex items-center gap-1 text-ink-4"><IconAlertTriangle size={12} className="text-amber-ink" />需核对账号：</span>
                     {summary.cautions.map((row) => (
-                      <Link key={row.handle} to={`/x-people/${row.handle}`} className="num rounded-full border border-line px-2 py-0.5 text-[11.5px] text-ink-2 hover:border-amber hover:text-amber">
+                      <Link key={row.handle} to={`/x-people/${row.handle}`} className="num rounded-full border border-line bg-surface px-2 py-0.5 text-[11px] text-ink-2 hover:border-amber hover:text-amber">
                         {row.name} {signed(row.growth)}
                       </Link>
                     ))}
-                  </>
+                  </div>
                 )}
               </div>
               {summary.moves.length > 0 && (
@@ -103,13 +107,16 @@ export default function GrowthReportPage() {
           <ol className="space-y-4">
             {reports.map((report) => (
               <li key={report.handle} className="rounded-card border border-line bg-surface p-4 lg:p-5">
-                <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-line-soft pb-3">
-                  <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
-                    <Link to={`/x-people/${report.handle}`} className="text-[17px] font-bold text-ink hover:text-accent">
-                      {report.name ?? report.screenName}
-                    </Link>
-                    <span className="num text-[12.5px] text-ink-3">@{report.handle}</span>
-                    <span className="num font-semibold text-accent">{signed(report.growth)} 粉</span>
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line-soft pb-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <SourceAvatar name={report.name ?? report.screenName} avatarUrl={report.avatarUrl} size={36} />
+                    <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
+                      <Link to={`/x-people/${report.handle}`} className="text-[16px] font-bold text-ink hover:text-accent">
+                        {report.name ?? report.screenName}
+                      </Link>
+                      <span className="num text-[12.5px] text-ink-3">@{report.handle}</span>
+                      <span className="num font-semibold text-accent">{signed(report.growth)} 粉</span>
+                    </div>
                   </div>
                   <div className="flex items-center gap-2 text-[11.5px] text-ink-4">
                     <span>置信度：{confidence[report.report.confidence]}</span>

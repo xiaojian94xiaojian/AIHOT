@@ -1,6 +1,7 @@
 // 飞书提醒：把「每天一张卡」和「回复机会」推到你自己的飞书群。
 // 不需要登录：绑一个飞书自定义机器人的 webhook 就行，消息里带退订链接。
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { KEYS, readRaw, writeRaw } from "@aihot/web/lib/local-state";
 import { Link } from "react-router";
 import { pageMeta } from "@aihot/web/lib/seo";
 
@@ -19,6 +20,11 @@ type State = { status: "idle" | "loading" | "ok" | "error"; message?: string };
 export default function AlertsPage() {
   const [webhook, setWebhook] = useState("");
   const [handleValue, setHandleValue] = useState("");
+
+  useEffect(() => {
+    const stored = readRaw(KEYS.xMineHandle);
+    if (stored && !handleValue) setHandleValue(stored);
+  }, []);
   const [kinds, setKinds] = useState<string[]>(["card"]);
   const [state, setState] = useState<State>({ status: "idle" });
 
@@ -39,6 +45,8 @@ export default function AlertsPage() {
       if (res.ok) {
         setState({ status: "ok", message: "绑定成功，去飞书看看刚才那条测试消息。" });
         setWebhook("");
+        const next = handleValue.trim().replace(/^@/, "").toLowerCase();
+        if (next) writeRaw(KEYS.xMineHandle, next);
       } else {
         setState({ status: "error", message: data.detail ?? "没绑上，检查一下地址再试。" });
       }
@@ -112,12 +120,12 @@ export default function AlertsPage() {
           <button
             type="submit"
             disabled={state.status === "loading"}
-            className="rounded-full bg-ink px-3.5 py-1.5 text-[13px] font-medium text-bg disabled:opacity-60"
+            className="min-h-[36px] rounded-full bg-ink px-3.5 py-1.5 text-[13px] font-medium text-bg transition-opacity hover:opacity-90 disabled:opacity-60"
           >
             {state.status === "loading" ? "发送测试…" : "绑定并测试"}
           </button>
           {state.status === "ok" && <span className="text-[12.5px] text-accent">{state.message}</span>}
-          {state.status === "error" && <span className="text-[12.5px] text-red-600">{state.message}</span>}
+          {state.status === "error" && <span className="text-[12.5px] text-hot font-medium">{state.message}</span>}
         </div>
         <p className="text-[11px] leading-relaxed text-ink-4">
           webhook 会加密存在我们这里，只能用来给你发消息；想停就点消息里的退订，或者再绑一次覆盖。

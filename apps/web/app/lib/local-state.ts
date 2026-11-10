@@ -13,6 +13,8 @@ export const KEYS = {
   changelogSeen: "aihot-changelog-seen-version",
   feedbackDraft: "aihot-feedback-draft-v1",
   recentSearches: "aihot-recent-searches",
+  // 工具页「查我的账号」：跨页面记住一个 handle，只在显式提交时写入。
+  xMineHandle: "aihot-x-mine-handle",
 } as const;
 
 const STARRED_LIMIT = 500;

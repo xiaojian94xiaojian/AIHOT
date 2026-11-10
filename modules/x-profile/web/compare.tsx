@@ -43,20 +43,32 @@ export function headers() {
 /** 手机底栏的「工具」标签：这几个页面都归在它下面。 */
 export const handle = { tab: "x-tools", name: "账号对比" } as const;
 
-const ROWS: Array<{ label: string; value: (person: XCompareResponse["people"][number]) => string }> = [
+const ROWS: Array<{
+  label: string;
+  value: (person: XCompareResponse["people"][number]) => string;
+  numeric?: (person: XCompareResponse["people"][number]) => number | null;
+}> = [
   { label: "语言区 / 类型", value: (p) => `${REGION_LABEL[p.region]} · ${KIND_LABEL[p.kind]}` },
-  { label: "粉丝", value: (p) => (p.followers === null ? "—" : compact(p.followers)) },
-  { label: "帖子", value: (p) => compact(p.posts) },
-  { label: "日均发帖", value: (p) => String(p.postsPerDay) },
-  { label: "中位浏览", value: (p) => compact(p.medViews) },
-  { label: "平均浏览", value: (p) => compact(p.avgViews) },
-  { label: "P90 浏览", value: (p) => compact(p.p90Views) },
-  { label: "中位赞", value: (p) => compact(p.medLikes) },
-  { label: "互动率", value: (p) => percent(p.engagementRate) },
-  { label: "带媒体", value: (p) => percent(p.mediaPct) },
-  { label: "回复", value: (p) => percent(p.replyPct) },
+  { label: "粉丝", value: (p) => (p.followers === null ? "—" : compact(p.followers)), numeric: (p) => p.followers },
+  { label: "帖子", value: (p) => compact(p.posts), numeric: (p) => p.posts },
+  { label: "日均发帖", value: (p) => String(p.postsPerDay), numeric: (p) => p.postsPerDay },
+  { label: "中位浏览", value: (p) => compact(p.medViews), numeric: (p) => p.medViews },
+  { label: "平均浏览", value: (p) => compact(p.avgViews), numeric: (p) => p.avgViews },
+  { label: "P90 浏览", value: (p) => compact(p.p90Views), numeric: (p) => p.p90Views },
+  { label: "中位赞", value: (p) => compact(p.medLikes), numeric: (p) => p.medLikes },
+  { label: "互动率", value: (p) => percent(p.engagementRate), numeric: (p) => p.engagementRate },
+  { label: "带媒体", value: (p) => percent(p.mediaPct), numeric: (p) => p.mediaPct },
+  { label: "回复", value: (p) => percent(p.replyPct), numeric: (p) => p.replyPct },
   { label: "主类目", value: (p) => (p.topCategory ? categoryName(p.topCategory) : "—") },
 ];
+
+// 绝对阈值只用来给一个粗略印象：不是全站 P90 口径，鼠标悬停会说明。
+function getPersona(p: XCompareResponse["people"][number]): string {
+  if (p.postsPerDay >= 2) return "高频输出型";
+  if (p.medViews >= 10000) return "重磅爆款型";
+  if (p.engagementRate >= 2.5) return "高黏性互动型";
+  return "稳健深耕型";
+}
 
 export default function ComparePage() {
   const { people: all, handles, compare } = useLoaderData<typeof loader>();
@@ -159,15 +171,16 @@ export default function ComparePage() {
           <table className="w-full min-w-[640px] border-collapse text-[13px]">
             <caption className="sr-only">已选账号的多维指标横向对比表格</caption>
             <thead>
-              <tr className="border-b border-line-soft">
-                <th scope="col" className="w-32 px-4 py-3 text-left text-[11px] font-normal text-ink-3">指标</th>
+              <tr className="border-b border-line-soft bg-bg-sunk/30">
+                <th scope="col" className="w-32 px-4 py-3 text-left text-[11px] font-semibold text-ink-3">指标</th>
                 {chosen.map((p) => (
                   <th key={p.sourceId} scope="col" className="px-4 py-3 text-left font-normal">
-                    <Link to={`/x-people/${p.handle}`} className="flex items-center gap-2.5">
-                      <SourceAvatar name={p.author} avatarUrl={p.avatar} size={34} />
+                    <Link to={`/x-people/${p.handle}`} className="flex items-center gap-2.5 group">
+                      <SourceAvatar name={p.author} avatarUrl={p.avatar} size={36} />
                       <span className="min-w-0">
-                        <span className="block truncate text-[13.5px] font-medium text-ink">{p.author}</span>
+                        <span className="block truncate text-[14px] font-bold text-ink group-hover:text-accent transition-colors">{p.author}</span>
                         <span className="num block truncate text-[11px] text-ink-3">@{p.handle}</span>
+                        <span className="mt-1 inline-block rounded-full bg-bg-sunk px-2 py-0.5 text-[10px] font-medium text-ink-3"><span title="按日均发帖 ≥2、中位浏览 ≥1 万等绝对阈值粗分，不是全站分位">{getPersona(p)}</span></span>
                       </span>
                     </Link>
                   </th>
@@ -175,14 +188,35 @@ export default function ComparePage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-line-soft">
-              {ROWS.map((row) => (
-                <tr key={row.label} className="hover:bg-bg-sunk/60">
-                  <td className="px-4 py-2.5 text-[12px] text-ink-3">{row.label}</td>
-                  {chosen.map((p) => (
-                    <td key={p.sourceId} className="num px-4 py-2.5 text-ink">{row.value(p)}</td>
-                  ))}
-                </tr>
-              ))}
+              {ROWS.map((row) => {
+                const maxVal = row.numeric ? Math.max(...chosen.map((p) => row.numeric!(p) ?? 0)) : null;
+                return (
+                  <tr key={row.label} className="hover:bg-bg-sunk/40 transition-colors">
+                    <td className="px-4 py-2.5 text-[12px] font-medium text-ink-3">{row.label}</td>
+                    {chosen.map((p) => {
+                      const val = row.numeric ? row.numeric(p) : null;
+                      const isMax = maxVal !== null && maxVal > 0 && val === maxVal;
+                      const ratio = maxVal !== null && maxVal > 0 && val !== null && val > 0 ? Math.max(6, Math.round((val / maxVal) * 100)) : null;
+                      return (
+                        <td key={p.sourceId} className="num px-4 py-2.5">
+                          <div className="flex items-center gap-1.5">
+                            <span className={isMax ? "font-bold text-accent" : "text-ink"}>{row.value(p)}</span>
+                            {isMax && <span title="当前指标数值最高，不代表更好" className="rounded-mark bg-accent-soft px-1 text-[10px] font-bold text-accent">最高</span>}
+                          </div>
+                          {ratio !== null && (
+                            <div className="mt-1 h-1 w-20 overflow-hidden rounded-full bg-bg-sunk">
+                              <div
+                                className={`h-full rounded-full ${isMax ? "bg-accent" : "bg-ink-4/30"}`}
+                                style={{ width: `${ratio}%` }}
+                              />
+                            </div>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
               <tr>
                 <td className="px-4 py-2.5 text-[12px] text-ink-3">近 12 周发帖</td>
                 {chosen.map((p) => (
