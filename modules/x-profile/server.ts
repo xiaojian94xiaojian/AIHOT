@@ -10,7 +10,7 @@ import { loadCompare } from "./backend/compare.ts";
 import { loadMethodology } from "./backend/methodology.ts";
 import { GROWTH_WINDOWS, growthBoard, loadPersonGrowth, scanFollowerSnapshots } from "./backend/followers.ts";
 import { generateGrowthReports, latestReportFor, loadGrowthReports } from "./backend/growth-report.ts";
-import { listRequests, lookupAccount, RequestRejected, reviewRequest, submitRequest } from "./backend/requests.ts";
+import { forwardRequestNotifications, listRequests, lookupAccount, RequestRejected, reviewRequest, submitRequest } from "./backend/requests.ts";
 import { growthDigest } from "./backend/digest.ts";
 import { todaysTopics } from "./backend/today.ts";
 import { algorithmPage } from "./backend/algorithm.ts";
@@ -221,6 +221,8 @@ export const xProfileServerModule: ServerModule = {
       when: () => config.environmentName === "production",
       run: () => runReplyAlerts(config.siteUrl),
     },
+    // 收录申请没送到运营群（飞书抖动、当时关着）就每五分钟补一次，只补最近 7 天。
+    { name: "x-request.notify", cron: "1,6,11,16,21,26,31,36,41,46,51,56 * * * *", run: () => forwardRequestNotifications() },
     // 每五分钟把新回执里的粉丝数记成当天的快照；一次最多二十秒，回填没追完的下一轮接着来。
     { name: "x-followers.scan", cron: "*/5 * * * *", run: () => scanFollowerSnapshots() },
     // 每天把前一天的采集账记一行（成本看板）；排在 04:20 的分档之后，看到的是调完档的结果。

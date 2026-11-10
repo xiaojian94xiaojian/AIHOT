@@ -33,28 +33,111 @@
 
 ## 开发流程（本站约定）
 
-**每个任务一个分支，先提交再审查，审查 PASS 才合并。** 线上事故走热修例外（先合并部署，事后补审查）。
+一个任务 = 一张任务卡（`docs/task-card.md`）+ 一个分支 + 一次自动检查 + 最多两轮审核返工。
+线上事故走热修例外：先合并部署，事后补任务卡与审核。
+
+**角色**：我 = Planner + Orchestrator + Worker；子 agent = Reviewer（只读，不改代码）；`scripts/` = Gate。
+不写自己审自己：reviewer 必须用另一个会话，且**默认用另一个模型**（见下）。
+
+### 状态
+
+`TODO → IN_PROGRESS → GATE → REVIEW → MERGE_READY → MERGED → DEPLOYED`
+
+- GATE 失败：退回 Worker，不计返工轮次、不消耗 reviewer；
+- REVIEW 不通过：REWORK（计 1 轮）→ 重跑 Gate → 复审；
+- **最多 2 次返工（3 次审核）**，仍有 blocker 就 ESCALATED：停下来问人，不再自动改。
+
+### 1. 任务卡（动手前写）
+
+用 `docs/task-card.md` 的模板，必须写明：允许/禁止改的范围、**每条验收标准怎么验证**、风险等级。
+验收标准要可执行（命令、测试名、截图尺寸），不要写「体验良好」「代码质量高」。
+预计 diff 超过 ~500 行就拆任务——上一轮 UI 任务 1200 行、返工 5 次，就是没拆。
+
+### 2. 分支
 
 ```bash
-git switch -c task/<slug> upgrade-4.0      # 1. 开分支
-# 2. 动手改，改完必须提交（不留脏工作区）
-git commit -am "feat(...): ..."
-git diff upgrade-4.0...task/<slug>          # 3. 审查对象就是这个 diff（附 commit sha）
-# 4. 子 agent 审查；FAIL 就在同一分支继续提交
-npm run typecheck && npm test && npm run build -w @aihot/web
-git switch upgrade-4.0 && git merge --no-ff task/<slug>   # 5. 合并
+git switch -c task/<slug> upgrade-4.0     # 记录基线 commit
 ```
 
-- **并行任务才用 worktree**：`git worktree add .worktrees/<task> task/<slug>`，否则共用一个工作树没问题；
-- **迁移编号在合并前对一遍**：两个分支都用同一个编号时重命名，迁移按文件名排序，重命名无副作用；
-- **公开仓库不变**：分支只在本地/私有仓库，合并后仍用 `publish-public.ps1` 发快照。
+并行任务用 `git worktree add .worktrees/<task> task/<slug>`，两个 agent 不同目录。
+迁移编号合并前对一遍；已推送的任务分支不 rebase。
 
-每个任务**做完、部署之前**，先让一个独立的审查 agent 看这次改动，审完再上线：
+### 3. 开发与提交
 
-1. 审查范围：`git diff <上一个已部署提交>..HEAD`，加上它碰到的现有代码；
-2. 必查项：正确性；安全（SSRF、注入、密钥、限流、token 泄露）；迁移规则（一个文件一条语句、索引 `CONCURRENTLY IF NOT EXISTS`）；时区与日期计算；外部调用失败与重试；测试是否覆盖边界；有没有死代码；
-3. 结论是 **FAIL 就返工**——改完重跑 `npm run typecheck` 和全量测试，再复审一次；
-4. **PASS 才部署**；部署完把快照推到公开仓库。
+- 只改任务卡范围；要超范围先停下来说明，不自行扩大；
+- 先补测试再实现；小步提交，一个 commit 一件事；
+- **改完必须提交**，留干净工作区——审核对象是 commit，不是工作区。
+
+### 4. 自动检查（Gate）
+
+```bash
+pwsh -File scripts/gate.ps1          # typecheck + build + architecture + 全量测试 + diff 规模
+```
+
+失败就修，不过 Gate 不进 review。Gate 报告贴进审核包。
+
+### 5. 审核
+
+送审前先跑：
+
+```bash
+pwsh -File scripts/review-precheck.ps1 -Since <上轮审核的 commit>
+```
+
+不通过（HEAD 没变 / diff 为空）直接退回，不消耗 reviewer。
+
+**审核包**：任务卡 + `git diff upgrade-4.0...task/<slug>`（附基线/HEAD sha）+ Gate 报告 + 交付说明；
+复审再加：上轮报告、修复说明、`git diff <上轮审核 commit>..HEAD`。
+
+**reviewer 用另一个模型**：
+
+```
+provider: opencode-go-glm
+model: glm-5.3-flash
+```
+
+（同一个 OpenCode Go 套餐，和 Worker 的 `deepseek-v4.1-flash` 不同源。首审用新会话；复审可以新会话喂上轮报告，也可以续用同一个 reviewer。）
+
+**审核规则**：
+
+- 先按任务卡验收标准逐条判，再看实现质量；
+- 问题分三级：**blocker**（不满足验收标准 / 功能错 / 数据损坏 / 安全 / 挂测试）、**major**、**minor**；
+- 只有 blocker 阻止合并；major/minor 记入待办，不要求本轮修；
+- **不得提出任务卡之外的新需求**——想加标准就写进下一张任务卡；
+- 每条问题给 `文件:行` + 期望结果 + 验证方式；说「未修复」必须指到当前 HEAD 的具体位置；
+- reviewer 只读：审完 Orchestrator 必须 `git status` 确认仓库干净，reviewer 写下的文件一律丢弃。
+
+**复审范围锁定**：只验上轮 blocker 是否解决、增量 diff 有没有引入回归。
+新 blocker 必须说明是返工引入的回归，或解释首审为何遗漏；否则记待办。
+
+### 6. 合并与部署
+
+```bash
+git switch upgrade-4.0
+git merge --no-ff task/<slug>        # commit message 引用任务
+# 部署：构建镜像 → 推送 merge-<sha> 与 latest → release.sh（迁移+重启+冒烟）
+# 冒烟失败立即回滚，任务回 IN_PROGRESS
+```
+
+部署后确认：`/api/health`、目标页面 200、关键行为抽查（数据类跑一次真实 SQL，UI 类拍 1280/393 截图）。
+之后 `publish-public.ps1` 发公开快照，删任务分支与 worktree，major/minor 写进待办。
+
+### 7. 防循环
+
+| 机制 | 规则 |
+| --- | --- |
+| 轮次上限 | 2 次返工；第 3 次审核仍有 blocker → ESCALATED |
+| 范围锁定 | 复审只验 blocker 与回归，不重新全面审查 |
+| 问题编号 | ISSUE-01 贯穿全程，状态 open / fixed / wontfix |
+| 震荡检测 | 同一 issue 连续两轮未修、同一处来回改、reviewer 前后要求矛盾 → 立即升级 |
+| 证据 | 「未修复」要指到当前 HEAD 行号；「已修复」要有验证命令或测试 |
+| 仲裁 | 有争议按任务卡验收标准裁决；标准不清就停下来问人 |
+
+### 8. 人工检查点
+
+- 任务卡确认（尤其高风险：迁移、权限、支付、删除类）；
+- 任何 ESCALATED；
+- 合并部署前的最终看一眼。
 ## 这个仓库怎么更新
 
 公开的这个 fork 只放**上游公开历史 + 我们的一次性快照提交**，不放开发历史；完整历史在私有仓库里。所以更新分两步：

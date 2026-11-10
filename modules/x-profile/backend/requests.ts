@@ -4,6 +4,8 @@
 // hot_signal 源，审计与去重都留在那一处。查询只读本地的 sources，不调任何付费接口。
 import { sql } from "@aihot/backend/db";
 import { createSource } from "@aihot/backend/admin/sources";
+import { config } from "@aihot/backend/config";
+import { feishuInternalEnabled, sendAlert } from "@aihot/backend/notify/feishu";
 import { hashIp } from "./hash.ts";
 import type { XAccountLookup, XAccountRequest, XAccountRequestList } from "../types.ts";
 
@@ -59,6 +61,58 @@ export async function lookupAccount(raw: string): Promise<XAccountLookup> {
   };
 }
 
+/** 访客输入进飞书纯文本前：折叠换行、去掉能伪造链接和 @ 的字符，再截断。 */
+function oneLine(text: string, max = 120): string {
+  return text.replace(/[\r\n\t]+/g, " ").replace(/[<>[\]`]/g, "").replace(/\s+/g, " ").trim().slice(0, max);
+}
+
+/**
+ * 一条申请发到运营机器人。先占位再发：提交路径和补发任务并发时只有一方能发出去；
+ * 发送失败或通道关着就把占位退回，留给下一轮。
+ */
+async function notifyRequest(row: { handle: string; note: string | null; contact: string | null }): Promise<boolean> {
+  const claimed = await sql<{ handle: string }[]>`
+    UPDATE x_account_requests SET notified_at = now()
+    WHERE handle = ${row.handle} AND notified_at IS NULL RETURNING handle`;
+  if (claimed.length === 0) return false;
+
+  const lines = [`@${row.handle}`];
+  if (row.note) lines.push(`备注：${oneLine(row.note)}`);
+  if (row.contact) lines.push(`联系：${oneLine(row.contact)}`);
+  lines.push(`待审：${config.siteUrl}/admin/x-people`);
+  try {
+    const result = await sendAlert("新的收录申请", lines);
+    if (result === "sent") return true;
+    await sql`UPDATE x_account_requests SET notified_at = NULL WHERE handle = ${row.handle}`;
+    return false;
+  } catch (error) {
+    await sql`UPDATE x_account_requests SET notified_at = NULL WHERE handle = ${row.handle}`.catch(() => {});
+    console.error(JSON.stringify({ level: "warn", msg: "x-account-request alert failed", handle: row.handle, error: error instanceof Error ? error.message : String(error) }));
+    return false;
+  }
+}
+
+/** 提交后立刻试一次。发送失败/通道关着会退回 notified_at，由定时任务补发；进程在发送途中被杀的那一条可能丢（接受 at-most-once）。 */
+export function notifyRequestSoon(row: { handle: string; note: string | null; contact: string | null }): void {
+  void notifyRequest(row).catch((error) => {
+    console.error(JSON.stringify({ level: "warn", msg: "x-account-request notify failed", handle: row.handle, error: error instanceof Error ? error.message : String(error) }));
+  });
+}
+
+/** 补发：关着的时候没发出去的申请，打开后每五分钟补一批（7 天内的，和反馈转发同口径）。 */
+export async function forwardRequestNotifications(limit = 20): Promise<{ sent: number; pending: number; disabled: boolean }> {
+  if (!feishuInternalEnabled()) return { sent: 0, pending: 0, disabled: true };
+  const rows = await sql<{ handle: string; note: string | null; contact: string | null }[]>`
+    SELECT handle, note, contact FROM x_account_requests
+    WHERE status = 'pending' AND notified_at IS NULL AND created_at > now() - interval '7 days'
+    ORDER BY created_at LIMIT ${limit}`;
+  let sent = 0;
+  for (const row of rows) {
+    if (await notifyRequest(row)) sent += 1;
+  }
+  return { sent, pending: rows.length - sent, disabled: false };
+}
+
 export interface SubmitRequestInput {
   handle: string;
   note?: string | null;
@@ -97,7 +151,9 @@ export async function submitRequest(input: SubmitRequestInput): Promise<{ status
     INSERT INTO x_account_requests (handle, note, contact, status, reason, ip_hash, created_at, reviewed_at, reviewed_by)
     VALUES (${handle}, ${note}, ${contact}, 'pending', NULL, ${ipHash}, now(), NULL, NULL)
     ON CONFLICT (handle) DO UPDATE SET note = EXCLUDED.note, contact = EXCLUDED.contact, status = 'pending',
-      reason = NULL, ip_hash = EXCLUDED.ip_hash, created_at = now(), reviewed_at = NULL, reviewed_by = NULL`;
+      reason = NULL, ip_hash = EXCLUDED.ip_hash, created_at = now(), reviewed_at = NULL, reviewed_by = NULL,
+      notified_at = CASE WHEN x_account_requests.status = 'rejected' THEN NULL ELSE x_account_requests.notified_at END`;
+  notifyRequestSoon({ handle, note, contact });
   return { status: "pending" };
 }
 

@@ -39,7 +39,10 @@ tar -C /src --exclude=./node_modules --exclude=./.git --exclude=./.data -cf - . 
 cd /work
 echo "=== installing dependencies from the lockfile ==="
 # The image sets NODE_ENV=production, which would skip the test-only dependencies (the MCP client).
-npm ci --include=dev --no-audit --no-fund >/tmp/npm.log 2>&1 || { tail -n 30 /tmp/npm.log; exit 1; }
+npm ci --include=dev --no-audit --no-fund >/tmp/npm.log 2>&1 || {
+  echo "=== npm ci failed; retrying against registry.npmjs.org ==="
+  npm ci --include=dev --no-audit --no-fund --registry=https://registry.npmjs.org --replace-registry-host=always >/tmp/npm.log 2>&1 || { tail -n 30 /tmp/npm.log; exit 1; }
+}
 echo "=== $(uname -s) / node $(node --version) / $(pg_dump --version | cut -d' ' -f1-3) ==="
 # The architecture test enumerates tracked template files with `git ls-files`: the image ships no git
 # and the staged tree is not a checkout, so the host's .git is mounted at /gitdir and git is pointed at
