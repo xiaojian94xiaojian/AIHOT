@@ -735,8 +735,8 @@ export default function GrowthPage() {
                   <th scope="col" aria-sort={ariaSort("perK")} className="px-3 py-2.5 text-right font-normal w-44">
                     <SortHead label="每千曝光" metric="perK" sort={sort} onSort={onSort} />
                   </th>
-                  <th scope="col" className="px-3 py-2.5 font-normal">标签</th>
-                  <th scope="col" className="px-3 py-2.5 text-right font-normal">数据日</th>
+                  <th scope="col" className="w-20 px-3 py-2.5 font-normal">标签</th>
+                  <th scope="col" className="w-16 whitespace-nowrap px-3 py-2.5 text-right font-normal">数据日</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line-soft">
@@ -789,7 +789,8 @@ export default function GrowthPage() {
                           )}
                         </div>
                       </td>
-                      <td className="px-3 py-2.5">
+                      {/* 名字是 nowrap，表格的 min-content 会被最长的一行撑到 1000px 以上，把「数据日」挤出可视区；给这一列封个顶。 */}
+                      <td className="max-w-[290px] px-3 py-2.5">
                         <Link to={`/x-people/${row.handle}`} className="flex items-center gap-3">
                           <SourceAvatar name={row.name ?? row.screenName} avatarUrl={row.avatarUrl} size={36} />
                           <span className="min-w-0">
@@ -826,15 +827,15 @@ export default function GrowthPage() {
                       </td>
                       <td className="px-3 py-2.5">
                         <span className="flex flex-wrap gap-1">
-                          {signal && <span className={`rounded-full bg-bg-sunk px-2 py-0.5 text-[10.5px] ${signal.tone}`} title={signal.title}>{signal.label}</span>}
+                          {signal && <span className={`whitespace-nowrap rounded-full bg-bg-sunk px-2 py-0.5 text-[10.5px] ${signal.tone}`} title={signal.title}>{signal.label}</span>}
                           {efficiency && !eligible && (
-                            <span className="rounded-full bg-bg-sunk px-2 py-0.5 text-[10.5px] text-ink-4" title={`窗口内曝光不足 ${EFF_MIN_VIEWS.toLocaleString("en-US")} 次或没有发帖：分母太小，不进效率名次`}>
+                            <span className="whitespace-nowrap rounded-full bg-bg-sunk px-2 py-0.5 text-[10.5px] text-ink-4" title={`窗口内曝光不足 ${EFF_MIN_VIEWS.toLocaleString("en-US")} 次或没有发帖：分母太小，不进效率名次`}>
                               样本小
                             </span>
                           )}
                         </span>
                       </td>
-                      <td className="num px-3 py-2.5 text-right text-[12px] text-ink-4" title={row.updatedOn}>{row.updatedOn.slice(5)}</td>
+                      <td className="num whitespace-nowrap px-3 py-2.5 text-right text-[12px] text-ink-4" title={row.updatedOn}>{row.updatedOn.slice(5)}</td>
                     </tr>
                   );
                 })}
