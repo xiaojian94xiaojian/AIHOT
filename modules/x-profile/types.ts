@@ -460,3 +460,39 @@ export interface XDailyCard {
   me: { handle: string; followers: number | null; verdict: string } | null;
   links: { post: string; reply: string | null; story: string };
 }
+/** 公开周报：一周的涨粉榜、爆款帖与内容形态。 */
+export interface XWeeklyRow {
+  rank: number;
+  handle: string;
+  name: string | null;
+  avatarUrl: string | null;
+  followers: number;
+  growth: number;
+  posts: number;
+  views: number;
+  perK: number | null;
+}
+export interface XWeeklyViral {
+  handle: string;
+  author: string | null;
+  text: string;
+  url: string;
+  views: number;
+  likes: number;
+  at: string;
+}
+export interface XWeeklyShape {
+  key: string;
+  label: string;
+  posts: number;
+  share: number;
+}
+export interface XWeeklyResponse {
+  week: { start: string; end: string };
+  weeks: string[];
+  rows: XWeeklyRow[];
+  viral: XWeeklyViral[];
+  shape: XWeeklyShape[];
+  summary: { accounts: number; posts: number; views: number; mediaPct: number };
+  generatedAt: string;
+}

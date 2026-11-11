@@ -1,10 +1,14 @@
 // Daily housekeeping: expired leases, old run history, feedback screenshots left behind and derived caches,
-// and the site's modules' own periods (their server.ts retention). Paid receipts and their raw responses are
-// kept: they stop a request being paid for twice and are the record for reviewing a result.
+// and the site's modules' own periods (their server.ts retention). Paid receipts stay for good: their
+// status and cost are the record of what was paid. Their raw responses are dropped once a replayed answer
+// is no longer useful — an embedding never is, and the X fetch answers feed the 32-day fan-growth lookback
+// — so the row keeps counting but the payload goes. Requests stay: one can carry the fallback marker that
+// keeps a primary receipt parked (see providers/receipts.ts).
 import { readdir, stat, unlink } from "node:fs/promises";
 import path from "node:path";
 import { config } from "../config.ts";
 import { sql } from "../db.ts";
+import { pruneReceiptPayloads } from "../providers/receipts.ts";
 import { expireFeedbackBans, pruneFeedbackSubmissionState, screenshotsForwarded } from "./feedback.ts";
 import { serverModules } from "../modules.ts";
 
@@ -37,6 +41,7 @@ export async function dailyRetention(now = new Date()) {
   const leases = await sql`DELETE FROM delivery_leases WHERE expires_at < ${now}`;
   const expiredFeedbackBans = await sql.begin(tx => expireFeedbackBans(tx, now));
   const expiredFeedbackState = await pruneFeedbackSubmissionState(now);
+  const prunedReceiptPayloads = await pruneReceiptPayloads(now);
   // Scheduled-task history: 30 days (failures 90) is enough for the runs view.
   const runs = await sql`DELETE FROM job_runs WHERE started_at < ${new Date(now.getTime() - 30 * 86400_000)} AND (status IS DISTINCT FROM 'failed' OR started_at < ${new Date(now.getTime() - 90 * 86400_000)})`;
   const monthMs = 30 * 86400_000;
@@ -51,6 +56,7 @@ export async function dailyRetention(now = new Date()) {
     deletedLeases: leases.count,
     expiredFeedbackBans,
     expiredFeedbackState,
+    prunedReceiptPayloads,
     deletedJobRuns: runs.count,
     deletedScreenshots,
     prunedCache,

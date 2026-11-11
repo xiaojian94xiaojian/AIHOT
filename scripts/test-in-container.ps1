@@ -47,7 +47,15 @@ echo "=== $(uname -s) / node $(node --version) / $(pg_dump --version | cut -d' '
 # The architecture test enumerates tracked template files with `git ls-files`: the image ships no git
 # and the staged tree is not a checkout, so the host's .git is mounted at /gitdir and git is pointed at
 # the staged tree (GIT_DIR/GIT_WORK_TREE above).
-command -v git >/dev/null 2>&1 || (apt-get update -qq && apt-get install -y -qq --no-install-recommends git) >/dev/null 2>&1 || echo "(no git: the architecture env-template test will fail)"
+if ! command -v git >/dev/null 2>&1; then
+  # The image ships no git; two of this deployment's runs met a flaky apt mirror and went on without it,
+  # which only showed up as "spawnSync git ENOENT" in the architecture test. Give the install three tries.
+  for attempt in 1 2 3; do
+    (apt-get update -qq && apt-get install -y -qq --no-install-recommends git) >/dev/null 2>&1 && break
+    sleep 3
+  done
+fi
+command -v git >/dev/null 2>&1 || echo "(no git: the architecture env-template test will fail)"
 git ls-files -- '*.env.example' >/dev/null 2>&1 || echo "(git cannot list the staged tree: the architecture env-template test will fail)"
 node scripts/migrate.ts 2>&1 | tail -n 1
 exec node --test-global-setup=tests/databases.ts --import ./tests/databases.ts --test --test-concurrency="$TEST_CONCURRENCY" --test-timeout=120000 $TEST_ARGS

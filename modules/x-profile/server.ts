@@ -8,6 +8,7 @@ import { actorOf, adminHandler } from "@aihot/backend/admin/auth";
 import { peoplePage, personPage } from "./backend/data.ts";
 import { loadCompare } from "./backend/compare.ts";
 import { methodologyPage } from "./backend/methodology.ts";
+import { loadWeekly, weeklyFeed } from "./backend/weekly.ts";
 import { GROWTH_WINDOWS, growthBoard, loadPersonGrowth, scanFollowerSnapshots } from "./backend/followers.ts";
 import { generateGrowthReports, latestReportFor, loadGrowthReports } from "./backend/growth-report.ts";
 import { forwardRequestNotifications, listRequests, lookupAccount, RequestRejected, reviewRequest, submitRequest } from "./backend/requests.ts";
@@ -58,6 +59,13 @@ export const xProfileServerModule: ServerModule = {
     }));
     app.get("/api/site/x-people/growth/report", guarded(async (req, reply) => {
       return sendJsonWithEtag(req, reply, await loadGrowthReports(), { etagPrefix: "xp-growth-report", cacheControl: CACHE });
+    }));
+    app.get("/api/site/x-people/weekly", guarded(async (req, reply) => {
+      const week = typeof (req.query as { week?: unknown })?.week === "string" ? (req.query as { week: string }).week : null;
+      return sendJsonWithEtag(req, reply, await loadWeekly(week), { etagPrefix: "xp-weekly", cacheControl: CACHE });
+    }));
+    app.get("/feed/x-people/weekly.xml", guarded(async (req, reply) => {
+      return reply.header("Cache-Control", "public, max-age=600, s-maxage=1800").type("application/rss+xml; charset=utf-8").send(await weeklyFeed());
     }));
     app.get("/api/site/x-people/compare", guarded(async (req, reply) => {
       const raw = String((req.query as { h?: string }).h ?? "");

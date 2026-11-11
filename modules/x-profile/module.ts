@@ -8,6 +8,7 @@ export const xProfileModule = defineModule({
     { path: "x-people", file: "web/people.tsx", id: "x-people" },
     { path: "x-people/growth", file: "web/growth.tsx", id: "x-growth" },
     { path: "x-people/growth/report", file: "web/growth-report.tsx", id: "x-growth-report" },
+    { path: "x-people/weekly", file: "web/weekly.tsx", id: "x-weekly" },
     { path: "x-people/today", file: "web/today.tsx", id: "x-today" },
     { path: "x-people/algorithm", file: "web/algorithm.tsx", id: "x-algorithm" },
     { path: "x-people/compare", file: "web/compare.tsx", id: "x-compare" },
@@ -16,7 +17,7 @@ export const xProfileModule = defineModule({
     { path: "x-people/:handle", file: "web/person.tsx", id: "x-person" },
   ],
   // 网页与 api 是两个进程：公开查询走 /api/site/x-people*，审核走 /api/admin/x-people*，都由 api 进程回答。
-  apiPaths: [/^\/api\/site\/x-people(\/|$)/, /^\/api\/admin\/x-people(\/|$)/, /^\/feed\/x\//],
+  apiPaths: [/^\/api\/site\/x-people(\/|$)/, /^\/api\/admin\/x-people(\/|$)/, /^\/feed\/x-people\//, /^\/feed\/x\//],
   // 账号收录申请的后台页（本站保留了 adminPages 插口）。
   adminPages: [
     { path: "admin/x-people", file: "web/admin-requests.tsx" },

@@ -52,6 +52,9 @@ export default function GrowthReportPage() {
           <Link to="/x-people/growth" className="min-h-[32px] inline-flex items-center rounded-full border border-line px-3 py-1 text-ink-2 transition-colors hover:border-accent hover:text-ink">
             回到涨粉榜
           </Link>
+          <Link to="/x-people/weekly" className="min-h-[32px] inline-flex items-center rounded-full border border-line px-3 py-1 text-ink-2 transition-colors hover:border-accent hover:text-ink">
+            涨粉周报
+          </Link>
           <Link to="/x-people" className="min-h-[32px] inline-flex items-center rounded-full border border-line px-3 py-1 text-ink-2 transition-colors hover:border-accent hover:text-ink">
             博主列表
           </Link>

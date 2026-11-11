@@ -415,3 +415,41 @@ export async function completeReceipt(db: Db, receiptId: number): Promise<void> 
 export async function rejectReceivedResponse(receiptId: number, reason: string): Promise<void> {
   await sql`UPDATE receipts SET status = 'failed', error = ${reason.slice(0, 2000)}, updated_at = now() WHERE id = ${receiptId}`;
 }
+
+
+/** 原始响应保留多少天：X 抓取结果还要被涨粉扫描回看 32 天，所以留 45 天。 */
+export const RECEIPT_PAYLOAD_DAYS = 45;
+/** embedding 的答案写进向量库后就不再读回执，14 天够了。 */
+export const EMBEDDING_PAYLOAD_DAYS = 14;
+const PRUNE_BATCH = 2000;
+
+/**
+ * 清掉旧回执的原始响应，并改写 logical_key：之后同一条请求不会再命中一条“没有答案”的旧回执。
+ * 只清 response 不清 request —— request 里可能有「已交给备份」的 fallbackReceiptId 标记，
+ * awaitingRelease 靠它把这行永久停牌（见本文件顶部注释），清掉就会被自动放行、可能再付一次钱。
+ * 行和花费一直保留。分批做，避免一次 UPDATE 锁住整张表。
+ */
+export async function pruneReceiptPayloads(now: Date): Promise<number> {
+  const cutoff = new Date(now.getTime() - RECEIPT_PAYLOAD_DAYS * 86400_000);
+  const embeddingCutoff = new Date(now.getTime() - EMBEDDING_PAYLOAD_DAYS * 86400_000);
+  let pruned = 0;
+  for (;;) {
+    const rows = await sql<{ id: number }[]>`
+      UPDATE receipts r
+         SET response = NULL,
+             logical_key = r.logical_key || ':pruned:' || r.id::text,
+             updated_at = now()
+       WHERE r.id IN (
+         SELECT id FROM receipts
+          WHERE response IS NOT NULL
+            AND ((service = 'embedding' AND created_at < ${embeddingCutoff})
+                 OR (service <> 'embedding' AND created_at < ${cutoff}))
+          ORDER BY id
+          LIMIT ${PRUNE_BATCH}
+       )
+       RETURNING id`;
+    pruned += rows.length;
+    if (rows.length < PRUNE_BATCH) break;
+  }
+  return pruned;
+}
