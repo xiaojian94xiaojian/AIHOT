@@ -11,6 +11,9 @@
 #   SYNC_ONLY=1 sudo sh deploy/release.sh     # 只同步挂载目录，不发版（合并后想先看一眼时用）
 #   PRUNE=1 sudo sh deploy/release.sh         # 顺带把宿主机独有的旧文件挪走，让挂载目录与镜像一致
 #
+# 镜像仓库：AIHOT_IMAGE 指向的仓库（腾讯云 TCR，如 krccr.ccs.tencentyun.com/aihot/app:latest）；
+# 登录账号放 .env 的 TCR_USERNAME / TCR_PASSWORD，没配就用本机已保存的 docker 凭证。
+#
 # 同步的规则：以镜像为准，覆盖同名文件、补上缺失；宿主机独有的文件默认只报告，
 # PRUNE=1 时移到 .mount-extras-<时间>/ 并在报告中列出（不删除）。
 set -eu
@@ -26,11 +29,19 @@ if [ -z "$IMAGE" ]; then
 fi
 [ -n "$IMAGE" ] || { echo "找不到镜像：传给脚本，或在 .env 里设 AIHOT_IMAGE"; exit 1; }
 
+# 镜像仓库的登录信息放在 .env（TCR_USERNAME / TCR_PASSWORD），仓库地址取自 AIHOT_IMAGE 的第一段。
+# 没配就沿用本机已经 docker login 过的凭证（/root/.docker/config.json）。
+env_value() { grep -E "^[[:space:]]*$1=" .env | tail -1 | cut -d= -f2-; }
+TCR_USERNAME="${TCR_USERNAME:-$(env_value TCR_USERNAME)}"
+TCR_PASSWORD="${TCR_PASSWORD:-$(env_value TCR_PASSWORD)}"
+REGISTRY="${IMAGE%%/*}"
+
 echo "== 1. 拉镜像 =="
-ACCESS_TOKEN="$(curl -sS -H 'Metadata-Flavor: Google' \
-  'http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token' \
-  | sed -E 's/.*"access_token"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/')"
-echo "$ACCESS_TOKEN" | sudo docker login -u oauth2accesstoken --password-stdin "https://asia-east2-docker.pkg.dev" >/dev/null 2>&1
+if [ -n "$TCR_USERNAME" ] && [ -n "$TCR_PASSWORD" ]; then
+  if ! printf '%s' "$TCR_PASSWORD" | sudo docker login "$REGISTRY" -u "$TCR_USERNAME" --password-stdin >/dev/null 2>&1; then
+    echo "   (仓库登录失败，用本机已保存的凭证继续)"
+  fi
+fi
 sudo docker pull "$IMAGE" >/dev/null
 echo "   镜像: $IMAGE"
 
