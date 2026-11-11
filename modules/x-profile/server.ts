@@ -7,7 +7,7 @@ import { clientIp, sendJsonWithEtag, sendProblem } from "@aihot/backend/lib/http
 import { actorOf, adminHandler } from "@aihot/backend/admin/auth";
 import { peoplePage, personPage } from "./backend/data.ts";
 import { loadCompare } from "./backend/compare.ts";
-import { loadMethodology } from "./backend/methodology.ts";
+import { methodologyPage } from "./backend/methodology.ts";
 import { GROWTH_WINDOWS, growthBoard, loadPersonGrowth, scanFollowerSnapshots } from "./backend/followers.ts";
 import { generateGrowthReports, latestReportFor, loadGrowthReports } from "./backend/growth-report.ts";
 import { forwardRequestNotifications, listRequests, lookupAccount, RequestRejected, reviewRequest, submitRequest } from "./backend/requests.ts";
@@ -68,7 +68,7 @@ export const xProfileServerModule: ServerModule = {
       return sendJsonWithEtag(req, reply, await loadCompare(handles), { etagPrefix: `xp-cmp-${handles.map((h) => h.toLowerCase()).join("-")}`, cacheControl: CACHE });
     }));
     app.get("/api/site/x-people/methodology", guarded(async (req, reply) => {
-      return sendJsonWithEtag(req, reply, await loadMethodology(), { etagPrefix: "xp-method", cacheControl: CACHE });
+      return sendJsonWithEtag(req, reply, await methodologyPage.get(undefined), { etagPrefix: "xp-method", cacheControl: CACHE });
     }));
     // 算法视角：用本站数据回测「连发衰减 / 外链限流 / 讨论率涨粉」三个说法，10 分钟缓存。
     app.get("/api/site/x-people/algorithm", guarded(async (req, reply) => {

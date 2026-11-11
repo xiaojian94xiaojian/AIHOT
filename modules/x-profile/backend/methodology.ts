@@ -2,6 +2,7 @@
 // 这样大号不会因为绝对浏览高而淹没小号的相对爆款；结论只描述相关性。
 import { sql } from "@aihot/backend/db";
 import { BEIJING_TIMEZONE } from "@aihot/contracts/time";
+import { cached } from "@aihot/backend/lib/cache";
 import { num, posts } from "./data.ts";
 import type { XHitSummary, XMethodologyResponse } from "../types.ts";
 
@@ -179,3 +180,9 @@ export async function loadMethodology(): Promise<XMethodologyResponse> {
     })),
   };
 }
+
+/**
+ * 这条聚合要扫 120 天的帖子上十秒，而页面只读一个结论：5 分钟内复用上一次结果，
+ * 过期后先返回旧值、后台再算，读者不会再等到 15 秒超时。
+ */
+export const methodologyPage = cached(loadMethodology, { freshMs: 300_000, maxStaleMs: 3_600_000 });
