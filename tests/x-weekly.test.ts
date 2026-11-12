@@ -4,6 +4,7 @@ import { tag } from "./setup.ts";
 import assert from "node:assert/strict";
 import { after, test } from "node:test";
 import { closeDb, sql } from "@aihot/backend/db";
+import { newArticleId } from "@aihot/backend/lib/ids";
 import { addDays } from "@aihot/contracts/time";
 import { loadWeekly, recentWeeks, weeklyFeed } from "@aihot/x-profile/backend/weekly";
 
@@ -12,7 +13,7 @@ const weeks = recentWeeks();
 const week = weeks[0]!;
 const baseline = addDays(week, -1);
 const mid = addDays(week, 6);
-const handles = { big: `weekly-${T}-big`, second: `weekly-${T}-second`, noBase: `weekly-${T}-nobase`, noWeek: `weekly-${T}-noweek`, stale: `weekly-${T}-stale` };
+const handles = { big: `weekly-${T}-big`, second: `weekly-${T}-second`, noBase: `weekly-${T}-nobase`, noWeek: `weekly-${T}-noweek`, stale: `weekly-${T}-stale`, english: `weekly-${T}-english`, mixed: `weekly-${T}-mixed`, noPosts: `weekly-${T}-noposts` };
 
 async function snapshot(handle: string, on: string, followers: number, receipt: number) {
   await sql`
@@ -20,8 +21,23 @@ async function snapshot(handle: string, on: string, followers: number, receipt: 
     VALUES (${handle}, ${on}::date, ${handle}, ${handle}, ${followers}, ${on}::timestamptz + interval '9 hours', ${receipt})`;
 }
 
+/** 一条 x 帖：榜单按最近 120 天的语言占比判「中文圈」，所以每个候选账号都要有帖子。
+ *  `postHandle` 模拟 SocialData 返回的原始大小写（快照键是小写）。 */
+async function post(handle: string, lang: string, on: string, views: number, postHandle = handle) {
+  const source = `x-account-${handle}`;
+  await sql`INSERT INTO sources (id, name, kind, config) VALUES (${source}, ${handle}, 'x_search', ${sql.json({ query: `from:${handle}` })})
+            ON CONFLICT (id) DO NOTHING`;
+  await sql`
+    INSERT INTO articles (id, source_id, identity_key, url, title, discovered_at, timeline_at, language, published_at, x_post)
+    VALUES (${newArticleId()}, ${source}, ${`${source}-${on}`}, ${`https://x.com/${handle}/status/${on.replaceAll("-", "")}`}, ${`${handle} post`},
+            now(), now(), ${lang}, ${on}::timestamptz + interval '12 hours',
+            ${sql.json({ handle: postHandle, text: "post", tweetId: on.replaceAll("-", "") })})`;
+}
+
 after(async () => {
   await sql`DELETE FROM x_follower_snapshots WHERE handle LIKE ${`weekly-${T}-%`}`;
+  await sql`DELETE FROM articles WHERE source_id LIKE ${`x-account-weekly-${T}-%`}`;
+  await sql`DELETE FROM sources WHERE id LIKE ${`x-account-weekly-${T}-%`}`;
   await sql`DELETE FROM receipts WHERE logical_key = ${`weekly-${T}`}`;
   await closeDb();
 });
@@ -39,6 +55,19 @@ test("a week ranks by snapshot difference and skips accounts without both ends",
   // 基线在 20 天前：不能把三周涨幅算进这一周，直接不上榜。
   await snapshot(handles.stale, addDays(week, -20), 5_000, id);
   await snapshot(handles.stale, mid, 9_000, id);
+  // 英文账号：涨粉更多，但周报写的是中文圈，不能出现在榜里。
+  await snapshot(handles.english, baseline, 1_000, id);
+  await snapshot(handles.english, mid, 90_000, id);
+  // 帖子里的 handle 保留 SocialData 的原始大小写，快照键是小写：不能因此被当成「没有语言证据」。
+  await snapshot(handles.mixed, baseline, 2_000, id);
+  await snapshot(handles.mixed, mid, 4_000, id);
+  // 有快照、涨粉不少，但一条帖子都没采到：没有语言证据，不进中文榜。
+  await snapshot(handles.noPosts, baseline, 1_000, id);
+  await snapshot(handles.noPosts, mid, 8_000, id);
+  await post(handles.big, "zh", mid, 1_200);
+  await post(handles.second, "zh", mid, 800);
+  await post(handles.english, "en", mid, 50_000);
+  await post(handles.mixed, "zh", mid, 500, `Weekly-${T}-Mixed`);
 
   const report = await loadWeekly(week);
   assert.equal(report.week.start, week);
@@ -47,10 +76,14 @@ test("a week ranks by snapshot difference and skips accounts without both ends",
   assert.ok(big, "an account with both snapshots is ranked");
   assert.equal(big.growth, 5_000, "a seven-day span is reported as-is");
   assert.equal(big.followers, 6_000);
+  assert.equal(big.posts, 1, "the week's posts are counted");
   assert.ok(report.rows.find((row) => row.handle === handles.second)?.growth === 400);
+  assert.ok(report.rows.find((row) => row.handle === handles.mixed), "a mixed-case post handle still matches the lowercase snapshot");
   assert.equal(report.rows.some((row) => row.handle === handles.noBase), false, "no baseline means no rank");
   assert.equal(report.rows.some((row) => row.handle === handles.noWeek), false, "no snapshot in the week means no rank");
   assert.equal(report.rows.some((row) => row.handle === handles.stale), false, "a baseline older than 14 days means no rank");
+  assert.equal(report.rows.some((row) => row.handle === handles.english), false, "an English account stays out of the Chinese report");
+  assert.equal(report.rows.some((row) => row.handle === handles.noPosts), false, "no posts means no language evidence");
   assert.ok(report.rows.length <= 10, "the report is a top ten");
   assert.equal((await loadWeekly("2026-02-30")).week.start, weeks[0], "an impossible date falls back to the latest week");
   assert.equal((await loadWeekly("2020-01-06")).week.start, weeks[0], "a week outside the window falls back to the latest");

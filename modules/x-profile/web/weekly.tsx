@@ -45,7 +45,8 @@ export default function WeeklyPage() {
         <h1 className="text-[24px] font-black tracking-[-0.02em] text-ink lg:text-[28px]">中文 AI 圈涨粉周报</h1>
         <p className="mt-1.5 max-w-2xl text-[13.5px] leading-relaxed text-ink-2">
           {monthDay(week.start)} – {monthDay(week.end)}：本周涨粉前十、这一周最火的帖子、
-          大家发的是什么形态。涨粉按本周快照与基线快照相减、稀疏基线折算成一周算；基线超过 14 天的不进榜。
+          大家发的是什么形态。只算中文账号（近 120 天抓到的帖子里中文占一半以上）；涨粉按本周快照与基线快照相减、
+          稀疏基线折算成一周，基线超过 14 天的不进榜。
         </p>
         <div className="mt-3 flex flex-wrap gap-1.5 text-[12px]">
           {weeks.map((w) => (

@@ -8,6 +8,7 @@ import { SITE } from "@aihot/site";
 import { addDays, beijingAt, beijingDate, isValidDate } from "@aihot/contracts/time";
 import { escapeXml, weekStartOf } from "./digest.ts";
 import { posts } from "./data.ts";
+import { regionOf } from "./classify.ts";
 import type { XWeeklyResponse, XWeeklyRow, XWeeklyShape, XWeeklyViral } from "../types.ts";
 
 /** 页面上能回看的周数，也是 RSS 的条目数。 */
@@ -72,14 +73,42 @@ async function growthOf(start: string, end: string): Promise<GrowthRow[]> {
       AND s.captured_on >= ${addDays(start, -MAX_BASELINE_LAG_DAYS)}::date`;
 }
 
-/** 这一周里每个账号发了多少帖、带来多少浏览。 */
+/**
+ * 中文 AI 圈：近 120 天抓到的帖子里中文占一半以上的账号（与涨粉榜的 region 口径一致）。
+ * 没有语言证据的账号不算进来 —— 榜单写的是中文圈，就不能拿全区的账号充数。
+ * 帖子里的 handle 是 SocialData 返回的原样大小写（`AndrewYNg`），快照键是小写，比较一律 lower()。
+ */
+async function chineseHandles(handles: string[]): Promise<Set<string>> {
+  const out = new Set<string>();
+  if (handles.length === 0) return out;
+  const rows = await sql<{ handle: string; zh: number; en: number }[]>`
+    SELECT lower(a.x_post->>'handle') AS handle,
+           count(*) FILTER (WHERE coalesce(a.language, a.x_post->>'lang') LIKE 'zh%')::int AS zh,
+           count(*) FILTER (WHERE coalesce(a.language, a.x_post->>'lang') LIKE 'en%')::int AS en
+    FROM articles a
+    WHERE a.source_id LIKE 'x-account-%'
+      AND a.published_at > now() - interval '120 days'
+      AND lower(a.x_post->>'handle') IN ${sql(handles)}
+    GROUP BY 1`;
+  for (const row of rows) {
+    const known = row.zh + row.en;
+    if (known > 0 && regionOf((row.zh / known) * 100, (row.en / known) * 100) === "zh") out.add(row.handle);
+  }
+  return out;
+}
+
+/** 这一周里每个账号发了多少帖、带来多少浏览（同样按小写 handle 对齐快照）。 */
 async function activityOf(startAt: Date, endAt: Date, handles: string[]): Promise<Map<string, { posts: number; views: number }>> {
   const out = new Map<string, { posts: number; views: number }>();
   if (handles.length === 0) return out;
   const rows = await sql<{ handle: string; posts: number; views: string }[]>`
-    SELECT p.handle, count(*)::int AS posts, coalesce(sum(p.views), 0)::text AS views
-    FROM (${posts()}) p
-    WHERE p.published_at >= ${startAt} AND p.published_at < ${endAt} AND p.handle IN ${sql(handles)}
+    SELECT lower(a.x_post->>'handle') AS handle, count(*)::int AS posts,
+           coalesce(sum(coalesce((a.raw->>'views')::bigint, 0)), 0)::text AS views
+    FROM articles a
+    WHERE a.source_id LIKE 'x-account-%'
+      AND a.published_at >= ${startAt} AND a.published_at < ${endAt}
+      AND lower(a.x_post->>'handle') IN ${sql(handles)}
+      AND coalesce(a.language, a.x_post->>'lang') LIKE 'zh%'
     GROUP BY 1`;
   for (const row of rows) out.set(row.handle, { posts: Number(row.posts), views: Number(row.views) });
   return out;
@@ -90,7 +119,7 @@ async function viralOf(startAt: Date, endAt: Date): Promise<XWeeklyViral[]> {
     SELECT p.handle, p.author, p.text, p.tweet_id, p.views::text AS views, p.likes::text AS likes, p.published_at
     FROM (${posts()}) p
     WHERE p.published_at >= ${startAt} AND p.published_at < ${endAt}
-      AND p.tweet_id IS NOT NULL AND p.views > 0
+      AND p.tweet_id IS NOT NULL AND p.views > 0 AND p.lang LIKE 'zh%'
     ORDER BY p.views DESC
     LIMIT ${VIRAL}`;
   return rows.map((row) => ({
@@ -114,7 +143,7 @@ async function shapeOf(startAt: Date, endAt: Date): Promise<{ shape: XWeeklyShap
            count(*)::int AS total, coalesce(sum(p.views), 0)::text AS views,
            count(DISTINCT p.handle)::int AS accounts
     FROM (${posts()}) p
-    WHERE p.published_at >= ${startAt} AND p.published_at < ${endAt}`;
+    WHERE p.published_at >= ${startAt} AND p.published_at < ${endAt} AND p.lang LIKE 'zh%'`;
   const total = row?.total ?? 0;
   const share = (n: number) => (total > 0 ? Math.round((n / total) * 1000) / 10 : 0);
   const shape = [
@@ -139,12 +168,15 @@ async function build(start: string): Promise<XWeeklyResponse> {
   const startAt = beijingAt(start, "00:00");
   const endAt = beijingAt(addDays(end, 1), "00:00");
   const growth = await growthOf(start, end);
-  const ranked = growth
+  const scored = growth
     .map((row) => {
       const spanDays = Math.max(1, Math.round((Date.parse(row.end_on) - Date.parse(row.baseline_on)) / 86_400_000));
       return { row, growth: Math.round(((Number(row.followers) - Number(row.baseline)) * 7) / spanDays) };
     })
-    .filter((item) => item.growth > 0)
+    .filter((item) => item.growth > 0);
+  const chinese = await chineseHandles(scored.map((item) => item.row.handle));
+  const ranked = scored
+    .filter((item) => chinese.has(item.row.handle))
     .sort((a, b) => b.growth - a.growth)
     .slice(0, TOP);
   const [activity, viral, shape] = await Promise.all([
