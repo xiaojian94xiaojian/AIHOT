@@ -332,7 +332,7 @@ function GrowthBlock({ growth, person, structure, categories, formats }: { growt
           <h3 className="text-[12.5px] font-medium text-ink">
             本周涨粉观察{growth.report && <span className="ml-2 text-[11px] font-normal text-ink-4">{monthDay(growth.report.periodEnd)} · 置信度{confidence[growth.report.confidence]}</span>}
           </h3>
-          <Link to="/x-people/growth/report" className="text-[11.5px] text-accent hover:underline">全部观察</Link>
+          <Link to="/x-people/weekly" className="text-[11.5px] text-accent hover:underline">全部观察</Link>
         </div>
         {growth.report ? (
           <div className="mt-2 space-y-2 text-[12.5px] leading-relaxed text-ink-2">

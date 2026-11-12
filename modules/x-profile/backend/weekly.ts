@@ -8,8 +8,9 @@ import { SITE } from "@aihot/site";
 import { addDays, beijingAt, beijingDate, beijingTime, beijingWeekday, isValidDate } from "@aihot/contracts/time";
 import { escapeXml, weekStartOf } from "./digest.ts";
 import { posts } from "./data.ts";
+import { reportsFor } from "./growth-report.ts";
 import { regionOf } from "./classify.ts";
-import type { XWeeklyDarkHorse, XWeeklyPattern, XWeeklyResponse, XWeeklyRow, XWeeklyShape, XWeeklySummary, XWeeklyViral } from "../types.ts";
+import type { XGrowthReport, XWeeklyDarkHorse, XWeeklyPattern, XWeeklyResponse, XWeeklyRow, XWeeklyShape, XWeeklySummary, XWeeklyViral } from "../types.ts";
 
 /** 页面上能回看的周数，也是 RSS 的条目数。 */
 export const WEEKLY_WEEKS = 8;
@@ -272,13 +273,17 @@ async function build(start: string): Promise<XWeeklyResponse> {
     .sort((a, b) => b.growthPct - a.growthPct)
     .slice(0, 5);
   const handles = [...new Set([...ranked, ...dark].map((item) => item.row.handle))];
-  const [activity, viral, shape, prevScale, prevTop] = await Promise.all([
+  const [activity, viral, shape, prevScale, prevTop, observationsAfter, observationsOn] = await Promise.all([
     activityOf(startAt, endAt, handles),
     viralOf(startAt, endAt),
     shapeOf(startAt, endAt),
     scaleOf(prevStart),
     topOf(prevStart),
+    // 定时任务周一跑，period_end 就是周一；表为空时 runOnStart 首跑可能落在别的日子，周日那种也认一下。
+    reportsFor(addDays(end, 1)),
+    reportsFor(end),
   ]);
+  const observations = observationsAfter.length > 0 ? observationsAfter : observationsOn;
   const prevRank = new Map(prevTop.map((item, index) => [item.handle, index + 1]));
   const rows: XWeeklyRow[] = ranked.map(({ row, growth: value, growthPct }, index) => {
     const extra = activity.get(row.handle) ?? { posts: 0, views: 0 };
@@ -311,6 +316,7 @@ async function build(start: string): Promise<XWeeklyResponse> {
     weeks: recentWeeks(),
     rows,
     darkHorses,
+    observations,
     patterns: patternsOf(viral, shape.summary, rows, darkHorses[0] ?? null),
     compare: {
       posts: shape.summary.posts,
@@ -362,7 +368,7 @@ export async function weeklyFeed(today = beijingDate(new Date())): Promise<strin
         top.length ? `涨粉前五：${listed}。` : "这一周没有足够快照，涨粉榜单暂缺。",
         dark ? `小账号黑马：@${dark.handle} 净增 ${dark.growth.toLocaleString("en-US")} 粉（+${dark.growthPct}%）。` : "",
         best ? `最热帖子：@${best.handle} ${best.views.toLocaleString("en-US")} 浏览。` : "",
-        report.patterns.length ? `本周观察：${report.patterns.map((pattern) => `${pattern.title}——${pattern.detail}`).join(" ")}` : "",
+        report.patterns.length ? `本期看点：${report.patterns.map((pattern) => `${pattern.title}——${pattern.detail}`).join(" ")}` : "",
         `那周共 ${report.summary.posts.toLocaleString("en-US")} 帖、${report.summary.accounts} 个账号在发，带图/视频占 ${report.summary.mediaPct}%。`,
       ].filter(Boolean).join("");
       return `    <item>

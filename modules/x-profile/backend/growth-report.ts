@@ -156,22 +156,27 @@ function toReport(row: StoredRow): XGrowthReport {
   };
 }
 
-/** 最近一期的报告；没有生成过时返回空列表。 */
-export async function loadGrowthReports(): Promise<XGrowthReportResponse> {
-  const [latest] = await sql<{ on: string | null }[]>`
-    SELECT to_char(max(period_end), 'YYYY-MM-DD') AS on FROM x_growth_reports`;
-  if (!latest?.on) return { window: WINDOW, generatedAt: null, reports: [], summary: null };
+/** 某一期（定时任务在周一跑，period_end 就是那天）已经生成的账号观察；没生成过就是空列表。 */
+export async function reportsFor(periodEnd: string): Promise<XGrowthReport[]> {
   const rows = await sql<StoredRow[]>`
     SELECT handle, screen_name, name, avatar_url, growth::text AS growth, followers::text AS followers,
            posts, views::text AS views, to_char(period_start, 'YYYY-MM-DD') AS period_start,
            to_char(period_end, 'YYYY-MM-DD') AS period_end, generated_at, model, report
     FROM x_growth_reports
-    WHERE window_days = ${WINDOW} AND period_end = ${latest.on}::date
+    WHERE window_days = ${WINDOW} AND period_end = ${periodEnd}::date
     ORDER BY x_growth_reports.growth DESC`;
-  const reports = rows.map(toReport);
+  return rows.map(toReport);
+}
+
+/** 最近一期的报告；没有生成过时返回空列表。 */
+export async function loadGrowthReports(): Promise<XGrowthReportResponse> {
+  const [latest] = await sql<{ on: string | null }[]>`
+    SELECT to_char(max(period_end), 'YYYY-MM-DD') AS on FROM x_growth_reports`;
+  if (!latest?.on) return { window: WINDOW, generatedAt: null, reports: [], summary: null };
+  const reports = await reportsFor(latest.on);
   return {
     window: WINDOW,
-    generatedAt: rows.length ? new Date(rows[0]!.generated_at).toISOString() : null,
+    generatedAt: reports.length ? reports[0]!.generatedAt : null,
     reports,
     summary: await summaryOf(reports),
   };

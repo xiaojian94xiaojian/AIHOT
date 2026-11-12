@@ -532,6 +532,8 @@ export interface XWeeklyResponse {
   weeks: string[];
   rows: XWeeklyRow[];
   darkHorses: XWeeklyDarkHorse[];
+  /** 这一周已经生成过的账号观察（模型写的），没有就是空。 */
+  observations: XGrowthReport[];
   patterns: XWeeklyPattern[];
   compare: XWeeklyCompare;
   viral: XWeeklyViral[];

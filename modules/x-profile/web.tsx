@@ -10,7 +10,7 @@ export const xProfileWebModule: WebModule = defineWebModule({
     items: [
       { to: "/x-people/growth", label: "涨粉榜", icon: IconTrendUp },
       { to: "/x-people", label: "博主画像", icon: IconUsers },
-      { to: "/x-people/growth/report", label: "本周观察", icon: IconDoc },
+      { to: "/x-people/weekly", label: "涨粉周报", icon: IconDoc },
       { to: "/x-people/today", label: "今天发什么", icon: IconSparkles },
       { to: "/x-people/algorithm", label: "算法视角", icon: IconChart },
       { to: "/x-people/alerts", label: "飞书提醒", icon: IconMessage },
@@ -21,7 +21,7 @@ export const xProfileWebModule: WebModule = defineWebModule({
   tools: [
     { to: "/x-people/growth", label: "涨粉榜", icon: <IconTrendUp size={20} /> },
     { to: "/x-people", label: "博主画像", icon: <IconUsers size={20} /> },
-    { to: "/x-people/growth/report", label: "本周观察", icon: <IconDoc size={20} /> },
+    { to: "/x-people/weekly", label: "涨粉周报", icon: <IconDoc size={20} /> },
     { to: "/x-people/today", label: "今天发什么", icon: <IconSparkles size={20} /> },
     { to: "/x-people/algorithm", label: "算法视角", icon: <IconChart size={20} /> },
     { to: "/x-people/alerts", label: "飞书提醒", icon: <IconMessage size={20} /> },

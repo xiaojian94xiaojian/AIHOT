@@ -37,6 +37,7 @@ async function post(handle: string, lang: string, on: string, views: number, pos
 
 after(async () => {
   await sql`DELETE FROM x_follower_snapshots WHERE handle LIKE ${`weekly-${T}-%`}`;
+  await sql`DELETE FROM x_growth_reports WHERE handle LIKE ${`weekly-${T}-%`}`;
   await sql`DELETE FROM articles WHERE source_id LIKE ${`x-account-weekly-${T}-%`}`;
   await sql`DELETE FROM sources WHERE id LIKE ${`x-account-weekly-${T}-%`}`;
   await sql`DELETE FROM receipts WHERE logical_key = ${`weekly-${T}`}`;
@@ -69,6 +70,10 @@ test("a week ranks by snapshot difference and skips accounts without both ends",
   await post(handles.second, "zh", mid, 800);
   await post(handles.english, "en", mid, 50_000);
   await post(handles.mixed, "zh", mid, 500, `Weekly-${T}-Mixed`);
+  // 这一期已经生成过的账号观察，周报应原样带出来。
+  await sql`INSERT INTO x_growth_reports (handle, screen_name, name, window_days, period_start, period_end, model, growth, followers, posts, views, report)
+    VALUES (${handles.big}, ${handles.big}, ${handles.big}, 7, ${week}::date, ${addDays(week, 7)}::date, ${"test"}, 5000, 6000, 1, 1200,
+            ${sql.json({ conclusion: "测试结论", drivers: [{ why: "因为", evidence: "依据" }], moves: ["动作"], confidence: "medium" })})`;
 
   const report = await loadWeekly(week);
   assert.equal(report.week.start, week);
@@ -94,6 +99,9 @@ test("a week ranks by snapshot difference and skips accounts without both ends",
   assert.equal(report.darkHorses[0]?.growthPct, 500, "the dark-horse growth is the scaled percentage");
   assert.equal(big.rankPrev, null, "no previous week means no rank change");
   assert.equal(report.rows[0]?.rank, 1, "the fastest-growing account leads");
+  assert.equal(report.observations.length, 1, "this week's stored observations are served with the report");
+  assert.equal(report.observations[0]?.handle, handles.big, "the observation is the one stored for this week");
+  assert.equal(report.observations[0]?.periodEnd, addDays(week, 7), "the Monday run is the one that belongs to this week");
   assert.equal(report.compare.posts, report.summary.posts, "the compare block uses the same weekly totals");
   assert.equal(report.compare.prevPosts, 0, "the previous week has no fixtures");
   assert.equal((await loadWeekly("2026-02-30")).week.start, weeks[0], "an impossible date falls back to the latest week");
