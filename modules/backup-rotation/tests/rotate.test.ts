@@ -58,5 +58,42 @@ test("a rotation pass deletes only expired objects and follows pagination", asyn
 });
 
 test("an unconfigured store does nothing", async () => {
-  assert.deepEqual(await rotate({ store: null }), { scanned: 0, deleted: [], failed: [] });
+  assert.deepEqual(await rotate({ store: null }), { scanned: 0, deleted: [], failed: [], pending: 0, aborted: [], abortFailed: [] });
+});
+
+test("unfinished multipart uploads older than the window are aborted, recent ones are left alone", async () => {
+  const aborted: string[] = [];
+  const hoursAgo = (hours: number) => new Date(now - hours * 3_600_000).toISOString();
+  const upload = (key: string, id: string, hours: number) =>
+    `<Upload><Key>${key}</Key><UploadId>${id}</UploadId><Initiated>${hoursAgo(hours)}</Initiated></Upload>`;
+  const server = http.createServer((req, res) => {
+    const url = new URL(req.url ?? "/", "http://stub");
+    if (req.method === "DELETE") {
+      aborted.push(url.searchParams.get("uploadId") ?? "");
+      res.writeHead(204);
+      res.end();
+      return;
+    }
+    if (url.searchParams.has("uploads")) {
+      res.writeHead(200, { "content-type": "application/xml" });
+      res.end(`<?xml version="1.0"?><ListMultipartUploadsResult>${upload("daily/orphan.dump", "u-old", 72)}${upload("daily/live.dump", "u-new", 1)}</ListMultipartUploadsResult>`);
+      return;
+    }
+    res.writeHead(200, { "content-type": "application/xml" });
+    res.end(`<?xml version="1.0"?><ListBucketResult></ListBucketResult>`);
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
+  const { port } = server.address() as { port: number };
+  try {
+    const result = await rotate({
+      now,
+      store: { secretId: "id", secretKey: "key", bucket: "b", region: "auto", endpoint: (key) => `http://127.0.0.1:${port}/b/${key}` },
+    });
+    assert.equal(result.pending, 2, "both unfinished uploads are seen");
+    assert.deepEqual(result.aborted, ["daily/orphan.dump#u-old"], "only the one older than the window is aborted");
+    assert.deepEqual(aborted, ["u-old"]);
+    assert.deepEqual(result.abortFailed, []);
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
 });

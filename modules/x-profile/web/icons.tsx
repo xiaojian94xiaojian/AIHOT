@@ -27,7 +27,7 @@ function Svg({ size = 16, children, ...rest }: IconProps & { children: React.Rea
 /** 皇冠 / 冠军 */
 export const IconCrown = (p: IconProps) => (
   <Svg {...p}>
-    <path d="M4 18h16M4 18l2-10 5 4 5-8 5 8 2 10H4z" />
+    <path d="M4 19h16M4 19l1.5-11 4.5 4 2-6 2 6 4.5-4L20 19H4z" />
   </Svg>
 );
 

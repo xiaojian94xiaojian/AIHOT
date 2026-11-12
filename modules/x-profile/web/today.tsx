@@ -146,7 +146,7 @@ export default function TodayPage() {
               }}
               className="inline-flex shrink-0 min-h-[28px] items-center gap-1 rounded-full border border-line bg-bg-sunk/50 px-2.5 py-1 text-[11px] text-ink-3 transition-colors hover:border-accent hover:text-ink"
             >
-              {copiedAngle ? <IconCheck size={11} className={copyFailed ? "text-ink-4" : "text-ok"} /> : <IconCopy size={11} className="text-ink-4" />}
+              {copiedAngle ? <IconCheck size={11} className="text-ok" /> : <IconCopy size={11} className="text-ink-4" />}
               <span>{copyFailed ? "复制失败，请手动选中" : copiedAngle ? "已复制切入角度" : "复制切入角度"}</span>
             </button>
           </div>

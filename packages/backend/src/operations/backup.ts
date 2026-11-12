@@ -164,7 +164,12 @@ export async function upload(
     complete.searchParams.set("uploadId", uploadId);
     const headers = sign("POST", complete, hex(xml), { "content-length": String(Buffer.byteLength(xml)), "content-type": "application/xml" });
     const res = await request(complete, { method: "POST", headers, body: xml }, 60_000);
-    if (!res.ok) throw new Error(`backup multipart ${key}: HTTP ${res.status} ${(await res.text()).slice(0, 300)}`);
+    const answer = await res.text();
+    // S3 允许 CompleteMultipartUpload 回 200、把失败写在 body 的 <Error> 里；只看状态码会当成成功。
+    if (!res.ok || /<Error[\s>]/.test(answer)) {
+      const code = /<Code>([^<]+)<\/Code>/.exec(answer)?.[1];
+      throw new Error(`backup multipart ${key}: HTTP ${res.status}${code ? ` ${code}` : ""} ${answer.slice(0, 300)}`);
+    }
   } catch (error) {
     abort();
     throw error;

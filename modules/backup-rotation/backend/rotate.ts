@@ -62,23 +62,87 @@ async function remove(store: Store, key: string): Promise<boolean> {
   return res.ok || res.status === 404;
 }
 
+/** 没完成的分片上传：进程被杀、部署重启或链路断掉时留下的。 */
+interface PendingUpload {
+  key: string;
+  uploadId: string;
+  initiated: Date;
+}
+
+/** 只清两天前开始的：一次 3GB 的上传约半小时，48 小时足够避开正在进行的。 */
+export const ORPHAN_HOURS = 48;
+
+async function listUploads(store: Store): Promise<PendingUpload[]> {
+  const out: PendingUpload[] = [];
+  let keyMarker: string | undefined;
+  let idMarker: string | undefined;
+  for (;;) {
+    const url = new URL(store.endpoint(""));
+    url.searchParams.set("uploads", "");
+    if (keyMarker) url.searchParams.set("key-marker", keyMarker);
+    if (idMarker) url.searchParams.set("upload-id-marker", idMarker);
+    const res = await fetch(url, {
+      headers: signV4({ method: "GET", url, region: store.region, accessKey: store.secretId, secretKey: store.secretKey, payloadHash: EMPTY_HASH }),
+      signal: AbortSignal.timeout(60_000),
+    });
+    if (!res.ok) throw new Error(`备份桶分片列举失败：HTTP ${res.status}`);
+    const xml = await res.text();
+    for (const m of xml.matchAll(/<Upload>([\s\S]*?)<\/Upload>/g)) {
+      const key = /<Key>([^<]+)<\/Key>/.exec(m[1])?.[1];
+      const uploadId = /<UploadId>([^<]+)<\/UploadId>/.exec(m[1])?.[1];
+      const initiated = /<Initiated>([^<]+)<\/Initiated>/.exec(m[1])?.[1];
+      if (key && uploadId && initiated && Number.isFinite(Date.parse(initiated))) {
+        out.push({ key, uploadId, initiated: new Date(initiated) });
+      }
+    }
+    if (!/<IsTruncated>true<\/IsTruncated>/.test(xml)) break;
+    keyMarker = /<NextKeyMarker>([^<]+)<\/NextKeyMarker>/.exec(xml)?.[1];
+    idMarker = /<NextUploadIdMarker>([^<]+)<\/NextUploadIdMarker>/.exec(xml)?.[1];
+    if (!keyMarker) break;
+  }
+  return out;
+}
+
+async function abortUpload(store: Store, upload: PendingUpload): Promise<boolean> {
+  const url = new URL(store.endpoint(upload.key));
+  url.searchParams.set("uploadId", upload.uploadId);
+  const res = await fetch(url, {
+    method: "DELETE",
+    headers: signV4({ method: "DELETE", url, region: store.region, accessKey: store.secretId, secretKey: store.secretKey, payloadHash: EMPTY_HASH }),
+    signal: AbortSignal.timeout(60_000),
+  });
+  return res.ok || res.status === 404;
+}
+
 export interface RotationResult {
   /** 桶里看过的对象数。 */
   scanned: number;
   deleted: string[];
   failed: string[];
+  /** 桶里还没完成的分片上传数。 */
+  pending: number;
+  /** 清掉的孤儿分片（key#uploadId）。 */
+  aborted: string[];
+  abortFailed: string[];
 }
 
 /** 跑一轮保留策略。`store` 可注入（测试用本地桩），默认读环境里的备份桶配置。 */
 export async function rotate(opts: { now?: number; store?: Store | null } = {}): Promise<RotationResult> {
   const store = opts.store === undefined ? backupStore() : opts.store;
-  if (!store) return { scanned: 0, deleted: [], failed: [] };
+  if (!store) return { scanned: 0, deleted: [], failed: [], pending: 0, aborted: [], abortFailed: [] };
   const now = opts.now ?? Date.now();
   const objects = await listAll(store);
-  const result: RotationResult = { scanned: objects.length, deleted: [], failed: [] };
+  const result: RotationResult = { scanned: objects.length, deleted: [], failed: [], pending: 0, aborted: [], abortFailed: [] };
   for (const object of objects.filter((o) => expired(o.key, o.lastModified, now))) {
     if (await remove(store, object.key)) result.deleted.push(object.key);
     else result.failed.push(object.key);
+  }
+  const uploads = await listUploads(store);
+  result.pending = uploads.length;
+  for (const upload of uploads.filter((u) => now - u.initiated.getTime() > ORPHAN_HOURS * 3_600_000)) {
+    const id = `${upload.key}#${upload.uploadId}`;
+    if (await abortUpload(store, upload)) result.aborted.push(id);
+    else result.abortFailed.push(id);
   }
   return result;
 }

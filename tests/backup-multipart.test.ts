@@ -26,6 +26,7 @@ let completed: string | null = null;
 let aborted: string | null = null;
 let failPart: number | null = null;
 let failAlways = false;
+let failComplete = false;
 let failedOnce = false;
 
 const xml = (body: string) => new Response(body, { status: 200, headers: { "content-type": "application/xml" } });
@@ -56,6 +57,8 @@ globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) =>
   }
   if (method === "POST" && url.searchParams.has("uploadId")) {
     completed = typeof body === "string" ? body : String(body);
+    // S3 可以在 200 里回一个 <Error>：只看状态码会当成成功。
+    if (failComplete) return xml("<Error><Code>InternalError</Code><Message>try again</Message></Error>");
     return xml("<CompleteMultipartUploadResult/>");
   }
   if (method === "PUT") {
@@ -87,6 +90,7 @@ const reset = () => {
   aborted = null;
   failPart = null;
   failAlways = false;
+  failComplete = false;
   failedOnce = false;
 };
 
@@ -149,4 +153,17 @@ test("a part that keeps failing aborts the upload instead of leaving parts behin
     /HTTP 503/,
   );
   assert.equal(aborted, UPLOAD_ID, "the unfinished upload is deleted");
+});
+
+test("a complete that answers 200 with an <Error> body fails the upload instead of reporting success", async () => {
+  reset();
+  const store = backupStore();
+  assert.ok(store);
+  const { file, data, sha } = await fixture(2 * 1024 * 1024);
+  failComplete = true;
+  await assert.rejects(
+    upload(store, "daily/error-body.bin", file, sha, data.length, { partSize: 1024 * 1024, threshold: 1024 * 1024 }),
+    /InternalError/,
+  );
+  assert.equal(aborted, UPLOAD_ID, "the upload is aborted so no half-joined object stays behind");
 });

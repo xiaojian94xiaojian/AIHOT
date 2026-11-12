@@ -292,25 +292,25 @@ export default function MethodologyPage() {
               </thead>
               <tbody className="divide-y divide-line-soft">
                 <tr className="hover:bg-bg-sunk/40 transition-colors">
-                  <td className="px-3.5 py-2.5 text-ink-2 font-medium flex items-center gap-1.5"><IconLink size={13} className="text-accent shrink-0" />复制链接分享</td>
+                  <td className="px-3.5 py-2.5 text-ink-2 font-medium"><span className="flex items-center gap-1.5"><IconLink size={13} className="text-accent shrink-0" />复制链接分享</span></td>
                   <td className="num px-3.5 py-2.5 text-right font-black text-accent text-[13px]">+20.0</td>
                   <td className="px-3.5 py-2.5 text-ink-2 font-medium">点赞</td>
                   <td className="num px-3.5 py-2.5 text-right text-ink">+0.708</td>
                 </tr>
                 <tr className="hover:bg-bg-sunk/40 transition-colors">
-                  <td className="px-3.5 py-2.5 text-ink-2 font-medium flex items-center gap-1.5"><IconMessageCircle size={13} className="text-accent shrink-0" />回复 / 引用</td>
+                  <td className="px-3.5 py-2.5 text-ink-2 font-medium"><span className="flex items-center gap-1.5"><IconMessageCircle size={13} className="text-accent shrink-0" />回复 / 引用</span></td>
                   <td className="num px-3.5 py-2.5 text-right font-black text-accent text-[13px]">+5.0</td>
                   <td className="px-3.5 py-2.5 text-ink-2 font-medium">点击帖子</td>
                   <td className="num px-3.5 py-2.5 text-right text-ink">+0.274</td>
                 </tr>
                 <tr className="hover:bg-bg-sunk/40 transition-colors">
-                  <td className="px-3.5 py-2.5 text-ink-2 font-medium flex items-center gap-1.5"><IconSend size={13} className="text-accent shrink-0" />DM 分享</td>
+                  <td className="px-3.5 py-2.5 text-ink-2 font-medium"><span className="flex items-center gap-1.5"><IconSend size={13} className="text-accent shrink-0" />DM 分享</span></td>
                   <td className="num px-3.5 py-2.5 text-right font-black text-accent text-[13px]">+5.0</td>
                   <td className="px-3.5 py-2.5 text-ink-2 font-medium">打开外链</td>
                   <td className="num px-3.5 py-2.5 text-right text-ink">+0.2</td>
                 </tr>
                 <tr className="hover:bg-bg-sunk/40 transition-colors">
-                  <td className="px-3.5 py-2.5 text-ink-2 font-medium flex items-center gap-1.5"><IconUsers size={13} className="text-accent shrink-0" />关注作者</td>
+                  <td className="px-3.5 py-2.5 text-ink-2 font-medium"><span className="flex items-center gap-1.5"><IconUsers size={13} className="text-accent shrink-0" />关注作者</span></td>
                   <td className="num px-3.5 py-2.5 text-right font-black text-accent text-[13px]">+4.0</td>
                   <td className="px-3.5 py-2.5 text-ink-2 font-medium">停留 / 停留时长</td>
                   <td className="num px-3.5 py-2.5 text-right text-ink">+0.05 / +0.0075</td>
@@ -318,13 +318,13 @@ export default function MethodologyPage() {
                 <tr className="hover:bg-bg-sunk/40 transition-colors">
                   <td className="px-3.5 py-2.5 text-ink-2 font-medium">转发</td>
                   <td className="num px-3.5 py-2.5 text-right text-ink font-semibold">+1.0</td>
-                  <td className="px-3.5 py-2.5 text-ink-2 font-medium flex items-center gap-1.5"><IconAlertTriangle size={13} className="text-hot shrink-0" />举报</td>
+                  <td className="px-3.5 py-2.5 text-ink-2 font-medium"><span className="flex items-center gap-1.5"><IconAlertTriangle size={13} className="text-hot shrink-0" />举报</span></td>
                   <td className="num px-3.5 py-2.5 text-right font-black text-hot text-[13px]">−234</td>
                 </tr>
                 <tr className="hover:bg-bg-sunk/40 transition-colors">
                   <td className="px-3.5 py-2.5 text-ink-2 font-medium">分享</td>
                   <td className="num px-3.5 py-2.5 text-right text-ink font-semibold">+2.118</td>
-                  <td className="px-3.5 py-2.5 text-ink-2 font-medium flex items-center gap-1.5"><IconShieldAlert size={13} className="text-hot shrink-0" />静音 / 不想看 / 屏蔽</td>
+                  <td className="px-3.5 py-2.5 text-ink-2 font-medium"><span className="flex items-center gap-1.5"><IconShieldAlert size={13} className="text-hot shrink-0" />静音 / 不想看 / 屏蔽</span></td>
                   <td className="num px-3.5 py-2.5 text-right font-black text-hot text-[13px]">−58.8 / −53.1 / −31.2</td>
                 </tr>
               </tbody>
