@@ -56,7 +56,9 @@ export const PRESETS: Record<string, ModelPreset> = {
   },
   "mimo-v2.6-flash": {
     service: "mimo", model: "mimo-v2.6-flash", baseUrlEnv: "XIAOMI_MIMO_BASE_URL", apiKeyEnv: "XIAOMI_MIMO_API_KEY",
-    extra: { thinking: { type: "disabled" } }, jsonMode: true,
+    // 这个模型即使关了 thinking 也会先花几百个 token 推理；归组复核只给了 400/512，结果被推理吃光、
+    // 没有 JSON。给它多留 2000 个输出 token（只是上限，不产生额外费用）。
+    extra: { thinking: { type: "disabled" } }, reasoningTokens: 2000, jsonMode: true,
   },
   "qwen3-vl-flash": {
     service: "dashscope", model: "qwen3-vl-flash", baseUrlEnv: "DASHSCOPE_BASE_URL", apiKeyEnv: "DASHSCOPE_API_KEY",
