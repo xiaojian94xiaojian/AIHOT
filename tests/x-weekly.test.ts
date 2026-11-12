@@ -28,10 +28,11 @@ async function post(handle: string, lang: string, on: string, views: number, pos
   await sql`INSERT INTO sources (id, name, kind, config) VALUES (${source}, ${handle}, 'x_search', ${sql.json({ query: `from:${handle}` })})
             ON CONFLICT (id) DO NOTHING`;
   await sql`
-    INSERT INTO articles (id, source_id, identity_key, url, title, discovered_at, timeline_at, language, published_at, x_post)
+    INSERT INTO articles (id, source_id, identity_key, url, title, discovered_at, timeline_at, language, published_at, x_post, raw)
     VALUES (${newArticleId()}, ${source}, ${`${source}-${on}`}, ${`https://x.com/${handle}/status/${on.replaceAll("-", "")}`}, ${`${handle} post`},
             now(), now(), ${lang}, ${on}::timestamptz + interval '12 hours',
-            ${sql.json({ handle: postHandle, text: "post", tweetId: on.replaceAll("-", "") })})`;
+            ${sql.json({ handle: postHandle, text: "post", tweetId: on.replaceAll("-", "") })},
+            ${sql.json({ views, favorite: Math.round(views / 10), retweet: 1 })})`;
 }
 
 after(async () => {
@@ -85,6 +86,14 @@ test("a week ranks by snapshot difference and skips accounts without both ends",
   assert.equal(report.rows.some((row) => row.handle === handles.english), false, "an English account stays out of the Chinese report");
   assert.equal(report.rows.some((row) => row.handle === handles.noPosts), false, "no posts means no language evidence");
   assert.ok(report.rows.length <= 10, "the report is a top ten");
+  assert.equal(report.viral.length, 3, "the week's posts with views make the viral list");
+  assert.ok(report.darkHorses.length >= 1, "small accounts get a dark-horse list");
+  assert.equal(report.darkHorses[0]?.handle, handles.big, "the fastest-growing small account leads the dark horses");
+  assert.equal(report.patterns.length, 1, "with only a few posts only the dark-horse observation is written");
+  assert.ok(report.patterns.every((p) => !/带图|篇幅|晚上/.test(p.title)), "viral observations wait for a full sample");
+  assert.equal(report.darkHorses[0]?.growthPct, 500, "the dark-horse growth is the scaled percentage");
+  assert.equal(report.compare.posts, report.summary.posts, "the compare block uses the same weekly totals");
+  assert.equal(report.compare.prevPosts, 0, "the previous week has no fixtures");
   assert.equal((await loadWeekly("2026-02-30")).week.start, weeks[0], "an impossible date falls back to the latest week");
   assert.equal((await loadWeekly("2020-01-06")).week.start, weeks[0], "a week outside the window falls back to the latest");
 });

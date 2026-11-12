@@ -48,11 +48,15 @@ echo "=== $(uname -s) / node $(node --version) / $(pg_dump --version | cut -d' '
 # and the staged tree is not a checkout, so the host's .git is mounted at /gitdir and git is pointed at
 # the staged tree (GIT_DIR/GIT_WORK_TREE above).
 if ! command -v git >/dev/null 2>&1; then
-  # The image ships no git; two of this deployment's runs met a flaky apt mirror and went on without it,
-  # which only showed up as "spawnSync git ENOENT" in the architecture test. Give the install three tries.
+  # The image ships no git; this deployment's runs have met a flaky apt mirror and gone on without it,
+  # which only shows up as "spawnSync git ENOENT" in the architecture test. Retry, and say why if it
+  # still fails instead of leaving the next reader to guess.
   for attempt in 1 2 3; do
-    (apt-get update -qq && apt-get install -y -qq --no-install-recommends git) >/dev/null 2>&1 && break
-    sleep 3
+    if (apt-get update -qq && apt-get install -y -qq --no-install-recommends git) >/tmp/apt-git.log 2>&1; then
+      break
+    fi
+    echo "(git install attempt ${attempt} failed: $(tail -n 1 /tmp/apt-git.log 2>/dev/null))"
+    sleep 5
   done
 fi
 command -v git >/dev/null 2>&1 || echo "(no git: the architecture env-template test will fail)"

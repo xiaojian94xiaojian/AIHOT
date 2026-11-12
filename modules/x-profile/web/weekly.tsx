@@ -7,7 +7,7 @@ import { pageMeta } from "@aihot/web/lib/seo";
 import { monthDay } from "@aihot/contracts/time";
 import { SourceAvatar } from "@aihot/web/components/ui/SourceAvatar";
 import { signed } from "./format";
-import { IconTrophy, IconZap } from "./icons";
+import { IconClock, IconTarget, IconTrendingUp, IconTrophy, IconZap } from "./icons";
 
 export async function loader({ request }: { request: Request }) {
   const week = new URL(request.url).searchParams.get("week");
@@ -32,7 +32,7 @@ export const handle = { tab: "x-tools", name: "涨粉周报" } as const;
 const compact = (n: number) => (n >= 10_000 ? `${(n / 10_000).toFixed(1)}万` : n.toLocaleString("en-US"));
 
 export default function WeeklyPage() {
-  const { week, weeks, rows, viral, shape, summary } = useLoaderData<typeof loader>();
+  const { week, weeks, rows, darkHorses, patterns, compare, viral, shape, summary } = useLoaderData<typeof loader>();
   return (
     <div className="mx-auto max-w-4xl px-4 pb-16 pt-4 lg:px-6">
       <nav className="mt-1 text-[12px] text-ink-3">
@@ -75,6 +75,21 @@ export default function WeeklyPage() {
         ))}
       </section>
 
+      {patterns.length > 0 && (
+        <section className="mt-6">
+          <h2 className="flex items-center gap-1.5 text-[15px] font-bold text-ink"><IconTarget className="size-4 text-accent" />本周观察：能照着做的几件事</h2>
+          <ul className="mt-2 space-y-2">
+            {patterns.map((pattern) => (
+              <li key={pattern.title} className="rounded-card border border-line bg-surface px-3 py-2.5">
+                <div className="text-[13px] font-semibold text-ink">{pattern.title}</div>
+                <p className="mt-0.5 text-[12.5px] leading-relaxed text-ink-2">{pattern.detail}</p>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-[11.5px] text-ink-3">观察只从本周采集到的帖子里算，不调模型；爆款样本没采满时不写爆款观察。全周基线包含回复和引用，爆款基本是原帖。</p>
+        </section>
+      )}
+
       <section className="mt-6">
         <div className="flex items-end justify-between">
           <h2 className="flex items-center gap-1.5 text-[15px] font-bold text-ink"><IconTrophy className="size-4 text-accent" />本周涨粉 TOP 10</h2>
@@ -93,6 +108,7 @@ export default function WeeklyPage() {
                   <th className="px-3 py-2 font-normal">账号</th>
                   <th className="px-3 py-2 font-normal text-right">粉丝</th>
                   <th className="px-3 py-2 font-normal text-right">本周涨粉</th>
+                  <th className="hidden px-3 py-2 font-normal text-right sm:table-cell">涨幅</th>
                   <th className="px-3 py-2 font-normal text-right">本周帖</th>
                   <th className="px-3 py-2 font-normal text-right">千曝涨粉</th>
                 </tr>
@@ -112,12 +128,43 @@ export default function WeeklyPage() {
                     </td>
                     <td className="num px-3 py-2 text-right text-ink-2">{compact(row.followers)}</td>
                     <td className="num px-3 py-2 text-right font-semibold text-emerald-600">{signed(row.growth)}</td>
+                    <td className="num hidden px-3 py-2 text-right text-ink-2 sm:table-cell">{row.growthPct}%</td>
                     <td className="num px-3 py-2 text-right text-ink-2">{row.posts}</td>
                     <td className="num px-3 py-2 text-right text-ink-2">{row.perK == null ? "—" : row.perK}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+      </section>
+
+      <section className="mt-6">
+        <div className="flex items-end justify-between">
+          <h2 className="flex items-center gap-1.5 text-[15px] font-bold text-ink"><IconTrendingUp className="size-4 text-accent" />小账号黑马</h2>
+          <span className="text-[11px] text-ink-3">粉丝 1 千–5 万、本周涨粉 ≥300 · 按涨幅排序（按快照跨度折算成 7 天）</span>
+        </div>
+        {darkHorses.length === 0 ? (
+          <p className="mt-3 rounded-card border border-line bg-surface px-3 py-6 text-center text-[13px] text-ink-3">这一周没有符合条件的小账号。</p>
+        ) : (
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            {darkHorses.map((row) => (
+              <div key={row.handle} className="rounded-card border border-line bg-surface px-3 py-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <Link to={`/x-people/${row.handle}`} className="group inline-flex min-w-0 items-center gap-2">
+                    <SourceAvatar avatarUrl={row.avatarUrl} name={row.name ?? row.handle} size={22} />
+                    <span className="min-w-0">
+                      <span className="block truncate text-[12.5px] font-medium text-ink group-hover:text-accent">{row.name ?? `@${row.handle}`}</span>
+                      <span className="block truncate text-[11px] text-ink-3">{compact(row.followers)} 粉 · 本周 {row.posts} 帖</span>
+                    </span>
+                  </Link>
+                  <span className="num shrink-0 text-right">
+                    <span className="block text-[14px] font-bold text-emerald-600">{signed(row.growth)}</span>
+                    <span className="block text-[11px] text-ink-3">{row.growthPct}%</span>
+                  </span>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </section>
@@ -137,6 +184,12 @@ export default function WeeklyPage() {
                 <a href={post.url} target="_blank" rel="noreferrer noopener" className="mt-1 block text-[13.5px] leading-relaxed text-ink hover:text-accent">
                   {post.text.length > 140 ? `${post.text.slice(0, 140)}…` : post.text}
                 </a>
+                <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-ink-3">
+                  <span className="inline-flex items-center gap-1"><IconClock className="size-3" />{post.weekday} {post.hour} 时</span>
+                  <span>{post.chars} 字</span>
+                  <span>{post.media > 0 ? "带图/视频" : "纯文字"}</span>
+                  <span className="num">互动率 {post.likeRate}%</span>
+                </div>
               </li>
             ))}
           </ol>
@@ -159,6 +212,32 @@ export default function WeeklyPage() {
           ))}
         </div>
         <p className="mt-2 text-[11.5px] text-ink-3">形态按帖子本身的字段统计（媒体、引用、回复），不是模型判断。</p>
+      </section>
+
+      <section className="mt-6 rounded-card border border-line bg-surface px-3 py-2.5">
+        <div className="flex items-end justify-between">
+          <h2 className="text-[15px] font-bold text-ink">比上周</h2>
+          <span className="text-[11px] text-ink-3">同口径 · 只算中文</span>
+        </div>
+        <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {[
+            { label: "帖子", now: compare.posts, prev: compare.prevPosts },
+            { label: "浏览", now: compare.views, prev: compare.prevViews },
+            { label: "在发账号", now: compare.accounts, prev: compare.prevAccounts },
+          ].map((item) => {
+            const delta = item.prev > 0 ? Math.round(((item.now - item.prev) / item.prev) * 1000) / 10 : null;
+            return (
+              <div key={item.label} className="text-[12px]">
+                <span className="text-ink-3">{item.label}</span>
+                <span className="num ml-1.5 font-semibold text-ink">{compact(item.now)}</span>
+                {delta != null && (
+                  <span className={`num ml-1.5 ${delta >= 0 ? "text-emerald-600" : "text-rose-500"}`}>{delta >= 0 ? "+" : ""}{delta}%</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        <p className="mt-1.5 text-[12px] text-ink-2">上榜账号合计涨粉 {compact(compare.topGrowth)}，上周 {compact(compare.prevTopGrowth)}。</p>
       </section>
 
       <footer className="mt-8 text-[12px] text-ink-3">

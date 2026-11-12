@@ -22,8 +22,18 @@ $notes = New-Object System.Collections.Generic.List[string]
 
 function Step([string]$name, [scriptblock]$body) {
   Write-Host "=== $name ===" -ForegroundColor Cyan
-  & $body
-  if ($LASTEXITCODE -ne 0) { $failures.Add($name) }
+  $out = & $body 2>&1
+  $out | ForEach-Object { $_ }
+  $code = $LASTEXITCODE
+  # 测试容器里 git 要现装，apt 镜像偶尔抖一下就会漏装，架构测试随即报 spawnSync git ENOENT。
+  # 那是环境问题不是改动问题：重跑一次，别拿它去消耗 reviewer。
+  if ($code -ne 0 -and (($out | Out-String) -match "spawnSync git ENOENT")) {
+    Write-Host "(retrying ${name}: the test container lost git)" -ForegroundColor Yellow
+    $out = & $body 2>&1
+    $out | ForEach-Object { $_ }
+    $code = $LASTEXITCODE
+  }
+  if ($code -ne 0) { $failures.Add($name) }
 }
 
 # 1. 类型检查

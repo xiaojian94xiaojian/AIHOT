@@ -460,7 +460,7 @@ export interface XDailyCard {
   me: { handle: string; followers: number | null; verdict: string } | null;
   links: { post: string; reply: string | null; story: string };
 }
-/** 公开周报：一周的涨粉榜、爆款帖与内容形态。 */
+/** 公开周报：一周的涨粉榜、黑马、爆款、内容形态与「能照着做」的观察。 */
 export interface XWeeklyRow {
   rank: number;
   handle: string;
@@ -468,9 +468,19 @@ export interface XWeeklyRow {
   avatarUrl: string | null;
   followers: number;
   growth: number;
+  growthPct: number;
   posts: number;
   views: number;
   perK: number | null;
+}
+export interface XWeeklyDarkHorse {
+  handle: string;
+  name: string | null;
+  avatarUrl: string | null;
+  followers: number;
+  growth: number;
+  growthPct: number;
+  posts: number;
 }
 export interface XWeeklyViral {
   handle: string;
@@ -480,6 +490,11 @@ export interface XWeeklyViral {
   views: number;
   likes: number;
   at: string;
+  chars: number;
+  media: number;
+  weekday: string;
+  hour: number;
+  likeRate: number;
 }
 export interface XWeeklyShape {
   key: string;
@@ -487,12 +502,39 @@ export interface XWeeklyShape {
   posts: number;
   share: number;
 }
+export interface XWeeklySummary {
+  accounts: number;
+  posts: number;
+  views: number;
+  mediaPct: number;
+  medianChars: number;
+  eveningPct: number;
+  quotePct: number;
+}
+/** 从数据里读出来的一条可复用观察，detail 里带数字。 */
+export interface XWeeklyPattern {
+  title: string;
+  detail: string;
+}
+export interface XWeeklyCompare {
+  posts: number;
+  views: number;
+  accounts: number;
+  topGrowth: number;
+  prevPosts: number;
+  prevViews: number;
+  prevAccounts: number;
+  prevTopGrowth: number;
+}
 export interface XWeeklyResponse {
   week: { start: string; end: string };
   weeks: string[];
   rows: XWeeklyRow[];
+  darkHorses: XWeeklyDarkHorse[];
+  patterns: XWeeklyPattern[];
+  compare: XWeeklyCompare;
   viral: XWeeklyViral[];
   shape: XWeeklyShape[];
-  summary: { accounts: number; posts: number; views: number; mediaPct: number };
+  summary: XWeeklySummary;
   generatedAt: string;
 }
