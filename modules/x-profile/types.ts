@@ -463,6 +463,7 @@ export interface XDailyCard {
 /** 公开周报：一周的涨粉榜、黑马、爆款、内容形态与「能照着做」的观察。 */
 export interface XWeeklyRow {
   rank: number;
+  rankPrev: number | null;
   handle: string;
   name: string | null;
   avatarUrl: string | null;

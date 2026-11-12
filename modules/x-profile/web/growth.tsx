@@ -444,6 +444,7 @@ export default function GrowthPage() {
         <div className="ml-auto flex flex-wrap gap-2 text-[12px]">
           <Link to="/x-people" className="text-ink-3 transition-colors hover:text-ink">博主列表</Link>
           <Link to="/x-people/growth/report" className="text-ink-3 transition-colors hover:text-ink">本周观察</Link>
+          <Link to="/x-people/weekly" className="text-ink-3 transition-colors hover:text-ink">涨粉周报</Link>
           <Link to="/x-people/methodology" className="text-ink-3 transition-colors hover:text-ink">方法论</Link>
         </div>
       </header>

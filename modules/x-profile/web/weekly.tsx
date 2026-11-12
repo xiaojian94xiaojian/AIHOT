@@ -15,11 +15,14 @@ export async function loader({ request }: { request: Request }) {
 }
 
 export function meta() {
-  return pageMeta({
-    title: "中文 AI 圈涨粉周报",
-    description: "每周一期：中文 AI 圈这一周谁涨粉最多、哪条帖子最火、大家发的是什么形态。数字来自本站自己的采集与粉丝快照，可核对。",
-    path: "/x-people/weekly",
-  });
+  return [
+    ...pageMeta({
+      title: "中文 AI 圈涨粉周报",
+      description: "每周一期：中文 AI 圈这一周谁涨粉最多、哪条帖子最火、大家发的是什么形态。数字来自本站自己的采集与粉丝快照，可核对。",
+      path: "/x-people/weekly",
+    }),
+    { tagName: "link", rel: "alternate", type: "application/rss+xml", title: "涨粉周报 RSS", href: "/feed/x-people/weekly.xml" } as const,
+  ];
 }
 
 export function headers() {
@@ -33,6 +36,9 @@ const compact = (n: number) => (n >= 10_000 ? `${(n / 10_000).toFixed(1)}万` : 
 
 export default function WeeklyPage() {
   const { week, weeks, rows, darkHorses, patterns, compare, viral, shape, summary } = useLoaderData<typeof loader>();
+  const at = weeks.indexOf(week.start);
+  const older = at >= 0 && at < weeks.length - 1 ? weeks[at + 1]! : null;
+  const newer = at > 0 ? weeks[at - 1]! : null;
   return (
     <div className="mx-auto max-w-4xl px-4 pb-16 pt-4 lg:px-6">
       <nav className="mt-1 text-[12px] text-ink-3">
@@ -58,6 +64,11 @@ export default function WeeklyPage() {
               {w.slice(5).replace("-", "/")}
             </Link>
           ))}
+        </div>
+        <div className="mt-2 flex flex-wrap gap-3 text-[12px] text-ink-3">
+          {older && <Link to={`/x-people/weekly?week=${older}`} className="hover:text-ink">← 更早一周</Link>}
+          {newer && <Link to={`/x-people/weekly?week=${newer}`} className="hover:text-ink">更新一周 →</Link>}
+          {week.start !== weeks[0] && <Link to="/x-people/weekly" className="text-accent hover:underline">回到本周</Link>}
         </div>
       </header>
 
@@ -116,7 +127,16 @@ export default function WeeklyPage() {
               <tbody>
                 {rows.map((row) => (
                   <tr key={row.handle} className="border-b border-line/60 last:border-0">
-                    <td className="num px-3 py-2 text-ink-3">{row.rank}</td>
+                    <td className="num px-3 py-2 text-ink-3">
+                      {row.rank}
+                      {row.rankPrev == null ? (
+                        <span className="ml-1 text-[10px] text-emerald-600">新</span>
+                      ) : row.rankPrev > row.rank ? (
+                        <span className="ml-1 text-[10px] text-emerald-600">↑{row.rankPrev - row.rank}</span>
+                      ) : row.rankPrev < row.rank ? (
+                        <span className="ml-1 text-[10px] text-rose-500">↓{row.rank - row.rankPrev}</span>
+                      ) : null}
+                    </td>
                     <td className="px-3 py-2">
                       <Link to={`/x-people/${row.handle}`} className="group inline-flex min-w-0 items-center gap-2">
                         <SourceAvatar avatarUrl={row.avatarUrl} name={row.name ?? row.handle} size={24} />

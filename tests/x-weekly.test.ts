@@ -92,6 +92,8 @@ test("a week ranks by snapshot difference and skips accounts without both ends",
   assert.equal(report.patterns.length, 1, "with only a few posts only the dark-horse observation is written");
   assert.ok(report.patterns.every((p) => !/带图|篇幅|晚上/.test(p.title)), "viral observations wait for a full sample");
   assert.equal(report.darkHorses[0]?.growthPct, 500, "the dark-horse growth is the scaled percentage");
+  assert.equal(big.rankPrev, null, "no previous week means no rank change");
+  assert.equal(report.rows[0]?.rank, 1, "the fastest-growing account leads");
   assert.equal(report.compare.posts, report.summary.posts, "the compare block uses the same weekly totals");
   assert.equal(report.compare.prevPosts, 0, "the previous week has no fixtures");
   assert.equal((await loadWeekly("2026-02-30")).week.start, weeks[0], "an impossible date falls back to the latest week");

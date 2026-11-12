@@ -203,15 +203,15 @@ function scoredOf(rows: GrowthRow[]): Array<{ row: GrowthRow; growth: number; gr
     .filter((item) => item.growth > 0);
 }
 
-/** 某周涨粉前 10 之和（只算中文账号、按同一套折算），用于「比上周」。 */
-async function topGrowthOf(start: string): Promise<number> {
+/** 某周涨粉前 10（只算中文账号、按同一套折算），既用于「比上周」也用于名次变化。 */
+async function topOf(start: string): Promise<Array<{ handle: string; growth: number }>> {
   const scored = scoredOf(await growthOf(start, addDays(start, 6)));
   const chinese = await chineseHandles(scored.map((item) => item.row.handle));
   return scored
     .filter((item) => chinese.has(item.row.handle))
     .sort((a, b) => b.growth - a.growth)
     .slice(0, TOP)
-    .reduce((sum, item) => sum + item.growth, 0);
+    .map((item) => ({ handle: item.row.handle, growth: item.growth }));
 }
 
 const median = (values: number[]): number => {
@@ -272,17 +272,19 @@ async function build(start: string): Promise<XWeeklyResponse> {
     .sort((a, b) => b.growthPct - a.growthPct)
     .slice(0, 5);
   const handles = [...new Set([...ranked, ...dark].map((item) => item.row.handle))];
-  const [activity, viral, shape, prevScale, prevTopGrowth] = await Promise.all([
+  const [activity, viral, shape, prevScale, prevTop] = await Promise.all([
     activityOf(startAt, endAt, handles),
     viralOf(startAt, endAt),
     shapeOf(startAt, endAt),
     scaleOf(prevStart),
-    topGrowthOf(prevStart),
+    topOf(prevStart),
   ]);
+  const prevRank = new Map(prevTop.map((item, index) => [item.handle, index + 1]));
   const rows: XWeeklyRow[] = ranked.map(({ row, growth: value, growthPct }, index) => {
     const extra = activity.get(row.handle) ?? { posts: 0, views: 0 };
     return {
       rank: index + 1,
+      rankPrev: prevRank.get(row.handle) ?? null,
       handle: row.handle,
       name: row.name,
       avatarUrl: row.avatar_url,
@@ -318,7 +320,7 @@ async function build(start: string): Promise<XWeeklyResponse> {
       prevPosts: prevScale.posts,
       prevViews: prevScale.views,
       prevAccounts: prevScale.accounts,
-      prevTopGrowth,
+      prevTopGrowth: prevTop.reduce((sum, item) => sum + item.growth, 0),
     },
     viral,
     shape: shape.shape,
@@ -347,15 +349,21 @@ export async function weeklyFeed(today = beijingDate(new Date())): Promise<strin
   const reports = await Promise.all(weeks.map((week) => loadWeekly(week)));
   const items = reports
     .map((report) => {
-      const top = report.rows.slice(0, 3);
-      const names = top.map((row) => `@${row.handle} +${row.growth.toLocaleString("en-US")}`).join("、");
+      const top = report.rows.slice(0, 5);
+      const listed = top
+        .map((row, index) => `${index + 1}. @${row.handle} +${row.growth.toLocaleString("en-US")}（${row.growthPct}%）`)
+        .join("；");
       const best = report.viral[0];
-      const title = `${report.week.end} 那周：${names || "暂无涨粉数据"}`;
+      const dark = report.darkHorses[0];
+      const title = report.rows[0]
+        ? `${report.week.end} 那周：@${report.rows[0].handle} 领跑，${report.rows.length} 个账号上榜`
+        : `${report.week.end} 那周：暂无涨粉数据`;
       const description = [
-        top.length ? `涨粉前三：${names}。` : "这一周没有足够快照，涨粉榜单暂缺。",
+        top.length ? `涨粉前五：${listed}。` : "这一周没有足够快照，涨粉榜单暂缺。",
+        dark ? `小账号黑马：@${dark.handle} 净增 ${dark.growth.toLocaleString("en-US")} 粉（+${dark.growthPct}%）。` : "",
         best ? `最热帖子：@${best.handle} ${best.views.toLocaleString("en-US")} 浏览。` : "",
+        report.patterns.length ? `本周观察：${report.patterns.map((pattern) => `${pattern.title}——${pattern.detail}`).join(" ")}` : "",
         `那周共 ${report.summary.posts.toLocaleString("en-US")} 帖、${report.summary.accounts} 个账号在发，带图/视频占 ${report.summary.mediaPct}%。`,
-        report.patterns[0] ? `本周观察：${report.patterns[0].detail}` : "",
       ].filter(Boolean).join("");
       return `    <item>
       <title>${escapeXml(title)}</title>
