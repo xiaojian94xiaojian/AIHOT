@@ -28,7 +28,7 @@ export async function registerEventJobs(boss: PgBoss) {
  * outage, shutdown) that outlasted the job's retries. Terminal failures need a receipt release or an
  * explicit rerun.
  */
-export async function sweepUngrouped(): Promise<{ enqueued: number }> {
+export async function sweepUngrouped(): Promise<{ enqueued: number; retried: number }> {
   await ensureQueue(QUEUES.group);
   return sql.begin(async (tx) => {
     const rows = await tx<{ id: string; participation_mode: string; backfill: boolean; published_at: Date | null; discovered_at: Date }[]>`
@@ -47,6 +47,20 @@ export async function sweepUngrouped(): Promise<{ enqueued: number }> {
       const data = signal ? { articleId: row.id, signalOnly: true } : { articleId: row.id };
       if (await enqueue(QUEUES.group, data, { singletonKey: row.id, priority }, tx)) enqueued += 1;
     }
-    return { enqueued };
+    // 失败重试：按 grouping_retry_at 到点再试一次，三次之后留人工（retry_at 为 NULL）。
+    const retries = await tx<{ id: string; participation_mode: string; backfill: boolean; published_at: Date | null; discovered_at: Date }[]>`
+      SELECT a.id, s.participation_mode, a.backfill, a.published_at, a.discovered_at FROM articles a JOIN sources s ON s.id = a.source_id
+      WHERE a.grouping_status = 'failed' AND a.grouping_retry_at IS NOT NULL AND a.grouping_retry_at <= now()
+        AND a.grouping_attempts <= 3
+        AND NOT EXISTS (SELECT 1 FROM pgboss.job j WHERE j.name = ${QUEUES.group}
+          AND j.data->>'articleId' = a.id AND j.state IN ('created', 'active', 'retry'))
+      ORDER BY a.grouping_retry_at LIMIT 100 FOR UPDATE OF a SKIP LOCKED`;
+    let retried = 0;
+    for (const row of retries) {
+      const signal = row.participation_mode !== "editorial";
+      const data = signal ? { articleId: row.id, signalOnly: true, regroup: true } : { articleId: row.id, regroup: true };
+      if (await enqueue(QUEUES.group, data, { singletonKey: `retry:${row.id}`, priority: groupingPriority({ signal, historical: isHistorical(row) }) }, tx)) retried += 1;
+    }
+    return { enqueued, retried };
   });
 }

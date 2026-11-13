@@ -210,6 +210,7 @@ async function lockCurrentRevision(db: Db, articleId: string, revision: number) 
 
 async function markGrouped(articleId: string, revision: number, selection?: SelectionValue, db: Db = sql) {
   const done = await db`UPDATE articles SET grouped_at = coalesce(grouped_at, now()), grouping_status = 'complete', grouping_receipt_id = NULL, grouping_error = NULL,
+    grouping_attempts = 0, grouping_retry_at = NULL,
     selection_adds_value = CASE WHEN ${!!selection} THEN ${selection?.addsValue ?? null} ELSE selection_adds_value END,
     selection_value_reason = CASE WHEN ${!!selection} THEN ${selection?.reason ?? null} ELSE selection_value_reason END
     WHERE id = ${articleId} AND revision = ${revision}`;
@@ -280,7 +281,19 @@ export async function groupArticle(articleId: string, opts: GroupOptions = {}): 
     const kind = failureKind(error);
     const waiting = shutdownSignal.signal.aborted || kind === "budget" || kind === "outage";
     await sql`UPDATE articles SET grouping_status = ${waiting ? 'pending' : 'failed'},
-      grouped_at = NULL, grouping_receipt_id = ${failedReceiptId(error)}, grouping_error = ${String(error).slice(0, 2000)}
+      grouped_at = NULL, grouping_receipt_id = ${failedReceiptId(error)}, grouping_error = ${String(error).slice(0, 2000)},
+      -- 真失败才计次并排在 1h/6h/24h 后重试；预算/停机等是等待，不计次，交给 pending 巡检。
+      -- 等待也会把已排好的 retry_at 清掉：之后真失败从当前档位继续，阶梯可能被压缩，但真失败总数仍是三次。
+      -- 退避时间还没到时再次失败，是 pg-boss 队列内的快速重试，不另计一轮。
+      grouping_attempts = CASE
+        WHEN ${waiting} THEN grouping_attempts
+        WHEN grouping_retry_at IS NOT NULL AND grouping_retry_at > now() THEN grouping_attempts
+        ELSE grouping_attempts + 1 END,
+      grouping_retry_at = CASE
+        WHEN ${waiting} THEN NULL
+        WHEN grouping_retry_at IS NOT NULL AND grouping_retry_at > now() THEN grouping_retry_at
+        WHEN grouping_attempts + 1 <= 3 THEN now() + make_interval(hours => (ARRAY[1, 6, 24])[grouping_attempts + 1])
+        ELSE NULL END
       WHERE id = ${articleId} AND revision = ${revision} AND grouping_status <> 'complete' AND ${!(error instanceof GroupingSupersededError)}`;
     await publishArticle(articleId);
     throw error;

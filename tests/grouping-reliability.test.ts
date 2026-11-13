@@ -80,19 +80,43 @@ for (const composite of [false, true]) test(`a ${composite ? "roundup" : "single
   const id = await report(composite ? "roundup" : "incomplete", composite);
   response = "missing";
   await assert.rejects(groupArticle(id), /unusable output/);
-  const [failed] = await sql`SELECT grouped_at,grouping_status,grouping_receipt_id FROM articles WHERE id=${id}`;
+  const [failed] = await sql`SELECT grouped_at,grouping_status,grouping_receipt_id,grouping_attempts,grouping_retry_at FROM articles WHERE id=${id}`;
   assert.equal(failed!.grouped_at, null);
   assert.equal(failed!.grouping_status, "failed");
   assert.ok(failed!.grouping_receipt_id);
   assert.equal((await sql`SELECT 1 FROM fact_articles WHERE article_id=${id}`).length, 0);
+  assert.equal(failed!.grouping_attempts, 1, "第一次真失败计一轮");
+  const firstWait = failed!.grouping_retry_at!.getTime() - Date.now();
+  assert.ok(firstWait > 55 * 60_000 && firstWait <= 60 * 60_000, "第一轮排在一小时后");
+  // 队列内的快速重试（退避未到）不另计轮次。
+  await assert.rejects(groupArticle(id), /unusable output/);
+  assert.equal((await sql`SELECT grouping_attempts FROM articles WHERE id=${id}`)[0]!.grouping_attempts, 1);
+  // 退避到点后再失败，进入下一档。
+  await sql`UPDATE articles SET grouping_retry_at = now() - interval '1 second' WHERE id=${id}`;
+  await assert.rejects(groupArticle(id), /unusable output/);
+  const second = (await sql`SELECT grouping_attempts,grouping_retry_at FROM articles WHERE id=${id}`)[0]!;
+  assert.equal(second.grouping_attempts, 2);
+  assert.ok(second.grouping_retry_at!.getTime() - Date.now() > 5 * 3600_000, "第二轮排在约六小时后");
+  await sql`UPDATE articles SET grouping_retry_at = now() - interval '1 second' WHERE id=${id}`;
+  await assert.rejects(groupArticle(id), /unusable output/);
+  const third = (await sql`SELECT grouping_attempts,grouping_retry_at FROM articles WHERE id=${id}`)[0]!;
+  assert.equal(third.grouping_attempts, 3);
+  assert.ok(third.grouping_retry_at!.getTime() - Date.now() > 23 * 3600_000, "第三轮排在约二十四小时后");
+  await sql`UPDATE articles SET grouping_retry_at = now() - interval '1 second' WHERE id=${id}`;
+  await assert.rejects(groupArticle(id), /unusable output/);
+  const fourth = (await sql`SELECT grouping_attempts,grouping_retry_at FROM articles WHERE id=${id}`)[0]!;
+  assert.equal(fourth.grouping_attempts, 4);
+  assert.equal(fourth.grouping_retry_at, null, "三次退避之后留给人工");
   response = "complete";
   const result = await groupArticle(id);
   assert.equal(result.verdict, composite ? "roundup" : "same-fact");
-  const [done] = await sql`SELECT grouped_at,grouping_status,grouping_receipt_id,grouping_error FROM articles WHERE id=${id}`;
+  const [done] = await sql`SELECT grouped_at,grouping_status,grouping_receipt_id,grouping_error,grouping_attempts,grouping_retry_at FROM articles WHERE id=${id}`;
   assert.equal(done!.grouping_status, "complete");
   assert.ok(done!.grouped_at);
   assert.equal(done!.grouping_receipt_id, null);
   assert.equal(done!.grouping_error, null);
+  assert.equal(done!.grouping_attempts, 0, "成功后重试计数归零");
+  assert.equal(done!.grouping_retry_at, null);
 });
 
 // The grouping decision and the paid result it consumes must commit together. Without this,
@@ -332,4 +356,22 @@ for (const change of ["revision", "regroup"] as const) test(`${change} withdraws
   }
   const [current] = await sql`SELECT a.grouping_status,p.selected FROM articles a JOIN publications p ON p.article_id=a.id WHERE a.id=${id}`;
   assert.deepEqual({ ...current }, { grouping_status: "pending", selected: false });
+});
+
+test("a failed grouping retries when its backoff is due, once, and stops after three attempts", async () => {
+  const id = await report("retry-due");
+  await sql`UPDATE articles SET grouping_status='failed', grouping_attempts=1, grouping_retry_at=now() - interval '1 second', grouping_error='fixture' WHERE id=${id}`;
+  const due = await sweepUngrouped();
+  assert.ok(due.retried >= 1, "a due failure is enqueued again");
+  const queued = await sql`SELECT 1 FROM pgboss.job WHERE name=${QUEUES.group} AND data->>'articleId'=${id} AND state IN ('created','active','retry')`;
+  assert.equal(queued.length, 1, "the retry job is queued");
+  const again = await sweepUngrouped();
+  assert.equal(again.retried, 0, "the queued retry is not enqueued twice");
+
+  // 三次之后不再自动重试，留给人工。
+  const done = await report("retry-exhausted");
+  await sql`UPDATE articles SET grouping_status='failed', grouping_attempts=4, grouping_retry_at=now() - interval '1 second' WHERE id=${done}`;
+  await sweepUngrouped();
+  const exhausted = await sql`SELECT 1 FROM pgboss.job WHERE name=${QUEUES.group} AND data->>'articleId'=${done} AND state IN ('created','active','retry')`;
+  assert.equal(exhausted.length, 0, "attempts beyond the third are left for a human");
 });

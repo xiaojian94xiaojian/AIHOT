@@ -12,6 +12,7 @@ import { hasItemPage } from "../publication/rules.ts";
  * (new material, an editorial publisher, a source turned editorial).
  */
 export const groupingReset = () => sql`grouping_status = 'pending', grouped_at = NULL, grouping_receipt_id = NULL, grouping_error = NULL,
+  grouping_attempts = 0, grouping_retry_at = NULL,
   selection_adds_value = NULL, selection_value_reason = NULL`;
 
 interface Publisher {
