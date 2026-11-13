@@ -4,6 +4,7 @@
 // 需要逐次曝光的数据，这里明确写「测不了」，不硬凑结论。
 import { cached } from "@aihot/backend/lib/cache";
 import { sql } from "@aihot/backend/db";
+import { notWithdrawn } from "./visibility.ts";
 import { BEIJING_TIMEZONE } from "@aihot/contracts/time";
 
 export interface DecayRow {
@@ -47,6 +48,7 @@ async function decayRows(): Promise<DecayRow[]> {
       WHERE a.source_id LIKE 'x-account-%'
         AND a.published_at > now() - interval '120 days'
         AND NOT (a.x_post->'replyTo' IS NOT NULL AND a.x_post->'replyTo' <> 'null'::jsonb)
+        AND ${notWithdrawn}
     ), acct AS (
       SELECT source_id, percentile_cont(0.5) WITHIN GROUP (ORDER BY views) AS med
       FROM p GROUP BY 1 HAVING count(*) >= 20
@@ -70,6 +72,7 @@ async function linkRows(): Promise<Array<{ hasLink: boolean; posts: number; rati
       WHERE a.source_id LIKE 'x-account-%'
         AND a.published_at > now() - interval '120 days'
         AND NOT (a.x_post->'replyTo' IS NOT NULL AND a.x_post->'replyTo' <> 'null'::jsonb)
+        AND ${notWithdrawn}
     ), acct AS (
       SELECT source_id, percentile_cont(0.5) WITHIN GROUP (ORDER BY views) AS med
       FROM p GROUP BY 1 HAVING count(*) >= 20
@@ -92,6 +95,7 @@ async function discussGrowth(): Promise<{ accounts: number; corr: number; high: 
       FROM articles a
       WHERE a.source_id LIKE 'x-account-%' AND a.published_at > now() - interval '120 days'
         AND NOT (a.x_post->'replyTo' IS NOT NULL AND a.x_post->'replyTo' <> 'null'::jsonb)
+        AND ${notWithdrawn}
     ), acct AS (
       SELECT source_id, max(handle) AS handle,
              1000.0 * sum(replies + quotes) / nullif(sum(views), 0) AS discuss_k

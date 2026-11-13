@@ -3,6 +3,7 @@
 // 为什么比中位而不是比权重：X 公开的权重乘的是「预测概率」，不是互动计数，直接拿 5.0、0.708 比大小
 // 只会让人误读。读者真正能用的信息是「我的回复/引用占比，比同站账号高还是低」。
 import { sql } from "@aihot/backend/db";
+import { notWithdrawn } from "./visibility.ts";
 import { cached } from "@aihot/backend/lib/cache";
 
 export interface Structure {
@@ -25,6 +26,7 @@ export async function structureMedians(): Promise<Structure> {
              1000.0 * sum((a.raw->>'quote')::numeric) / nullif(sum((a.raw->>'views')::numeric), 0) AS quotes
       FROM articles a
       WHERE a.source_id LIKE 'x-account-%' AND a.published_at > now() - interval '120 days'
+        AND ${notWithdrawn}
       GROUP BY a.source_id
       HAVING sum((a.raw->>'views')::numeric) >= 1000
     )

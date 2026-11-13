@@ -3,6 +3,7 @@
 // 规则来自 X 公开的 For You 算法（2026-11 版）：帖子 48 小时后不再进推荐；回复/引用的权重是点赞的
 // 七倍多；外链的权重很低。所以这里不算「算法分」，只给三件事：话题热度、讨论量、怎么写。
 import { sql } from "@aihot/backend/db";
+import { notWithdrawn } from "./visibility.ts";
 import { replyOpportunity } from "./insight.ts";
 import { latestHotRanking } from "@aihot/backend/publication/hot";
 import type { XCommentable, XPost, XTodayResponse, XTodayTopic } from "../types.ts";
@@ -52,6 +53,7 @@ async function discussionOf(storyIds: number[]): Promise<Map<number, Row>> {
     JOIN articles a ON a.id = ss.article_id
     WHERE ss.story_id IN ${sql(storyIds.map(Number))}
       AND ss.observed_at > now() - make_interval(hours => ${WINDOW_HOURS}::int)
+      AND ${notWithdrawn}
     GROUP BY ss.story_id`;
   return new Map(rows.map((row) => [row.story_id, row]));
 }
@@ -80,6 +82,7 @@ async function referencesOf(storyIds: number[]): Promise<Map<number, XPost[]>> {
       WHERE ss.story_id IN ${sql(storyIds.map(Number))}
         AND ss.observed_at > now() - make_interval(hours => ${WINDOW_HOURS}::int)
         AND s.kind = 'x_search'
+        AND ${notWithdrawn}
     ) ranked WHERE rn <= 2`;
   const out = new Map<number, XPost[]>();
   for (const row of rows) {
@@ -136,6 +139,7 @@ async function commentablesOf(storyIds: number[]): Promise<Map<number, XCommenta
         AND coalesce((a.raw->>'views')::bigint, 0) >= 50
         AND coalesce((a.raw->>'reply')::bigint, 0) < 50
         AND coalesce(m.kind, '') <> 'official'
+        AND ${notWithdrawn}
     ) ranked WHERE rn <= 3`;
   const out = new Map<number, XCommentable[]>();
   const now = Date.now();

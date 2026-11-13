@@ -6,6 +6,7 @@
 //   读取（页面接口）按 7 天 / 30 天两种窗口找最近一次和窗口外最近的一次，算涨粉。
 // 快照时间跟着抓取走，不是每天定点：不发帖的账号就没有新快照，读取时会被“最近一次在窗口内”滤掉。
 import { sql } from "@aihot/backend/db";
+import { notWithdrawn } from "./visibility.ts";
 import { freshnessOf } from "./freshness.ts";
 import { cachedByKey } from "@aihot/backend/lib/cache";
 import { beijingDate, BEIJING_TIMEZONE } from "@aihot/contracts/time";
@@ -336,6 +337,7 @@ async function activityOf(accounts: GrowthAccount[], ids: Map<string, string[]>)
     FROM w
     JOIN articles a ON a.source_id = w.source_id
       AND (a.published_at AT TIME ZONE ${BEIJING_TIMEZONE})::date BETWEEN w.from_on AND w.to_on
+    WHERE ${notWithdrawn}
     GROUP BY w.source_id`;
   const byId = new Map(rows.map((row) => [row.source_id, row]));
   for (const account of accounts) {
@@ -563,6 +565,7 @@ async function topPostsOf(handle: string, now: Date): Promise<XPost[]> {
            (a.x_post->'replyTo' IS NOT NULL AND a.x_post->'replyTo' <> 'null'::jsonb) AS is_reply
     FROM articles a
     WHERE a.source_id = ANY(${all}::text[]) AND a.published_at > ${new Date(now.getTime() - 7 * 86_400_000)}
+      AND ${notWithdrawn}
     ORDER BY coalesce((a.raw->>'views')::bigint, 0) DESC, a.published_at DESC
     LIMIT 300`;
   const mapped: XPost[] = rows.map((row) => ({

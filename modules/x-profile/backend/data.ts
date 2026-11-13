@@ -10,6 +10,7 @@ import { accountMeta } from "./meta.ts";
 import { structureMediansCached, structureVerdict } from "./structure.ts";
 import type { XPeopleResponse, XPersonResponse, XPersonSummary, XPost, XSeriesPoint } from "../types.ts";
 import { ageHours, breakoutRatio, projected24hViews } from "./insight.ts";
+import { notWithdrawn } from "./visibility.ts";
 
 /** 只看最近这些天：更早的帖子留作历史，不进画像。 */
 const WINDOW_DAYS = 120;
@@ -41,6 +42,7 @@ export const posts = (sourceId?: string) => sql`
   WHERE a.source_id LIKE 'x-account-%'
     ${sourceId ? sql`AND a.source_id = ${sourceId}` : sql``}
     AND a.published_at > now() - make_interval(days => ${WINDOW_DAYS})
+    AND ${notWithdrawn}
 `;
 
 export const SUMMARY = sql`
@@ -315,6 +317,7 @@ export async function loadPerson(handle: string): Promise<XPersonResponse | null
     sql<PostRow[]>`
       SELECT ${postColumns} FROM articles a
       WHERE a.source_id = ${id} AND a.published_at > now() - make_interval(days => ${WINDOW_DAYS})
+        AND ${notWithdrawn}
       ORDER BY coalesce((a.raw->>'views')::bigint, 0) DESC LIMIT 12
     `,
     sql<{ weekday: number; hour: number; posts: number; med_views: string }[]>`

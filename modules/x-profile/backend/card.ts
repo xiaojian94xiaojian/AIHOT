@@ -2,6 +2,7 @@
 //
 // 一张卡只回答一个问题：「今天写什么」。其他页面继续负责「看大盘」。
 import { sql } from "@aihot/backend/db";
+import { notWithdrawn } from "./visibility.ts";
 import { cached } from "@aihot/backend/lib/cache";
 import { replyOpportunity } from "./insight.ts";
 import { sourceIdsOfHandle } from "./followers.ts";
@@ -36,6 +37,7 @@ async function myStructure(handle: string) {
       WHERE a.source_id IN ${sql(ids)}
         AND a.published_at > now() - interval '120 days'
         AND NOT (a.x_post->'replyTo' IS NOT NULL AND a.x_post->'replyTo' <> 'null'::jsonb)
+        AND ${notWithdrawn}
     )
     SELECT round(1000.0 * sum(likes) / nullif(sum(views), 0), 1)::text AS likes,
            round(1000.0 * sum(retweets) / nullif(sum(views), 0), 1)::text AS reposts,

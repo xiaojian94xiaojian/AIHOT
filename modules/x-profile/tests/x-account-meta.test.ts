@@ -74,3 +74,32 @@ test("the model's labels override the code's kind table on the list and the prof
   assert.equal(withFollowers?.person.followers, 1234, "lower(handle) 之后混合大小写也能查到快照");
   await sql`DELETE FROM x_follower_snapshots WHERE handle = 'laba'`;
 });
+
+test("withdrawn posts leave the profile; summary-only and unpublished ones stay", async () => {
+  await sql`DELETE FROM publications WHERE source_id = 'x-account-lab-c'`;
+  await sql`DELETE FROM articles WHERE source_id = 'x-account-lab-c'`;
+  await sql`
+    INSERT INTO sources (id, name, kind, config) VALUES
+      ('x-account-lab-c', '@LabC', 'x_search', ${sql.json({ query: "from:LabC -filter:replies" })})
+    ON CONFLICT (id) DO NOTHING`;
+  const now = Date.now();
+  const post = (n: number, views: number) => {
+    const at = new Date(now - n * 86_400_000);
+    return sql`
+      INSERT INTO articles (id, source_id, identity_key, url, title, language, published_at, discovered_at, timeline_at, raw, x_post)
+      VALUES (${`lab-c-${n}`}, 'x-account-lab-c', ${`test:lab-c-${n}`}, ${`https://x.com/labc/${n}`}, ${`lab c ${n}`}, 'zh', ${at}, ${at}, ${at},
+              ${sql.json({ views })}, ${sql.json({ handle: "LabC", lang: "zh", text: `LabC 第 ${n} 条` })})`;
+  };
+  await post(2, 9000); // 撤回：浏览最高，但不该出现在画像里
+  await post(3, 3000); // summary-only：保留
+  await post(4, 1000); // 没有 publication：保留
+  await sql`
+    INSERT INTO publications (article_id, source_id, channel, visibility, title, url, discovered_at, timeline_at, sort_at) VALUES
+      ('lab-c-2', 'x-account-lab-c', 'x', 'withdrawn', 'lab c 2', 'https://x.com/labc/2', now(), now(), now()),
+      ('lab-c-3', 'x-account-lab-c', 'x', 'summary-only', 'lab c 3', 'https://x.com/labc/3', now(), now(), now())`;
+  const person = await loadPerson("LabC");
+  assert.deepEqual(person!.topPosts.map((item) => item.id).sort(), ["lab-c-3", "lab-c-4"], "只滤撤回，不误伤其它可见性");
+  await sql`DELETE FROM publications WHERE source_id = 'x-account-lab-c'`;
+  await sql`DELETE FROM articles WHERE source_id = 'x-account-lab-c'`;
+  await sql`DELETE FROM sources WHERE id = 'x-account-lab-c'`;
+});

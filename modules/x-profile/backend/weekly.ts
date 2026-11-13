@@ -9,6 +9,7 @@ import { addDays, beijingAt, beijingDate, beijingTime, beijingWeekday, isValidDa
 import { escapeXml, weekStartOf } from "./digest.ts";
 import { posts } from "./data.ts";
 import { reportsFor } from "./growth-report.ts";
+import { notWithdrawn } from "./visibility.ts";
 import { regionOf } from "./classify.ts";
 import type { XGrowthReport, XWeeklyDarkHorse, XWeeklyPattern, XWeeklyResponse, XWeeklyRow, XWeeklyShape, XWeeklySummary, XWeeklyViral } from "../types.ts";
 
@@ -90,6 +91,7 @@ async function chineseHandles(handles: string[]): Promise<Set<string>> {
     WHERE a.source_id LIKE 'x-account-%'
       AND a.published_at > now() - interval '120 days'
       AND lower(a.x_post->>'handle') IN ${sql(handles)}
+      AND ${notWithdrawn}
     GROUP BY 1`;
   for (const row of rows) {
     const known = row.zh + row.en;
@@ -110,6 +112,7 @@ async function activityOf(startAt: Date, endAt: Date, handles: string[]): Promis
       AND a.published_at >= ${startAt} AND a.published_at < ${endAt}
       AND lower(a.x_post->>'handle') IN ${sql(handles)}
       AND coalesce(a.language, a.x_post->>'lang') LIKE 'zh%'
+      AND ${notWithdrawn}
     GROUP BY 1`;
   for (const row of rows) out.set(row.handle, { posts: Number(row.posts), views: Number(row.views) });
   return out;
