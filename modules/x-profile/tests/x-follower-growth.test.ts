@@ -45,6 +45,7 @@ async function snapshot(at: Date, handle: string, followers: number, screenName 
 }
 
 test("snapshots are one row per account per Beijing day, last fetch wins, and a replay changes nothing", async () => {
+  await sql`DELETE FROM settings WHERE key = 'x-followers.scan'`;
   const now = new Date();
   const morning = new Date(`${beijingDate(daysAgo(now, 10))}T01:00:00+08:00`);
   const evening = new Date(`${beijingDate(daysAgo(now, 10))}T22:00:00+08:00`);
@@ -53,7 +54,6 @@ test("snapshots are one row per account per Beijing day, last fetch wins, and a 
   await receipt(morning, [{ handle: "Alice", followers: 1000, name: "Alice A" }]);
   await receipt(evening, [{ handle: "alice", followers: 1100 }, { handle: "bob", followers: 500 }]);
   await receipt(recent, [{ handle: "alice", followers: 1300 }, { handle: "carol" }]); // carol: no follower count
-
   const first = await scanFollowerSnapshots();
   assert.ok(first.receipts >= 3);
   const rows = await snapshots();
@@ -76,6 +76,29 @@ test("snapshots are one row per account per Beijing day, last fetch wins, and a 
   assert.equal(Number(latest.followers), 1400);
   assert.equal(latest.captured_on, beijingDate(daysAgo(now, 1)));
 });
+
+test("a receipt that completes after a newer one is still read", async () => {
+  await sql`DELETE FROM settings WHERE key = 'x-followers.scan'`;
+  await sql`TRUNCATE x_follower_snapshots`;
+  const now = new Date();
+  const newer = new Date(now.getTime() - 120_000);
+  const older = new Date(newer.getTime() - 300_000);
+  seq += 1;
+  const [pending] = await sql<{ id: number }[]>`
+    INSERT INTO receipts (logical_key, service, purpose, status)
+    VALUES (${`test-x-followers-late-${seq}`}, 'socialdata', 'source_fetch', 'pending') RETURNING id`;
+  await receipt(newer, [{ handle: "fresh", followers: 1000 }]);
+  await scanFollowerSnapshots();
+  // 这张回执 id 更小、收到得更早，但事务提交晚于新的那张；只按 id 推进的游标会把它漏掉。
+  await sql`
+    UPDATE receipts SET status = 'completed', received_at = ${older},
+      response = ${sql.json({ tweets: [{ id_str: "1700000000000000001", tweet_created_at: older.toISOString(), lang: "en", user: { screen_name: "slow", name: "slow", followers_count: 1200 } }] })}
+    WHERE id = ${pending!.id}`;
+  await scanFollowerSnapshots();
+  const slow = (await snapshots()).filter((row) => row.handle === "slow");
+  assert.deepEqual(slow.map((row) => Number(row.followers)), [1200], "the late receipt is still read");
+});
+
 
 test("growth compares the window's baseline, normalizes a longer gap, and skips stale or baseline-less accounts", async () => {
   const now = new Date();

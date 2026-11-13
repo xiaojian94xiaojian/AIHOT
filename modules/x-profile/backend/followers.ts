@@ -12,8 +12,13 @@ import { beijingDate, BEIJING_TIMEZONE } from "@aihot/contracts/time";
 import { regionOf } from "./classify.ts";
 import type { Region, XGrowthPrevRow, XGrowthResponse, XGrowthRow, XPersonGrowth, XPost } from "../types.ts";
 
-/** 扫描游标：处理到哪一张回执。写在 settings 里，和 receipts 表的自增 id 对齐。 */
+/** 扫描游标：处理到哪一张回执（自增 id）。写在 settings 里。 */
 const CURSOR_KEY = "x-followers.scan";
+/**
+ * 回看窗口：回执先建后完成，事务提交顺序可能让「更早收到」的回执晚落库，id 又被游标越过；
+ * 每轮先按 received_at 把最近十分钟收到的回执重读一遍，重复写入是幂等的（同一天取更晚的一次）。
+ */
+const REWIND_MS = 10 * 60_000;
 /** 一次取多少张回执；24 小时约 900 张，回填时每批几十毫秒。 */
 const BATCH = 400;
 /** 一次扫描最多占多久；没追完的下一轮接着来（游标已推进，任务可以重入）。 */
@@ -58,8 +63,8 @@ interface SnapshotRow {
 }
 
 async function readCursor(): Promise<number | null> {
-  const [row] = await sql<{ value: { receiptId?: unknown } }[]>`SELECT value FROM settings WHERE key = ${CURSOR_KEY}`;
-  const id = Number(row?.value?.receiptId);
+  const [row] = await sql<{ value: Record<string, unknown> }[]>`SELECT value FROM settings WHERE key = ${CURSOR_KEY}`;
+  const id = Number(row?.value?.receiptId ?? row?.value?.id);
   return Number.isSafeInteger(id) && id >= 0 ? id : null;
 }
 
@@ -136,27 +141,46 @@ async function storeSnapshots(rows: SnapshotRow[]): Promise<number> {
 
 /**
  * 定时扫描：从回执里把新出现的粉丝数记成当天的快照。按 id 顺序推进，处理过的回执不再读；
- * 一次最多花 RUN_BUDGET_MS，没追完的下一轮接着来。返回本轮读了多少张回执、写了多少行。
+ * 每轮先按收到时刻回看十分钟，补上晚落库的回执。一次最多花 RUN_BUDGET_MS，没追完的下一轮接着来。
  */
 export async function scanFollowerSnapshots(opts: { budgetMs?: number } = {}): Promise<{ receipts: number; snapshots: number; caughtUp: boolean }> {
   const deadline = Date.now() + (opts.budgetMs ?? RUN_BUDGET_MS);
-  let cursor = (await readCursor()) ?? (await firstCursor());
+  const stored = await readCursor();
+  let cursor = stored ?? (await firstCursor());
+  const rewindFrom = new Date(Date.now() - REWIND_MS);
+  let rewind = true;
   let receipts = 0;
   let snapshots = 0;
   for (;;) {
-    const rows = await sql<ReceiptRow[]>`
-      SELECT id, received_at, response FROM receipts
-      WHERE id > ${cursor} AND service = 'socialdata' AND purpose = 'source_fetch'
-        AND status IN ('received', 'completed') AND received_at IS NOT NULL
-        AND response IS NOT NULL AND jsonb_typeof(response->'tweets') = 'array'
-      ORDER BY id LIMIT ${BATCH}`;
+    // 第一批按收到时刻回看（晚落库的回执 id 可能已被越过）；之后严格按 id 往后推进。
+    const isRewind = rewind;
+    rewind = false;
+    const rows = isRewind
+      ? await sql<ReceiptRow[]>`
+          SELECT id, received_at, response FROM receipts
+          WHERE received_at > ${rewindFrom} AND received_at <= now()
+            AND service = 'socialdata' AND purpose = 'source_fetch'
+            AND status IN ('received', 'completed') AND received_at IS NOT NULL
+            AND response IS NOT NULL AND jsonb_typeof(response->'tweets') = 'array'
+          ORDER BY id LIMIT ${BATCH}`
+      : await sql<ReceiptRow[]>`
+          SELECT id, received_at, response FROM receipts
+          WHERE id > ${cursor}
+            AND service = 'socialdata' AND purpose = 'source_fetch'
+            AND status IN ('received', 'completed') AND received_at IS NOT NULL
+            AND response IS NOT NULL AND jsonb_typeof(response->'tweets') = 'array'
+          ORDER BY id LIMIT ${BATCH}`;
     if (rows.length === 0) {
-      // 没有新回执：游标没变就不用写，第一次扫描也能因此记下它从哪里开始。
-      if ((await readCursor()) === null) await saveCursor(cursor);
+      // 回看窗口里没有新回执不算结束，还要按 id 继续追。
+      if (isRewind) continue;
+      // 没有新回执：第一次扫描也在这里记下游标，下一轮从同一位置继续。
+      if (stored === null && receipts === 0) await saveCursor(cursor);
       return { receipts, snapshots, caughtUp: true };
     }
     snapshots += await storeSnapshots(snapshotsOf(rows));
-    cursor = Number(rows[rows.length - 1]!.id);
+    const lastId = Number(rows[rows.length - 1]!.id);
+    // 回看批里可能只有 id 已越过的晚落库回执：游标不能因此回退，否则每轮重放这段。
+    cursor = isRewind ? Math.max(cursor, lastId) : lastId;
     receipts += rows.length;
     await saveCursor(cursor);
     if (Date.now() >= deadline) return { receipts, snapshots, caughtUp: false };
