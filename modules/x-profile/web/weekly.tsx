@@ -36,6 +36,9 @@ export const handle = { tab: "x-tools", name: "涨粉周报" } as const;
 
 const compact = (n: number) => (n >= 10_000 ? `${(n / 10_000).toFixed(1)}万` : n.toLocaleString("en-US"));
 const confidence = { high: "高", medium: "中", low: "低" } as const;
+/** 报告实际测量了几天：基线快照到最近一次快照；旧报告没记日期时按 7 天窗口。 */
+const spanOf = (report: { fromOn: string | null; toOn: string | null }) =>
+  report.fromOn && report.toOn ? Math.max(1, Math.round((Date.parse(report.toOn) - Date.parse(report.fromOn)) / 86_400_000)) : 7;
 
 function RankMove({ prev, rank }: { prev: number | null; rank: number }) {
   if (prev == null) return <span className="ml-1 text-[10px] text-emerald-600">新</span>;
@@ -317,7 +320,7 @@ export default function WeeklyPage() {
                       </div>
                       <span className="num shrink-0 text-[13px] font-semibold text-emerald-600">{signed(report.growth)} 粉</span>
                     </div>
-                    <span className="text-[11px] text-ink-4">置信度 {confidence[report.report.confidence]} · {monthDay(report.periodStart)} – {monthDay(report.periodEnd)}</span>
+                    <span className="text-[11px] text-ink-4">置信度 {confidence[report.report.confidence]} · {monthDay(report.fromOn ?? report.periodStart)} – {monthDay(report.toOn ?? report.periodEnd)}{spanOf(report) > 7 ? `（按 ${spanOf(report)} 天折算）` : ""}</span>
                   </div>
                   <p className="mt-2.5 text-[13.5px] font-medium leading-relaxed text-ink">{report.report.conclusion}</p>
                   <ul className="mt-2 space-y-1.5">

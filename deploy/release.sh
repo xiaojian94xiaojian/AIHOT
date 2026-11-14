@@ -111,4 +111,6 @@ echo "== 6. 冒烟 =="
 for p in / /api/health; do
   printf '   %-14s HTTP %s\n' "$p" "$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "https://$DOMAIN$p")"
 done
+# 方法论一次聚合要几十秒：部署后直接热 API（页面 SSR 只有十几秒超时），别让第一个访客吃到 503。
+printf '   %-24s HTTP %s\n' "/api/.../methodology" "$(curl -s -o /dev/null -w '%{http_code}' --max-time 120 "https://$DOMAIN/api/site/x-people/methodology")"
 sudo docker logs --since 2m aihot-worker-1 2>&1 | grep -iE 'error|fail' | tail -3 || true

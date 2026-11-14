@@ -169,6 +169,9 @@ export interface XGrowthRow {
   growthPct: number;
   /** 两次快照相隔的天数：等于窗口时没有折算。 */
   spanDays: number;
+  /** 测量区间的起点（基线快照那天）与终点（最近一次快照那天）。 */
+  fromOn: string;
+  toOn: string;
   /** 最近一次快照是北京时间的哪一天。 */
   updatedOn: string;
   /** 全站名次（按涨粉数；筛选不改变名次）。 */
@@ -301,6 +304,9 @@ export interface XGrowthReport {
   perK: number | null;
   periodStart: string;
   periodEnd: string;
+  /** 这个账号实际测量的区间（基线快照到最近一次快照）；旧报告没有记录时为 null。 */
+  fromOn: string | null;
+  toOn: string | null;
   generatedAt: string;
   model: string | null;
   report: {
@@ -441,10 +447,14 @@ export interface XAlgorithmResponse {
 /** 采集成本看板：一天一行（北京时间）。 */
 export interface XCollectStat {
   day: string;
+  /** 采集搜索调用数（分片一次算一次）；单帖/改名检查/监控探针不计。 */
   calls: number;
   emptyCalls: number;
+  /** 采集搜索返回的推文对象数（计费按对象，不含单帖/监控）。 */
   objects: number;
+  /** 当天全部 SocialData 回执的花费（含单帖、改名检查、监控）。 */
   usd: number;
+  /** 当天查询过的不同 X 账号数（分片里的 from: 都算）。 */
   sources: number;
   enabledSources: number;
   /** 今天这行是实时算的，还没落库。 */

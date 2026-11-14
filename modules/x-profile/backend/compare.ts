@@ -1,11 +1,11 @@
 // 账号对比：最多三个账号的汇总并排。只读聚合，口径与个人页一致。
 import { sql } from "@aihot/backend/db";
+import { cachedByKey } from "@aihot/backend/lib/cache";
 import { BEIJING_TIMEZONE } from "@aihot/contracts/time";
 import { posts, SUMMARY, toSummary, type SummaryRow } from "./data.ts";
 import type { XCompareResponse } from "../types.ts";
 
-export async function loadCompare(handles: string[]): Promise<XCompareResponse> {
-  const wanted = [...new Set(handles.map((h) => h.toLowerCase()))].slice(0, 3);
+async function computeCompare(wanted: string[]): Promise<XCompareResponse> {
   if (wanted.length < 2) return { people: [] };
 
   const [rows, weeks] = await Promise.all([
@@ -46,4 +46,12 @@ export async function loadCompare(handles: string[]): Promise<XCompareResponse> 
       .filter((person): person is NonNullable<typeof person> => !!person)
       .map((person) => ({ ...person, spark: (spark.get(person.sourceId) ?? []).slice(-12) })),
   };
+}
+
+/** 公开 GET 的聚合不便宜：同一组 handle 在进程里缓存 5 分钟，键按排序后拼，顺序不同不重复算。 */
+const compares = cachedByKey<string, XCompareResponse>((key) => key, (key) => computeCompare(key.split(",")), { freshMs: 300_000, maxStaleMs: 3_600_000, maxKeys: 20 });
+
+export function loadCompare(handles: string[]): Promise<XCompareResponse> {
+  const wanted = [...new Set(handles.map((h) => h.toLowerCase()))].slice(0, 3).sort();
+  return compares(wanted.join(","));
 }

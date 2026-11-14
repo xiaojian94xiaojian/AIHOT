@@ -59,7 +59,7 @@ async function evidenceOf(row: XGrowthRow): Promise<string> {
     .catch(() => [] as string[]);
   const lines = [
     `账号：${row.name ?? row.screenName}（@${row.screenName}），${row.region === "zh" ? "中文区" : row.region === "en" ? "英文区" : "其他地区"}。`,
-    `近 ${WINDOW} 天涨粉：${row.growth}（${row.growthPct}%），现在粉丝 ${row.followers}，${row.spanDays} 天前的基线是 ${row.baseline}。`,
+    `近 ${WINDOW} 天涨粉：${row.growth}（${row.growthPct}%）${row.spanDays === WINDOW ? "" : `，按 ${row.spanDays} 天折算`}，现在粉丝 ${row.followers}，${row.spanDays} 天前的基线是 ${row.baseline}。`,
     `同期发帖 ${row.posts} 条，浏览合计 ${row.views}${row.perK === null ? "" : `，每千次曝光约涨 ${row.perK} 粉`}。`,
     ...(posts.length
       ? ["", "这周浏览最高的帖子：", ...posts.map((post, index) => {
@@ -104,11 +104,12 @@ export async function generateGrowthReports(now = new Date()): Promise<{ generat
       // 存模型的真名（预设的 key 可能是 default）；页面直接显示它。
       const modelName = MODELS[answer.model]?.model ?? answer.model;
       await sql`
-        INSERT INTO x_growth_reports (handle, screen_name, name, avatar_url, window_days, period_start, period_end, model, growth, followers, posts, views, report)
-        VALUES (${row.handle}, ${row.screenName}, ${row.name}, ${row.avatarUrl}, ${WINDOW}, ${periodStart}, ${period}, ${modelName},
+        INSERT INTO x_growth_reports (handle, screen_name, name, avatar_url, window_days, period_start, period_end, from_on, to_on, model, growth, followers, posts, views, report)
+        VALUES (${row.handle}, ${row.screenName}, ${row.name}, ${row.avatarUrl}, ${WINDOW}, ${periodStart}, ${period}, ${row.fromOn}::date, ${row.toOn}::date, ${modelName},
                 ${row.growth}, ${row.followers}, ${row.posts}, ${row.views}, ${sql.json(answer.data)})
         ON CONFLICT (handle, window_days, period_end) DO UPDATE SET
           screen_name = EXCLUDED.screen_name, name = EXCLUDED.name, avatar_url = EXCLUDED.avatar_url,
+          from_on = EXCLUDED.from_on, to_on = EXCLUDED.to_on,
           model = EXCLUDED.model, growth = EXCLUDED.growth, followers = EXCLUDED.followers,
           posts = EXCLUDED.posts, views = EXCLUDED.views, report = EXCLUDED.report, generated_at = now()`;
       generated += 1;
@@ -131,6 +132,8 @@ interface StoredRow {
   views: string;
   period_start: string;
   period_end: string;
+  from_on: string | null;
+  to_on: string | null;
   generated_at: Date;
   model: string | null;
   report: Report;
@@ -138,18 +141,25 @@ interface StoredRow {
 
 function toReport(row: StoredRow): XGrowthReport {
   const views = Number(row.views);
+  const growth = Number(row.growth);
+  // 涨粉数与发帖/浏览原始数都按测量区间来的：效率的分母要一起折算到窗口上，才和 growth 同一个单位。
+  const span = row.from_on && row.to_on
+    ? Math.max(1, Math.round((Date.parse(row.to_on) - Date.parse(row.from_on)) / 86_400_000))
+    : WINDOW;
   return {
     handle: row.handle,
     screenName: row.screen_name,
     name: row.name,
     avatarUrl: row.avatar_url,
-    growth: Number(row.growth),
+    growth,
     followers: Number(row.followers),
     posts: row.posts,
     views,
-    perK: views > 0 ? Math.round((Number(row.growth) / views) * 1000 * 10) / 10 : null,
+    perK: views > 0 ? Math.round(((growth * span) / (views * WINDOW)) * 1000 * 10) / 10 : null,
     periodStart: row.period_start,
     periodEnd: row.period_end,
+    fromOn: row.from_on,
+    toOn: row.to_on,
     generatedAt: new Date(row.generated_at).toISOString(),
     model: row.model,
     report: row.report,
@@ -161,7 +171,7 @@ export async function reportsFor(periodEnd: string): Promise<XGrowthReport[]> {
   const rows = await sql<StoredRow[]>`
     SELECT handle, screen_name, name, avatar_url, growth::text AS growth, followers::text AS followers,
            posts, views::text AS views, to_char(period_start, 'YYYY-MM-DD') AS period_start,
-           to_char(period_end, 'YYYY-MM-DD') AS period_end, generated_at, model, report
+           to_char(period_end, 'YYYY-MM-DD') AS period_end, to_char(from_on, 'YYYY-MM-DD') AS from_on, to_char(to_on, 'YYYY-MM-DD') AS to_on, generated_at, model, report
     FROM x_growth_reports
     WHERE window_days = ${WINDOW} AND period_end = ${periodEnd}::date
     ORDER BY x_growth_reports.growth DESC`;
@@ -219,7 +229,7 @@ export async function latestReportFor(handle: string): Promise<XGrowthReport | n
   const [row] = await sql<StoredRow[]>`
     SELECT handle, screen_name, name, avatar_url, growth::text AS growth, followers::text AS followers,
            posts, views::text AS views, to_char(period_start, 'YYYY-MM-DD') AS period_start,
-           to_char(period_end, 'YYYY-MM-DD') AS period_end, generated_at, model, report
+           to_char(period_end, 'YYYY-MM-DD') AS period_end, to_char(from_on, 'YYYY-MM-DD') AS from_on, to_char(to_on, 'YYYY-MM-DD') AS to_on, generated_at, model, report
     FROM x_growth_reports
     WHERE handle = ${handle.toLowerCase()} AND window_days = ${WINDOW}
     ORDER BY period_end DESC LIMIT 1`;

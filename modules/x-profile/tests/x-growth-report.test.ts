@@ -103,6 +103,9 @@ test("a report is written for Chinese-region accounts over 1000 growth, stored, 
   assert.equal(stored.summary?.moves.length, 1, "两条观察里的同一个动作只留一条");
   assert.equal(report.periodStart, beijingDate(daysAgo(now, 6)));
   assert.equal(report.periodEnd, beijingDate(now));
+  // 报告记下这个账号实际测量的区间：基线快照到最近一次快照（这个账号正好 7 天）。
+  assert.equal(report.fromOn, beijingDate(daysAgo(now, 8)));
+  assert.equal(report.toOn, beijingDate(daysAgo(now, 1)));
 
   const mine = await latestReportFor("grow");
   assert.equal(mine?.report.moves[0], ANSWER.moves[0]);

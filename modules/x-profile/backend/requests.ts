@@ -20,12 +20,15 @@ const REAPPLY_AFTER_MS = 30 * 86_400_000;
 
 export class RequestRejected extends Error {
   readonly status: number;
+  /** 后台的 adminHandler 按 statusCode 认业务错误（沿用仓库约定），所以两个字段都给。 */
+  readonly statusCode: number;
   readonly code: string;
   readonly retryAfter: number | undefined;
 
   constructor(status: number, code: string, message: string, retryAfter?: number) {
     super(message);
     this.status = status;
+    this.statusCode = status;
     this.code = code;
     this.retryAfter = retryAfter;
   }

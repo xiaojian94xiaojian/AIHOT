@@ -2,9 +2,9 @@
 import "../../../tests/setup.ts";
 import assert from "node:assert/strict";
 import { after, test } from "node:test";
-import { closeDb } from "@aihot/backend/db";
+import { closeDb, sql } from "@aihot/backend/db";
 import { toSummary, type SummaryRow } from "../backend/data.ts";
-import { structureVerdict } from "../backend/structure.ts";
+import { ownStructure, structureMedians, structureVerdict } from "../backend/structure.ts";
 
 after(closeDb);
 
@@ -73,4 +73,29 @@ test("接近中位时说接近，没有互动时直说样本太少", () => {
   assert.match(structureVerdict(mine(10, 1.2, 0.2), base), /接近全站中位/);
   assert.match(structureVerdict(mine(0, 0, 0), base), /互动还太少/);
   assert.match(structureVerdict(mine(0, 2, 0), base), /只有回复/);
+});
+
+test("the median and a person's pool both leave replies out", async () => {
+  await sql`DELETE FROM articles WHERE id LIKE 'st-%'`;
+  await sql`
+    INSERT INTO sources (id, name, kind, config) VALUES
+      ('x-account-st1', '@St1', 'x_search', ${sql.json({ query: "from:st1 -filter:replies" })}),
+      ('x-account-st2', '@St2', 'x_search', ${sql.json({ query: "from:st2 -filter:replies" })})
+    ON CONFLICT (id) DO NOTHING`;
+  const post = (id: string, source: string, reply: boolean, views: number, favorite: number) => sql`
+    INSERT INTO articles (id, source_id, identity_key, url, title, language, published_at, discovered_at, timeline_at, raw, x_post)
+    VALUES (${id}, ${source}, ${`test:${id}`}, ${`https://x.com/${id}`}, ${id}, 'zh', now() - interval '10 days', now() - interval '10 days', now() - interval '10 days',
+            ${sql.json({ views, favorite, retweet: 0, reply: 0, quote: 0 })},
+            ${sql.json({ handle: source, lang: "zh", ...(reply ? { replyTo: { tweetId: "context-1" } } : {}) })})`;
+  // s1 的原创：10 赞 / 1000 浏览；s1 还有一条回复 100 赞 / 1000 浏览——不进中位和自己的结构。
+  await post("st-s1-original", "x-account-st1", false, 1000, 10);
+  await post("st-s1-reply", "x-account-st1", true, 1000, 100);
+  // s2 的原创：30 赞 / 1000 浏览。
+  await post("st-s2-original", "x-account-st2", false, 1000, 30);
+
+  const median = await structureMedians();
+  assert.equal(median.likes, 20, "median(10, 30)，把回复算进来会是 median(55, 30)");
+  const own = await ownStructure(["x-account-st1"]);
+  assert.equal(own.perK.likes, 10);
+  assert.equal(own.posts, 1, "the reply is not part of the person's own structure");
 });

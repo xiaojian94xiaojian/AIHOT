@@ -15,7 +15,7 @@ import { forwardRequestNotifications, listRequests, lookupAccount, RequestReject
 import { growthDigest } from "./backend/digest.ts";
 import { todaysTopics } from "./backend/today.ts";
 import { algorithmPage } from "./backend/algorithm.ts";
-import { loadDailyCard } from "./backend/card.ts";
+import { loadDailyCardCached } from "./backend/card.ts";
 import { recentCollectStats, snapshotCollectStats } from "./backend/collect-stats.ts";
 import { config } from "@aihot/backend/config";
 import { AlertRejected, runDailyAlerts, runReplyAlerts, subscribe, unsubscribe } from "./backend/alerts.ts";
@@ -83,8 +83,9 @@ export const xProfileServerModule: ServerModule = {
       return sendJsonWithEtag(req, reply, await algorithmPage.get(undefined), { etagPrefix: "xp-algorithm", cacheControl: CACHE });
     }));    // 每日一张卡：今天写什么。带头像/诊断的那版带 ?handle=。
     app.get("/api/site/x-people/card", guarded(async (req, reply) => {
-      const handle = String((req.query as { handle?: string }).handle ?? "").trim();
-      const card = await loadDailyCard(handle || null);
+      const handle = String((req.query as { handle?: string }).handle ?? "").trim().replace(/^@/, "");
+      if (handle && !HANDLE.test(handle)) return sendProblem(req, reply, { status: 400, code: "invalid_request", detail: "handle 只能包含字母、数字和下划线，最长 30 个字符。" });
+      const card = await loadDailyCardCached(handle);
       if (!card) return sendProblem(req, reply, { status: 404, code: "not_found", detail: "热点榜还没有数据" });
       return sendJsonWithEtag(req, reply, card, { etagPrefix: `xp-card-${handle.toLowerCase()}`, cacheControl: CACHE });
     }));    // 今天发什么：热点榜 + 48 小时里的 X 讨论量，只读本站数据。

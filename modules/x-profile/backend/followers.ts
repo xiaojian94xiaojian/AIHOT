@@ -415,6 +415,8 @@ export async function loadGrowth(window: number, now = new Date()): Promise<XGro
       growth: account.growth,
       growthPct: account.growthPct,
       spanDays: account.spanDays,
+      fromOn: account.fromOn,
+      toOn: account.toOn,
       updatedOn: account.toOn,
       rank: rank.get(account.handle)!,
       rankPct: rankPct.get(account.handle)!,
@@ -422,8 +424,9 @@ export async function loadGrowth(window: number, now = new Date()): Promise<XGro
       rankPctPrev: prevRankPct.get(account.handle) ?? null,
       posts: extra.posts,
       views: extra.views,
-      perPost: extra.posts > 0 ? Math.round(account.growth / extra.posts) : null,
-      perK: extra.views > 0 ? Math.round((account.growth / extra.views) * 1000 * 10) / 10 : null,
+      // growth 是按窗口折算过的，发帖/浏览是整段测量区间（spanDays）的数：把分母也折算到窗口上再比。
+      perPost: extra.posts > 0 ? Math.round((account.growth * account.spanDays) / (extra.posts * window)) : null,
+      perK: extra.views > 0 ? Math.round(((account.growth * account.spanDays) / (extra.views * window)) * 1000 * 10) / 10 : null,
       signal: signalOf(account.growth, account.growthPct, extra.posts, extra.views),
     };
   });
@@ -440,8 +443,8 @@ export async function loadGrowth(window: number, now = new Date()): Promise<XGro
     };
   });
   const since = coverage?.since ?? null;
-  const coveredDays = coverage?.since && coverage?.latest ? Math.round((Date.parse(coverage.latest) - Date.parse(coverage.since)) / 86_400_000) + 1 : 0;
-  const freshness = freshnessOf({ latest: coverage?.latest ?? null, since, snapshots: coveredDays, now });
+  // 「覆盖了几天」不是「有几次快照」：稀疏账号两次快照隔 30 天，按跨度会显示正常，实际只有 2 天历史。
+  const freshness = freshnessOf({ latest: coverage?.latest ?? null, since, snapshots: coverage?.days ?? 0, now });
   return {
     window,
     freshness,
@@ -459,10 +462,10 @@ export async function loadGrowth(window: number, now = new Date()): Promise<XGro
   };
 }
 
-async function coverageOf(): Promise<{ accounts: number; since: string | null; latest: string | null; rows: number } | undefined> {
-  const [coverage] = await sql<{ accounts: number; since: string | null; latest: string | null; rows: number }[]>`
+async function coverageOf(): Promise<{ accounts: number; since: string | null; latest: string | null; rows: number; days: number } | undefined> {
+  const [coverage] = await sql<{ accounts: number; since: string | null; latest: string | null; rows: number; days: number }[]>`
     SELECT count(DISTINCT handle)::int AS accounts, to_char(min(captured_on), 'YYYY-MM-DD') AS since,
-           to_char(max(captured_on), 'YYYY-MM-DD') AS latest, count(*)::int AS rows
+           to_char(max(captured_on), 'YYYY-MM-DD') AS latest, count(*)::int AS rows, count(DISTINCT captured_on)::int AS days
     FROM x_follower_snapshots`;
   return coverage;
 }

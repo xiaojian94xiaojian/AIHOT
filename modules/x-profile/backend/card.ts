@@ -3,10 +3,10 @@
 // 一张卡只回答一个问题：「今天写什么」。其他页面继续负责「看大盘」。
 import { sql } from "@aihot/backend/db";
 import { notWithdrawn } from "./visibility.ts";
-import { cached } from "@aihot/backend/lib/cache";
+import { cached, cachedByKey } from "@aihot/backend/lib/cache";
 import { replyOpportunity } from "./insight.ts";
 import { sourceIdsOfHandle } from "./followers.ts";
-import { structureMedians, structureVerdict } from "./structure.ts";
+import { ownStructure, structureMedians, structureVerdict } from "./structure.ts";
 import { todaysTopics } from "./today.ts";
 import type { XCommentable, XDailyCard, XTodayTopic } from "../types.ts";
 
@@ -20,38 +20,21 @@ function opportunity(post: XCommentable, now: number) {
   return replyOpportunity({ views: post.views, age, replies: post.replies, windowHours: 12 });
 }
 
-/** 你最近 120 天的互动结构（轻量版，只为了给一句诊断）。 */
+/** 你最近 120 天的互动结构（轻量版，只为了给一句诊断）；和全站中位用同一池（原创、不含回复）。 */
 async function myStructure(handle: string) {
   // 源 id 不一定是 x-account-<handle>：历史源会把下划线换成连字符，必须查表。
   const ids = (await sourceIdsOfHandle(handle)).filter((id) => id.startsWith("x-account-"));
   if (ids.length === 0) return null;
-  const [row] = await sql<{ likes: string | null; reposts: string | null; replies: string | null; quotes: string | null; followers: string | null; posts120d: number; views120d: string; posts7d: number }[]>`
-    WITH p AS (
-      SELECT coalesce((a.raw->>'views')::bigint, 0) AS views,
-             coalesce((a.raw->>'favorite')::bigint, 0) AS likes,
-             coalesce((a.raw->>'retweet')::bigint, 0) AS retweets,
-             coalesce((a.raw->>'reply')::bigint, 0) AS replies,
-             coalesce((a.raw->>'quote')::bigint, 0) AS quotes,
-             a.published_at
-      FROM articles a
-      WHERE a.source_id IN ${sql(ids)}
-        AND a.published_at > now() - interval '120 days'
-        AND NOT (a.x_post->'replyTo' IS NOT NULL AND a.x_post->'replyTo' <> 'null'::jsonb)
-        AND ${notWithdrawn}
-    )
-    SELECT round(1000.0 * sum(likes) / nullif(sum(views), 0), 1)::text AS likes,
-           round(1000.0 * sum(retweets) / nullif(sum(views), 0), 1)::text AS reposts,
-           round(1000.0 * sum(replies) / nullif(sum(views), 0), 1)::text AS replies,
-           round(1000.0 * sum(quotes) / nullif(sum(views), 0), 1)::text AS quotes,
-           (SELECT followers::text FROM x_follower_snapshots s WHERE s.handle = ${handle} ORDER BY captured_on DESC LIMIT 1) AS followers,
-           count(*)::int AS posts120d,
-           coalesce(sum(views), 0)::bigint AS views120d,
-           count(*) FILTER (WHERE published_at > now() - interval '7 days')::int AS posts7d
-    FROM p`;
+  const [structure, rows] = await Promise.all([
+    ownStructure(ids),
+    sql<{ followers: string | null }[]>`
+      SELECT followers::text AS followers
+      FROM x_follower_snapshots WHERE handle = ${handle}
+      ORDER BY captured_on DESC LIMIT 1`,
+  ]);
+  const row = rows[0];
   if (!row) return null;
-  const num = (value: string | null) => (value === null ? 0 : Number(value));
-  const perK = { likes: num(row.likes), reposts: num(row.reposts), replies: num(row.replies), quotes: num(row.quotes) };
-  return { perK, posts: row.posts120d, views: Number(row.views120d), followers: row.followers === null ? null : Number(row.followers) };
+  return { perK: structure.perK, posts: structure.posts, views: structure.views, followers: row.followers === null ? null : Number(row.followers) };
 }
 
 function pickCommentable(topic: XTodayTopic, now: number) {
@@ -118,3 +101,7 @@ export const CARD_RULES = {
   decayHalfLifeHours: 8,
 } as const;
 
+/** /card 每次带不同 handle 都会算一遍今日选题和画像：按 handle 进程缓存 5 分钟，随机串打不穿。 */
+const dailyCards = cachedByKey<string, DailyCard | null>((key) => key, (key) => loadDailyCard(key || null), { freshMs: 300_000, maxStaleMs: 3_600_000, maxKeys: 50 });
+
+export const loadDailyCardCached = (handle: string): Promise<DailyCard | null> => dailyCards(handle.toLowerCase());

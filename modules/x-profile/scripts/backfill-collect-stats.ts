@@ -3,7 +3,8 @@
 import { closeDb } from "@aihot/backend/db";
 import { beijingToday, snapshotCollectStats } from "../backend/collect-stats.ts";
 
-const days = Math.max(1, Math.min(90, Number(process.argv[2] ?? 14)));
+// 回执响应只保留 45 天：更早的日子 response 已被清空，会把调用全读成空抓，最多回填 45 天。
+const days = Math.max(1, Math.min(45, Number(process.argv[2] ?? 14)));
 const out: Array<{ day: string; calls: number; usd: number }> = [];
 for (let offset = days; offset >= 1; offset -= 1) {
   const day = beijingToday(new Date(Date.now() - offset * 86_400_000));

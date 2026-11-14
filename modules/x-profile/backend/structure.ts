@@ -15,6 +15,9 @@ export interface Structure {
 
 const EMPTY: Structure = { likes: 0, reposts: 0, replies: 0, quotes: 0 };
 
+/** 回复别人的帖（replyTo 有值）的互动结构完全不同，中位和「我的结构」都不算它们。 */
+const ORIGINAL = sql`NOT (a.x_post->'replyTo' IS NOT NULL AND a.x_post->'replyTo' <> 'null'::jsonb)`;
+
 /** 每千次曝光的互动中位（只算 120 天内有发帖、曝光合计过千的账号，避免小样本拉偏）。 */
 export async function structureMedians(): Promise<Structure> {
   const [row] = await sql<{ likes: string | null; reposts: string | null; replies: string | null; quotes: string | null }[]>`
@@ -26,6 +29,7 @@ export async function structureMedians(): Promise<Structure> {
              1000.0 * sum((a.raw->>'quote')::numeric) / nullif(sum((a.raw->>'views')::numeric), 0) AS quotes
       FROM articles a
       WHERE a.source_id LIKE 'x-account-%' AND a.published_at > now() - interval '120 days'
+        AND ${ORIGINAL}
         AND ${notWithdrawn}
       GROUP BY a.source_id
       HAVING sum((a.raw->>'views')::numeric) >= 1000
@@ -40,6 +44,40 @@ export async function structureMedians(): Promise<Structure> {
     reposts: Number(row?.reposts ?? 0),
     replies: Number(row?.replies ?? 0),
     quotes: Number(row?.quotes ?? 0),
+  };
+}
+
+/**
+ * 一个账号原创帖（不含回复）的互动结构：卡片和画像页都用这一池，
+ * 和全站中位同一口径，读者在两处看到的结论不会再打架。
+ */
+export async function ownStructure(ids: readonly string[], days = 120): Promise<{ perK: Structure; posts: number; views: number }> {
+  if (ids.length === 0) return { perK: EMPTY, posts: 0, views: 0 };
+  const [row] = await sql<{ likes: string | null; reposts: string | null; replies: string | null; quotes: string | null; posts: number; views: string | null }[]>`
+    WITH p AS (
+      SELECT coalesce((a.raw->>'views')::numeric, 0) AS views,
+             coalesce((a.raw->>'favorite')::numeric, 0) AS likes,
+             coalesce((a.raw->>'retweet')::numeric, 0) AS reposts,
+             coalesce((a.raw->>'reply')::numeric, 0) AS replies,
+             coalesce((a.raw->>'quote')::numeric, 0) AS quotes
+      FROM articles a
+      WHERE a.source_id IN ${sql(ids)}
+        AND a.published_at > now() - make_interval(days => ${days})
+        AND ${ORIGINAL}
+        AND ${notWithdrawn}
+    )
+    SELECT round(1000.0 * sum(likes) / nullif(sum(views), 0), 1)::text AS likes,
+           round(1000.0 * sum(reposts) / nullif(sum(views), 0), 1)::text AS reposts,
+           round(1000.0 * sum(replies) / nullif(sum(views), 0), 1)::text AS replies,
+           round(1000.0 * sum(quotes) / nullif(sum(views), 0), 1)::text AS quotes,
+           count(*)::int AS posts,
+           coalesce(sum(views), 0)::text AS views
+    FROM p`;
+  const num = (value: string | null | undefined) => (value === null || value === undefined ? 0 : Number(value));
+  return {
+    perK: { likes: num(row?.likes), reposts: num(row?.reposts), replies: num(row?.replies), quotes: num(row?.quotes) },
+    posts: row?.posts ?? 0,
+    views: num(row?.views),
   };
 }
 

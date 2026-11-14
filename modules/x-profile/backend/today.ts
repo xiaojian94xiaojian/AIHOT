@@ -131,7 +131,7 @@ async function commentablesOf(storyIds: number[]): Promise<Map<number, XCommenta
              ) AS rn
       FROM story_signals ss
       JOIN articles a ON a.id = ss.article_id
-      LEFT JOIN x_account_meta m ON m.handle = lower(a.x_post->>'handle')
+      LEFT JOIN x_account_meta m ON lower(m.handle) = lower(a.x_post->>'handle')
       WHERE ss.story_id IN ${sql(storyIds.map(Number))}
         AND ss.observed_at > now() - make_interval(hours => ${WINDOW_HOURS}::int)
         AND coalesce(a.language, a.x_post->>'lang', '') LIKE 'zh%'

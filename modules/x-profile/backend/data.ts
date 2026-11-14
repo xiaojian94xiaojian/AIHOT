@@ -7,10 +7,11 @@ import { cached, cachedByKey } from "@aihot/backend/lib/cache";
 import { BEIJING_TIMEZONE, beijingDate } from "@aihot/contracts/time";
 import { personKind, regionOf } from "./classify.ts";
 import { accountMeta } from "./meta.ts";
-import { structureMediansCached, structureVerdict } from "./structure.ts";
+import { ownStructure, structureMediansCached, structureVerdict } from "./structure.ts";
 import type { XPeopleResponse, XPersonResponse, XPersonSummary, XPost, XSeriesPoint } from "../types.ts";
 import { ageHours, breakoutRatio, projected24hViews } from "./insight.ts";
 import { notWithdrawn } from "./visibility.ts";
+import { sourceIdsOfHandle } from "./followers.ts";
 
 /** 只看最近这些天：更早的帖子留作历史，不进画像。 */
 const WINDOW_DAYS = 120;
@@ -412,7 +413,10 @@ export async function loadPerson(handle: string): Promise<XPersonResponse | null
   // 破圈系数要粉丝数：优先用最新快照，没有快照时退回画像里的值。
   const followers = snap[0] ? Number(snap[0].followers) : summary.followers;
   summary.followers = followers ?? null;
-  const structure = { median, verdict: structureVerdict(summary.perK, median) };
+  // 画像页和卡片用同一池（原创、不含回复）算「我的结构」，否则同一个人两处结论会打架。
+  const ids = (await sourceIdsOfHandle(summary.handle)).filter((id) => id.startsWith("x-account-"));
+  const own = ids.length ? await ownStructure(ids, WINDOW_DAYS) : null;
+  const structure = { median, verdict: structureVerdict(own?.perK ?? summary.perK, median) };
   return {
     person: meta.get(summary.handle) ? { ...summary, kind: meta.get(summary.handle)!.kind, category: meta.get(summary.handle)!.category } : summary,
     structure,

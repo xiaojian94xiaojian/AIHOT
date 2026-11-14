@@ -8,24 +8,30 @@ import type { XHitSummary, XMethodologyResponse } from "../types.ts";
 
 const round1 = (value: number) => Math.round(value * 10) / 10;
 
-/** 每篇帖子 + 所属账号的 P90 切点；账号至少 20 帖才参与。 */
+/**
+ * 每篇成熟的原创新帖 + 所属账号的 P90 切点；账号至少 20 帖成熟原创才参与。
+ * 回复帖的浏览结构和原创不同，和卡片/画像页一样不进池；P90 也只从同一批成熟帖里切，
+ * 否则切点会被还没攒够曝光的新帖往下拉。
+ */
 const LABELED = sql`
+  WITH matured AS (
+    SELECT * FROM (${posts()}) m
+    WHERE m.published_at < now() - interval '3 days' AND NOT m.is_reply
+  )
   SELECT p.*, (p.views >= per.cut) AS is_hit, per.cut
-  FROM (${posts()}) p
+  FROM matured p
   JOIN (
     SELECT source_id, percentile_cont(0.9) WITHIN GROUP (ORDER BY views)::numeric AS cut
-    FROM (${posts()}) q
+    FROM matured
     GROUP BY 1 HAVING count(*) >= 20
   ) per ON per.source_id = p.source_id
-  -- 只统计发布满 3 天的帖子：浏览是抓取快照，新帖还没攒够曝光。
-  WHERE p.published_at < now() - interval '3 days'
 `;
 
 interface TotalRow {
   accounts: number;
   posts: number;
   hits: number;
-  hit_rate: string;
+  hit_rate: string | null;
   top_media: string; top_reply: string; top_len: number; top_med: string;
   rest_media: string; rest_reply: string; rest_len: number; rest_med: string;
 }
@@ -56,7 +62,7 @@ export async function loadMethodology(): Promise<XMethodologyResponse> {
       SELECT count(DISTINCT source_id)::int AS accounts,
              count(*)::int AS posts,
              count(*) FILTER (WHERE is_hit)::int AS hits,
-             round(100.0 * count(*) FILTER (WHERE is_hit) / count(*), 1) AS hit_rate,
+             round(100.0 * count(*) FILTER (WHERE is_hit) / nullif(count(*), 0), 1) AS hit_rate,
              round(100.0 * avg((media_count > 0)::int) FILTER (WHERE is_hit), 1) AS top_media,
              round(100.0 * avg(is_reply::int) FILTER (WHERE is_hit), 1) AS top_reply,
              round(avg(text_len) FILTER (WHERE is_hit))::int AS top_len,
@@ -72,7 +78,7 @@ export async function loadMethodology(): Promise<XMethodologyResponse> {
       SELECT CASE WHEN media_kind = 'video' THEN 'video' WHEN media_count > 0 THEN 'image' ELSE 'text' END AS key,
              count(*)::int AS posts,
              count(*) FILTER (WHERE is_hit)::int AS hits,
-             round(100.0 * count(*) FILTER (WHERE is_hit) / count(*), 1) AS hit_rate,
+             round(100.0 * count(*) FILTER (WHERE is_hit) / nullif(count(*), 0), 1) AS hit_rate,
              round(percentile_cont(0.5) WITHIN GROUP (ORDER BY views)::numeric)::bigint AS med_views
       FROM l GROUP BY 1
     `,
@@ -83,7 +89,7 @@ export async function loadMethodology(): Promise<XMethodologyResponse> {
                   WHEN text_len <= 560 THEN '281-560'
                   ELSE '560+' END AS key,
              count(*)::int AS posts,
-             round(100.0 * count(*) FILTER (WHERE is_hit) / count(*), 1) AS hit_rate,
+             round(100.0 * count(*) FILTER (WHERE is_hit) / nullif(count(*), 0), 1) AS hit_rate,
              round(percentile_cont(0.5) WITHIN GROUP (ORDER BY views)::numeric)::bigint AS med_views
       FROM l GROUP BY 1
     `,
@@ -91,7 +97,7 @@ export async function loadMethodology(): Promise<XMethodologyResponse> {
       WITH l AS (${LABELED})
       SELECT extract(hour FROM published_at AT TIME ZONE ${BEIJING_TIMEZONE})::int AS hour,
              count(*)::int AS posts,
-             round(100.0 * count(*) FILTER (WHERE is_hit) / count(*), 1) AS hit_rate,
+             round(100.0 * count(*) FILTER (WHERE is_hit) / nullif(count(*), 0), 1) AS hit_rate,
              round(percentile_cont(0.5) WITHIN GROUP (ORDER BY views)::numeric)::bigint AS med_views
       FROM l GROUP BY 1 ORDER BY 1
     `,
@@ -119,7 +125,7 @@ export async function loadMethodology(): Promise<XMethodologyResponse> {
       WITH l AS (${LABELED})
       SELECT CASE WHEN lang LIKE 'zh%' THEN 'zh' WHEN lang LIKE 'en%' THEN 'en' ELSE 'other' END AS key,
              count(*)::int AS posts,
-             round(100.0 * count(*) FILTER (WHERE is_hit) / count(*), 1) AS hit_rate,
+             round(100.0 * count(*) FILTER (WHERE is_hit) / nullif(count(*), 0), 1) AS hit_rate,
              round(100.0 * avg((media_count > 0)::int), 1) AS media_pct
       FROM l GROUP BY 1
     `,
@@ -185,4 +191,4 @@ export async function loadMethodology(): Promise<XMethodologyResponse> {
  * 这条聚合要扫 120 天的帖子上十秒，而页面只读一个结论：5 分钟内复用上一次结果，
  * 过期后先返回旧值、后台再算，读者不会再等到 15 秒超时。
  */
-export const methodologyPage = cached(loadMethodology, { freshMs: 300_000, maxStaleMs: 3_600_000 });
+export const methodologyPage = cached(loadMethodology, { freshMs: 600_000, maxStaleMs: 3_600_000 });

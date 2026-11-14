@@ -293,3 +293,43 @@ test("the profile page reads the same board: growth, ranks and the daily snapsho
   assert.equal(growth.report, null);
   assert.equal((await loadPersonGrowth("nobody-here", now)), null);
 });
+
+test("efficiency denominators are scaled to the window, not left at the measured span", async () => {
+  const now = new Date();
+  await sql`TRUNCATE x_follower_snapshots`;
+  await sql`
+    INSERT INTO sources (id, name, kind, config) VALUES
+      ('x-account-eff', '@Eff', 'x_search', ${sql.json({ query: "from:Eff -filter:replies" })})
+    ON CONFLICT (id) DO NOTHING`;
+  await sql`DELETE FROM articles WHERE source_id = 'x-account-eff'`;
+  // 10 天的快照跨度：200 → 900，涨 700；按 7 天折算是 490。
+  await snapshot(daysAgo(now, 11), "eff", 200);
+  await snapshot(daysAgo(now, 1), "eff", 900);
+  for (const days of [2, 5, 9]) {
+    await sql`
+      INSERT INTO articles (id, source_id, identity_key, url, title, language, published_at, discovered_at, timeline_at, raw, x_post)
+      VALUES (${`eff-span-${days}`}, 'x-account-eff', ${`test:eff-span-${days}`}, ${`https://x.com/eff-span-${days}`}, ${`eff ${days}`}, 'zh', ${daysAgo(now, days)}, ${daysAgo(now, days)}, ${daysAgo(now, days)},
+              ${sql.json({ views: 1000 })}, ${sql.json({ handle: "eff", lang: "zh" })})`;
+  }
+  const week = await loadGrowth(7, now);
+  const eff = week.rows.find((row) => row.handle === "eff")!;
+  assert.equal(eff.spanDays, 10);
+  assert.equal(eff.growth, 490);
+  assert.equal(eff.posts, 3);
+  assert.equal(eff.views, 3000);
+  // 490 粉 / 3000 浏览：浏览是 10 天的，折到 7 天是 2100，所以每千曝光约 233.3，而不是 163.3。
+  assert.equal(eff.perK, 233.3);
+  assert.equal(eff.perPost, 233, "490 / 3 帖，按 10/7 折算");
+});
+
+test("freshness counts snapshot days, not the calendar span between two sparse points", async () => {
+  const now = new Date();
+  await sql`TRUNCATE x_follower_snapshots`;
+  // 只有两天快照，相隔 30 天：按跨度会显示「正常」，实际是样本不足。
+  await snapshot(daysAgo(now, 31), "sparse", 1000);
+  await snapshot(daysAgo(now, 1), "sparse", 1200);
+  const week = await loadGrowth(7, now);
+  assert.equal(week.freshness.status, "insufficient");
+  assert.equal(week.freshness.snapshots, 2, "two distinct days, not the 30-day span");
+  assert.equal(week.freshness.spanDays, 30);
+});
