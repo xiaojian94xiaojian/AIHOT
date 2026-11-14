@@ -88,7 +88,7 @@ const getSignalInfo = (windowDays: number): Record<NonNullable<XGrowthRow["signa
   },
   caution: {
     label: "需核对",
-    title: `涨粉远高于同期曝光，或 ${windowDays} 日涨跌幅超过 30%：可能是一次站外传播、抽奖或买粉，建议核对，不是定论。`,
+    title: `涨粉与同期曝光不匹配，或 ${windowDays} 日涨跌幅超过 30%：可能是一次站外传播、抽奖或其它原因，建议核对，不是定论。`,
     tone: "text-amber-ink",
   },
 });
@@ -860,8 +860,8 @@ export default function GrowthPage() {
         </p>
         <p className="mt-2">
           涨粉 = 最近快照 − {label}之外最近的一次快照，基线更早时按天数折算到 {label}；粉丝快照跟着采集走，不发帖就没有新快照。
-          「本期无发帖」说明这 {window} 天没抓到它的帖子，涨粉只能来自外部；「需核对」表示涨粉远高于曝光或 {window} 日涨跌幅超过 30%，
-          可能是一次站外传播、抽奖或买粉，建议核对，不是定论。
+          「本期无发帖」说明这 {window} 天没抓到它的帖子，涨粉只能来自外部；「需核对」表示涨粉与同期曝光不匹配或 {window} 日涨跌幅超过 30%，
+          可能是一次站外传播、抽奖或其它原因，建议核对，不是定论。
         </p>
       </div>
       <p className="mt-4 text-[11.5px] text-ink-4">数据截至 {stamp(data.generatedAt)}（北京时间），每 5 分钟从采集回执里更新一次。</p>

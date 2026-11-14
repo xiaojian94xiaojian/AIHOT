@@ -150,7 +150,7 @@ function copyNotes(person: XPersonResponse["person"], growth: XPersonGrowth, cat
   const notes: string[] = [];
   // 徽标要有解释，否则读者只看到一个「需核对」。
   if (growth.d7?.signal === "caution") {
-    notes.push("涨粉与曝光不匹配，可能含站外传播、活动或买粉因素，先人工核对。");
+    notes.push("涨粉与曝光不匹配，可能含站外传播、活动或其它原因，先人工核对。");
   } else if (growth.d7?.signal === "quiet") {
     notes.push("这一期没发帖，涨粉不代表内容表现。");
   } else if (growth.d7?.signal === "thin") {
