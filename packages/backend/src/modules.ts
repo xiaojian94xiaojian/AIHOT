@@ -5,6 +5,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { WorkOptions } from "pg-boss";
 import type { z } from "zod";
+import type { MentionTarget } from "@aihot/contracts/mentions";
 import type { Brand } from "@aihot/contracts/site";
 import type { Db } from "./db.ts";
 import type { QueueOptions } from "./jobs/queue.ts";
@@ -178,6 +179,8 @@ export interface ServerModule {
   http?: (app: FastifyInstance) => void;
   agent?: {
     abilities?: AgentAbility[];
+    /** Questions answered by a web page's Markdown representation, without an MCP tool. */
+    pages?: Array<{ ask: string; where: string }>;
     /** The guide's "目前查不到的" list, after the engine's first entry. */
     unavailable?: string[];
     /** The guide's "请求" list (how to ask), after the engine's first entry. */
@@ -241,6 +244,8 @@ export interface ServerModule {
   sourceUses?: Record<string, SourceUse>;
   /** Lines of the Monday source-health report (operations/reports.ts), after the source counts. */
   sourceHealth?: (now: number) => Promise<string[]>;
+  /** Its pages that names in the site's own text link to, such as a model's page by the model's name (publication/mentions.ts). */
+  mentions?: () => Promise<MentionTarget[]>;
   /** Job queues of its own (jobs/queue.ts). */
   queues?: ModuleQueue[];
   /** Follow-ups (level later), after the engine's (operations/alerts.ts). */
@@ -249,6 +254,11 @@ export interface ServerModule {
   notices?: Partial<RequestNotices>;
   /** More keys a feedback sender is known by; a ban under any of them holds (operations/feedback.ts). */
   feedbackKeys?: (ip: string) => string[];
+  /**
+   * Its pages, by path ("/free-tokens"), whose reports it handles itself (operations/feedback.ts): they stay out
+   * of the internal chat, and only their screenshots go to Feishu. It wakes whoever handles them (`alerts`).
+   */
+  feedbackPages?: readonly string[];
 }
 
 export function defineServerModule(module: ServerModule): ServerModule {

@@ -1,9 +1,14 @@
 // X accounts via SocialData search, newest first. Verified publishers include their own thread
 // continuations; other replies stay excluded. Plain accounts share length-bounded search shards.
-import { searchTweets, tweetMedia, tweetText, type SdArticle, type SdTweet } from "../providers/socialdata.ts";
+import { marked } from "marked";
+import { searchTweets, tweetMedia, tweetText, type SdArticle, type SdArticleImage, type SdTweet } from "../providers/socialdata.ts";
+import { shownAddress } from "@aihot/contracts/addresses";
+import { escHtml, sanitizeBody } from "../content/sanitize.ts";
+import { X_ARTICLE_LINK } from "../content/posts.ts";
 import { ProviderRejectedError } from "../providers/receipts.ts";
 import type { XPostData } from "../content/materials.ts";
 import { sha256 } from "../lib/ids.ts";
+import { isXVideoUrl } from "../lib/video-url.ts";
 import { FetchError, type Candidate, type SourceRow } from "./types.ts";
 import { xHandle } from "./account.ts";
 
@@ -29,7 +34,6 @@ export function toXPost(t: SdTweet): XPostData {
   };
 }
 
-const X_ARTICLE_LINK = /https?:\/\/(?:www\.)?(?:x|twitter)\.com\/i\/article\/\d+/gi;
 
 /** The post links an X Article (long-form text posted on X): its body is fetched before judging. */
 export function linksXArticle(text: string | null | undefined): boolean {
@@ -41,8 +45,11 @@ export function onlyXArticleLink(text: string | null | undefined): boolean {
   return linksXArticle(text) && (text ?? "").replace(X_ARTICLE_LINK, "").trim().length < 30;
 }
 
-/** An X Article as plain text with Markdown-like headings, quotes and list marks; media blocks are left out. */
-export function xArticleText(article: SdArticle): { title: string; text: string } | null {
+/**
+ * An X Article as plain text with Markdown-like headings, quotes and list marks, for judging and writing
+ * (media blocks are left out), and as the page shows it (`html`, xArticleHtml).
+ */
+export function xArticleText(article: SdArticle, postUrl: string): { title: string; text: string; html: string | null } | null {
   const lines: string[] = [];
   for (const b of article.content_state?.blocks ?? []) {
     const text = (b.text ?? "").trim();
@@ -51,7 +58,115 @@ export function xArticleText(article: SdArticle): { title: string; text: string 
     lines.push(mark + text);
   }
   const text = lines.join("\n\n").trim();
-  return text ? { title: (article.title ?? "").trim(), text } : null;
+  return text ? { title: (article.title ?? "").trim(), text, html: xArticleHtml(article, postUrl) } : null;
+}
+
+type ArticleBlock = NonNullable<NonNullable<SdArticle["content_state"]>["blocks"]>[number];
+type ArticleEntity = { type?: string; data?: any };
+
+const STYLE_TAGS: Record<string, string> = { Bold: "strong", Italic: "em", Strikethrough: "del" };
+const HEADING_TAGS: Record<string, string> = { "header-one": "h2", "header-two": "h3", "header-three": "h4" };
+
+/** A block's words with its bold, italic and struck-through ranges and its links (ranges count characters). */
+function articleInline(block: ArticleBlock, entities: Map<string, ArticleEntity>): string {
+  const chars = Array.from(block.text ?? "");
+  const marks = chars.map(() => ({ tags: [] as string[], href: null as string | null }));
+  for (const r of block.inlineStyleRanges ?? []) {
+    const tag = STYLE_TAGS[r.style ?? ""];
+    for (let i = Math.max(0, r.offset); tag && i < Math.min(chars.length, r.offset + r.length); i++) if (!marks[i]!.tags.includes(tag)) marks[i]!.tags.push(tag);
+  }
+  for (const r of block.entityRanges ?? []) {
+    const entity = entities.get(String(r.key));
+    const url = entity?.type === "LINK" ? entity.data?.url : null;
+    if (typeof url !== "string" || !/^https?:\/\//i.test(url)) continue;
+    for (let i = Math.max(0, r.offset); i < Math.min(chars.length, r.offset + r.length); i++) marks[i]!.href = url;
+  }
+  const styled = (from: number, to: number) => {
+    let out = "";
+    for (let i = from; i < to;) {
+      const key = [...marks[i]!.tags].sort().join();
+      let j = i + 1;
+      while (j < to && [...marks[j]!.tags].sort().join() === key) j++;
+      let text = escHtml(chars.slice(i, j).join("")).replace(/\n/g, "<br>");
+      for (const tag of ["del", "em", "strong"]) if (marks[i]!.tags.includes(tag)) text = `<${tag}>${text}</${tag}>`;
+      out += text;
+      i = j;
+    }
+    return out;
+  };
+  let html = "";
+  for (let i = 0; i < chars.length;) {
+    let j = i + 1;
+    while (j < chars.length && marks[j]!.href === marks[i]!.href) j++;
+    html += marks[i]!.href ? `<a href="${escHtml(marks[i]!.href!)}">${styled(i, j)}</a>` : styled(i, j);
+    i = j;
+  }
+  return html;
+}
+
+/**
+ * An X Article as its page shows it, from the blocks X sent: the cover, headings, paragraphs with their
+ * emphasis and links, lists, quotes, pictures, dividers, tables and code (MARKDOWN blocks), and embedded
+ * posts as links. Inline videos keep a playable X rendition when supplied, with the original post as a fallback.
+ */
+export function xArticleHtml(article: SdArticle, postUrl: string): string | null {
+  const blocks = article.content_state?.blocks ?? [];
+  const map = article.content_state?.entityMap ?? [];
+  const entities = new Map<string, ArticleEntity>(Array.isArray(map) ? map.map((e) => [String(e.key), e.value]) : Object.entries(map));
+  const media = new Map((article.media_entities ?? []).map((m) => [String(m.media_id), m.media_info]));
+  const size = (image: SdArticleImage | undefined) => image?.original_img_width && image.original_img_height
+    ? ` width="${image.original_img_width}" height="${image.original_img_height}"` : "";
+  const picture = (image: SdArticleImage | undefined) => image?.original_img_url
+    ? `<img src="${escHtml(image.original_img_url)}"${size(image)} alt="">` : "";
+  const original = escHtml(postUrl);
+  const parts: string[] = [];
+  if (article.cover_url) parts.push(`<figure>${picture({ original_img_url: article.cover_url })}</figure>`);
+  for (let i = 0; i < blocks.length; i++) {
+    const block = blocks[i]!;
+    const type = block.type ?? "unstyled";
+    if (type === "unordered-list-item" || type === "ordered-list-item") {
+      const items: string[] = [];
+      for (; i < blocks.length && blocks[i]!.type === type; i++) if ((blocks[i]!.text ?? "").trim()) items.push(`<li>${articleInline(blocks[i]!, entities)}</li>`);
+      i--;
+      const tag = type === "ordered-list-item" ? "ol" : "ul";
+      if (items.length) parts.push(`<${tag}>${items.join("")}</${tag}>`);
+    } else if (type === "atomic") {
+      for (const range of block.entityRanges ?? []) {
+        const entity = entities.get(String(range.key));
+        if (entity?.type === "MEDIA") {
+          for (const item of entity.data?.mediaItems ?? []) {
+            const info = media.get(String(item?.mediaId));
+            if (info?.original_img_url) {
+              parts.push(`<figure>${picture(info)}</figure>`);
+            } else if (info?.preview_image || info?.variants?.length) {
+              // The 832 kb/s rendition of the reported demos was 724px wide, close to the reading column.
+              const mp4 = (info.variants ?? []).filter((v) => v.content_type === "video/mp4" && typeof v.url === "string" && isXVideoUrl(v.url))
+                .sort((a, b) => (a.bit_rate ?? 0) - (b.bit_rate ?? 0));
+              const src = (mp4.findLast((v) => (v.bit_rate ?? 0) <= 832_000) ?? mp4[0])?.url;
+              const preview = info.preview_image;
+              const poster = preview?.original_img_url ? ` poster="${escHtml(preview.original_img_url)}"` : "";
+              const label = "在 X 查看原视频";
+              parts.push(src
+                ? `<figure><video src="${escHtml(src)}"${poster}${size(preview)}></video><a href="${original}">${label}</a></figure>`
+                : `<figure><a href="${original}">${picture(preview)}${label}</a></figure>`);
+            }
+          }
+        } else if (entity?.type === "DIVIDER") {
+          parts.push("<hr>");
+        } else if (entity?.type === "TWEET" && /^\d+$/.test(String(entity.data?.tweetId ?? ""))) {
+          const url = `https://x.com/i/status/${entity.data.tweetId}`;
+          parts.push(`<p><a href="${url}">${escHtml(shownAddress(url))}</a></p>`);
+        } else if (entity?.type === "MARKDOWN" && typeof entity.data?.markdown === "string") {
+          parts.push(marked.parse(entity.data.markdown, { async: false, gfm: true }));
+        }
+      }
+    } else if ((block.text ?? "").trim()) {
+      const words = articleInline(block, entities);
+      const heading = HEADING_TAGS[type];
+      parts.push(heading ? `<${heading}>${words}</${heading}>` : type === "blockquote" ? `<blockquote><p>${words}</p></blockquote>` : `<p>${words}</p>`);
+    }
+  }
+  return sanitizeBody(parts.join("")) || null;
 }
 
 export function tweetToCandidate(t: SdTweet): Candidate {

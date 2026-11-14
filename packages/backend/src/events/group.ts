@@ -29,12 +29,12 @@ import { enqueue, QUEUES, shutdownSignal } from "../jobs/queue.ts";
 import { groupingPriority } from "../jobs/content.ts";
 import { publishArticle, publishArticleTx, republishTx } from "../publication/publish.ts";
 import { isIndependentSelectedSource } from "../publication/rules.ts";
-import { latestCompositeCondition } from "../publication/scope.ts";
+import { groupingEvidenceCondition, latestCompositeCondition } from "../publication/scope.ts";
 import { alreadyOnCard, echoesOnCard, factHasCard, foldsUnder, ownArticleOnCard, readerOf, retireCardTx, seenOnCard } from "./cards.ts";
 import { consolidate, liveStory, type Consolidation } from "./consolidate.ts";
 import { HEAT_WINDOW_HOURS } from "./hot.ts";
 import { mergeFactInto, mergeStoryInto } from "./merge.ts";
-import { bestPerFact, candidateViews, cosine32, recallFacts, recallFactsByPosts, recallSelectedBackground, relatedPosts, vectorsFor, type Recalled, type CardRow } from "./recall.ts";
+import { bestPerFact, candidateViews, cosine32, RECALL_DAYS, recallFacts, recallFactsByPosts, recallSelectedBackground, relatedPosts, vectorsFor, type Recalled, type CardRow } from "./recall.ts";
 import {
   BATCH_SYSTEM, BATCH_PROMPT_VERSION, BatchSchema, PAIR_SYSTEM, PairSchema, RELATE_PROMPT_VERSION, SIGNAL_SYSTEM, SignalSchema, TIE_MIN_CONFIDENCE,
   batchUser, completeDecisions, firmlyTied, pairUser, reportText, sameOccurrence, signalTarget, signalText, storyForDevelopment, verdictsByFact,
@@ -586,11 +586,11 @@ async function decide(articleId: string, opts: GroupOptions, revision: number, r
 /** How long a discussion post waits for the post it replies to or quotes. */
 const WAIT_HOURS = 48;
 
-/** Discussion posts not yet attached to any story (a post a person placed or detached is left alone). */
+/** Discussion posts attached to no story now: no heat evidence, latest decision found nothing (a post a person placed or detached is left alone). */
 const unattachedSignal = sql`
   s.participation_mode = 'hot_signal' AND a.processing_state = 'skipped' AND ${newsCondition}
   AND NOT EXISTS (SELECT 1 FROM story_signals ss WHERE ss.article_id = a.id)
-  AND NOT EXISTS (SELECT 1 FROM grouping_decisions d WHERE d.article_id = a.id AND d.verdict <> 'signal-unmatched')
+  AND coalesce((SELECT d.verdict FROM grouping_decisions d WHERE d.article_id = a.id ORDER BY d.id DESC LIMIT 1), 'signal-unmatched') = 'signal-unmatched'
   AND NOT EXISTS (SELECT 1 FROM grouping_overrides o WHERE o.article_id = a.id)`;
 
 /**
@@ -660,12 +660,18 @@ async function rematch(result: GroupResult, articleId: string, text: string, fac
 async function groupSignal(a: ArticleRow, source: { id: string; signal_group_id: string | null }, observedAt: Date, regroup: boolean): Promise<GroupResult> {
   const text = signalText(a);
   // Discussion evidence obeys the same article lock and last-minute manual check as reports. The
-  // evidence and decision commit together; a retry cannot leave half of a signal attached.
+  // evidence and decision commit together, and the decision replaces the post's earlier evidence.
+  // Finding nothing only withdraws evidence from a story recall can still reach: once a story's
+  // reports have left the recall window, a late re-evaluation cannot meet it again.
   const write = async (target: { factId: number; storyId: number } | null, verdict: "signal" | "signal-native" | "signal-unmatched", candidates: DecisionCandidate[], receiptId: number | null = null): Promise<GroupResult> => {
     const result: GroupResult = await sql.begin(async (tx) => {
       await lockCurrentRevision(tx, a.id, a.revision);
       const manual = await manualDecision(tx, a.id);
       if (!manual) {
+        await tx`DELETE FROM story_signals ss WHERE ss.article_id = ${a.id} AND (${target !== null} OR EXISTS (
+                   SELECT 1 FROM facts f JOIN fact_articles fa ON fa.fact_id = f.id JOIN articles r ON r.id = fa.article_id
+                   WHERE f.story_id = ss.story_id AND fa.role IN ('primary', 'report') AND ${groupingEvidenceCondition(sql`r.id`)}
+                     AND r.discovered_at > now() - make_interval(days => ${RECALL_DAYS})))`;
         if (target) await recordSignal(tx, target.storyId, a.id, source, "signal", observedAt);
         await recordDecision(tx, a.id, target?.factId ?? null, target?.storyId ?? null, verdict, candidates, receiptId);
       }
@@ -681,10 +687,15 @@ async function groupSignal(a: ArticleRow, source: { id: string; signal_group_id:
     const target = referenced[0]!;
     return write({ factId: target.fact_id, storyId: target.story_id }, "signal-native", [{ id: target.fact_id, score: 1, relation: "SAME_STORY", confidence: 1 }]);
   }
+  // Without embeddings nothing was compared: the earlier evidence stands.
   if (!embeddingsAvailable()) return { verdict: "signal-unmatched" };
   const asCandidates = (recalled: Recalled[], verdicts?: Map<number, Verdict>): DecisionCandidate[] =>
     recalled.map((r) => ({ id: r.factId, score: Math.round(r.score * 1000) / 1000, relation: verdicts?.get(r.factId)?.relation, confidence: verdicts?.get(r.factId)?.confidence }));
-  const answered = new Set(regroup ? [] : (await sql<{ id: number }[]>`SELECT unnest(${answeredFacts(sql`${a.id}`)}) AS id`).map((r) => r.id));
+  // The facts of the story the post counts for are judged again: an earlier "no" to one of them must
+  // not withdraw an attachment made since.
+  const answered = new Set(regroup ? [] : (await sql<{ id: number }[]>`
+    SELECT unnest(${answeredFacts(sql`${a.id}`)}) AS id
+    EXCEPT SELECT f.id FROM facts f JOIN story_signals ss ON ss.story_id = f.story_id WHERE ss.article_id = ${a.id}`).map((r) => r.id));
   const open = (recalled: Recalled[]) => recalled.filter((r) => !answered.has(r.factId));
   const byReports = open(await recallFacts(a.id, text, SIGNAL_MIN_COSINE, Infinity));
   if (byReports[0] && byReports[0].score >= SIGNAL_AUTO_COSINE) {
@@ -697,7 +708,7 @@ async function groupSignal(a: ArticleRow, source: { id: string; signal_group_id:
     return write(null, "signal-unmatched", []);
   }
   const cands = await candidateViews(recalled);
-  if (cands.length === 0) return { verdict: "signal-unmatched" };
+  if (cands.length === 0) return write(null, "signal-unmatched", []);
   const query: ReportView = { title: a.title, source: a.source_name, firstParty: false, at: a.published_at, publicationTime: a.publication_time, summary: a.body_text?.slice(0, 300) ?? null };
   const { verdicts, receiptId } = await judgeSignal(a.id, query, cands);
   const target = signalTarget(cands, verdicts);

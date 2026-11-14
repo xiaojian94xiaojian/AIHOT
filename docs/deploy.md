@@ -99,6 +99,22 @@ docker compose run --rm setup && docker compose up -d
 
 下面按时间从新到旧列出每次更新要注意的事。
 
+#### 百度主动推送（2026 年 11 月 8 日）
+
+没有迁移。新增两个可选的环境变量 `BAIDU_PUSH_ENABLED` 和 `BAIDU_PUSH_TOKEN`：站点在百度搜索资源平台验证后，把「普通收录 · API提交」推送地址末尾的 token 填进 `BAIDU_PUSH_TOKEN`，开关设成 `true`，worker 每小时把新出现的页面推给百度。第一次只记下已有页面、不推送（它们靠站点地图），之后每个地址只推一次，不超过百度当天给的配额；连续失败一天会出现在每天的跟进清单里。不用就不填，什么都不会发出去。
+
+#### 站长平台的网站验证（2026 年 11 月 8 日）
+
+没有迁移，没有新的环境变量。`site/site.ts` 新增 `SITE.siteVerification`：百度、必应、360、搜狗、神马、头条等站长平台给的 HTML 标签验证码按“meta 名 → 验证码”填进去，就会出现在首页的 head 里；验证通过后也要留着。自己维护 `site/site.ts` 的站，合并时加上这一行，用不到就写 `siteVerification: {}`；不加的话构建会报找不到 `siteVerification`。
+
+#### 页脚的“由 AIHOT 驱动”（2026 年 11 月 8 日）
+
+没有迁移，没有新的环境变量。`site/site.ts` 新增 `SITE.poweredBy`：填了就在侧栏底部和“我的”页底部显示“由 X 驱动”并链到它的网址，模板默认链回 AIHOT。自己维护 `site/site.ts` 的站，合并时把这一行加上；不想显示就写 `poweredBy: null`。不加这一行构建会报找不到 `poweredBy`。
+
+#### 搜索结果里的标题（2026 年 11 月 8 日）
+
+没有迁移，没有新的环境变量。`site/site.ts` 新增必填的 `SEO_TITLES`：热点榜、全部动态、Agent 接入页、关于页、日报周报月报的最新一期和主题页在搜索结果里的标题，读者会搜的词在前，页面自动在最后接上“ · 站名”；首页仍用 `SITE.homeTitle`。自己维护 `site/site.ts` 的站，合并时把模板里的这一段复制过去，再换成你行业的说法；不加的话构建会报找不到 `SEO_TITLES`。
+
 #### 钉钉内容推送（2026 年 11 月 6 日）
 
 新增一个可选的推送渠道：精选卡片可以推到钉钉群（自定义机器人，markdown 消息，支持加签）。没有迁移必做事项，`setup` 启动时自动执行；已有的飞书推送部署升级后行为不变。要用的话在 `.env` 里设 `DINGTALK_CONTENT_PUSH_ENABLED=true` 和 `DINGTALK_PUSH_WEBHOOK_URL`（机器人开了加签再设 `DINGTALK_PUSH_SECRET`），然后到后台“设置 → 通知目的地”启用“钉钉内容群”，与飞书内容推送互相独立、可同时开。详见 `.env.example` 里的说明。

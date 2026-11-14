@@ -7,7 +7,7 @@ import http from "node:http";
 import { after, before, test } from "node:test";
 import { closeDb, sql } from "@aihot/backend/db";
 import { upsertMaterial } from "@aihot/backend/content/materials";
-import { translateArticle, translatePending, importBodyTranslation } from "@aihot/backend/editorial/translate";
+import { translateArticle, translatePending, translateQuotes, importBodyTranslation } from "@aihot/backend/editorial/translate";
 import { stopBoss } from "@aihot/backend/jobs/queue";
 import { autoReleaseUnknownReceipts } from "@aihot/backend/operations/recover";
 import { publishArticle } from "@aihot/backend/publication/publish";
@@ -42,6 +42,7 @@ const provider = await stub(async (_hit, req) => {
       return n === 1 ? "解释 Neuroglancer 的文字 ⟦0⟧。" : '解释 <a id="L0">Neuroglancer</a> 的文字 ⟦0⟧。';
     }
     if (s.includes("never keeps")) return "丢了链接。";
+    if (s.includes("Cited paragraph")) return '引用<a id="L0">来源</a>的段落。';
     if (s.includes("Introducing")) return "隆重推出 Sonnet 5.5。";
     return s.includes("twenty") ? "价格是二十美元。" : s.includes("ten") ? "价格是十美元。" : "译文";
   });
@@ -239,6 +240,21 @@ test("links and images inside a paragraph survive the translation, or the paragr
   assert.ok(receipts.every((receipt) => receipt.status === "completed"), "every paid batch covered by the committed translation is completed");
 });
 
+test("the length cap counts what the model is sent, not the addresses of links it never sees", async () => {
+  // About 69,000 characters of paragraph markup, under 6,000 once each link is reduced to its id.
+  const href = `https://example.com/${"x".repeat(1600)}`;
+  const html = Array.from({ length: 40 }, (_v, i) => `<p>Cited paragraph ${i} with <a href="${href}">its source</a> (${T}).</p>`).join("");
+  const { articleId } = await upsertMaterial({ sourceId: SOURCE, url: `${URL_}-long-links`, title: `Long links ${T}`, language: "en",
+    bodyText: html.replace(/<[^>]+>/g, ""), bodyHtml: html, bodyStatus: "ok", via: "fetch", publishedAt: new Date() });
+  await sql`INSERT INTO analyses (article_id,input_revision,origin,relevance,category,title_zh,summary_zh,reason_zh,score,selected)
+    VALUES (${articleId},1,'rule','pass','ai-models','长链接','摘要','理由',90,true)`;
+  await publishArticle(articleId, { releasedAt: new Date(Date.now() - 60_000) });
+  assert.equal((await translateArticle(articleId)).status, "translated");
+  const body = (await detail(articleId)).body;
+  assert.equal(body.complete, true);
+  assert.equal(body.zh?.match(/引用<a href="https:\/\/example\.com\/x+">来源<\/a>的段落/g)?.length, 40);
+});
+
 test("the post a selected X post quotes is translated once and shown with the item", async () => {
   const tweetId = `7${Date.now()}`;
   const { articleId: id } = await upsertMaterial({
@@ -254,8 +270,8 @@ test("the post a selected X post quotes is translated once and shown with the it
   const [q] = await sql<{ text_zh: string; origin: string }[]>`SELECT text_zh, origin FROM quote_translations WHERE tweet_id = ${tweetId}`;
   assert.deepEqual({ ...q }, { text_zh: "隆重推出 Sonnet 5.5。", origin: "model" });
   const res = await app.inject({ method: "GET", url: `/api/site/items/${id}` });
-  const item = JSON.parse(res.body) as { x: { quoted: { text: string; translation: string | null } } };
-  assert.deepEqual([item.x.quoted.text, item.x.quoted.translation], [`Introducing Claude Sonnet 5.5 ${T}`, "隆重推出 Sonnet 5.5。"]);
+  const item = JSON.parse(res.body) as { x: { quoted: { html: string; translationHtml: string | null } } };
+  assert.deepEqual([item.x.quoted.html, item.x.quoted.translationHtml], [`<p>Introducing Claude Sonnet 5.5 ${T}</p>`, "<p>隆重推出 Sonnet 5.5。</p>"]);
   await translatePending({ limit: 1 });
   const receipts = await sql<{ status: string }[]>`SELECT status FROM receipts WHERE purpose = 'translate_quoted' AND subject = ${`quote:${tweetId}`}`;
   assert.equal(receipts.length, 1, "translated once");
@@ -441,31 +457,58 @@ test("account 429 pauses translation without spending the article attempts", asy
   }
 });
 
-test("saved X long articles neither buy unused introduction translations nor occupy the translation batch", async () => {
+test("a selected X long article is translated as its page shows it: the article, not the post's introduction alone", async () => {
   const source = `${SOURCE}-long-article`;
   await sql`INSERT INTO sources(id,name,kind,tier,participation_mode,site_fulltext,syndicate_fulltext,next_fetch_at)
     VALUES(${source},'Saved long article','x_search','T1','editorial',true,true,'2100-01-01')`;
-  const intro = `This introduction is long enough to be translated, but its translation would omit the already saved complete article. ${T}`;
+  const intro = `This introduction comes with a long article. ${T}`;
   const { articleId: long } = await upsertMaterial({sourceId: source, url: `https://x.com/fixture/status/${T}`, title: intro,
     language: 'en', bodyText: intro, bodyStatus: 'ok', via: 'fetch', publishedAt: new Date(), discoveredAt: new Date(Date.now()+30_000_000),
-    xPost: {tweetId: T, authorName: 'Fixture', handle: 'fixture', text: intro}});
-  await sql`UPDATE articles SET x_article=${sql.json({title:'Saved long article',text:'The complete article is already stored.'})} WHERE id=${long}`;
-  const { articleId: regular } = await upsertMaterial({sourceId: SOURCE, url: `${URL_}-behind-long-article`, title: `Regular article ${T}`,
-    language: 'en', bodyText: `The price is ten dollars ${T}.`, bodyHtml: `<p>The price is ten dollars ${T}.</p>`,
-    bodyStatus: 'ok', via: 'fetch', publishedAt: new Date(), discoveredAt: new Date(Date.now()+29_000_000)});
-  for (const id of [long, regular]) {
-    await sql`INSERT INTO analyses(article_id,input_revision,origin,relevance,category,title_zh,summary_zh,reason_zh,score,selected)
-      VALUES(${id},1,'rule','pass','ai-models','保存正文','摘要','理由',90,true)`;
-    await publishArticle(id,{releasedAt:new Date(Date.now()-60_000)});
-  }
-  const calls = provider.hits();
-  assert.equal((await translateArticle(long)).status,'skipped');
-  assert.equal(provider.hits(),calls,'a direct request must not pay for a translation readers cannot see');
+    xPost: {tweetId: T, authorName: 'Fixture', handle: 'fixture', text: `${intro} https://x.com/i/article/2119000000000000001`}});
+  const html = `<h2>Pricing ${T}</h2><p>The price is twenty dollars ${T}.</p><figure><img src="https://pbs.twimg.com/media/long-${T}.jpg" alt=""></figure>`;
+  await sql`UPDATE articles SET x_article=${sql.json({title:'Saved long article',text:`Pricing. The price is twenty dollars ${T}.`,html})} WHERE id=${long}`;
+  await sql`INSERT INTO analyses(article_id,input_revision,origin,relevance,category,title_zh,summary_zh,reason_zh,score,selected)
+    VALUES(${long},1,'rule','pass','ai-models','保存的长文','摘要','理由',90,true)`;
+  await publishArticle(long,{releasedAt:new Date(Date.now()-60_000)});
   const run = await translatePending({limit:1});
-  assert.equal(run.done.find(r=>r.articleId===regular)?.status,'translated','skip the long article before applying the batch limit');
-  assert.ok(!run.done.some(r=>r.articleId===long));
-  assert.equal((await sql`SELECT 1 FROM receipts WHERE subject LIKE ${`article:${long}@%`}`).length,0);
-  assert.equal((await sql`SELECT 1 FROM translations WHERE article_id=${long}`).length,0);
+  assert.equal(run.done.find(r=>r.articleId===long)?.status,'translated');
+  const [tr] = await sql<{ body_html: string; complete: boolean }[]>`SELECT body_html,complete FROM translations WHERE article_id=${long}`;
+  assert.equal(tr!.complete, true);
+  assert.match(tr!.body_html, /价格是二十美元/, 'the long article itself is translated');
+  assert.match(tr!.body_html, /<img [^>]*long-/, 'its pictures stay in place');
+  const page = (await app.inject({method:'GET',url:`/api/site/items/${long}`})).json();
+  assert.equal(page.bodyLanguage, 'zh');
+  assert.equal(page.hasTranslation, true);
+  assert.match(page.body.zh, /价格是二十美元/);
+  const original = (await app.inject({method:'GET',url:`/api/site/items/${long}/original`})).json();
+  assert.match(original.body.original, /The price is twenty dollars/);
+  assert.ok(!original.body.original.includes('x.com/i/article'), 'the article stands for its link');
+  const md = (await app.inject({method:'GET',url:`/items/${long}/markdown`})).body;
+  assert.match(md, /## 正文 · 中文译文[\s\S]*价格是二十美元[\s\S]*## 正文 · 原文[\s\S]*The price is twenty dollars/);
+  assert.ok((await app.inject({method:'GET',url:'/feed/full.xml'})).body.includes('价格是二十美元'), 'the full feed carries the complete translation');
+});
+
+test("a post quoting a long-article post gets the quoted words translated, not the article's translation", async () => {
+  const longTweet = `6${Date.now()}`;
+  const { articleId: long } = await upsertMaterial({sourceId: SOURCE, url: `https://x.com/writer/status/${longTweet}`, title: `Long piece ${T}`, language: 'en',
+    bodyText: `My long piece ${T}`, bodyStatus: 'ok', via: 'fetch', publishedAt: new Date(), discoveredAt: new Date(),
+    xPost: {tweetId: longTweet, authorName: 'Writer', handle: 'writer', text: `My long piece ${T} https://x.com/i/article/2119000000000000002`}});
+  await sql`UPDATE articles SET x_article=${sql.json({title:'Long piece',text:`The whole long piece ${T}.`,html:`<p>The whole long piece ${T}.</p>`})} WHERE id=${long}`;
+  // The long article's own translation covers the article, not the short post quoted below.
+  await sql`INSERT INTO translations(article_id,lang,revision,title,body_html,body_text,complete,origin)
+    VALUES(${long},'zh',1,'长文','<p>整篇长文的译文。</p>','整篇长文的译文。',true,'model')`;
+  const quotingTweet = `5${Date.now()}`;
+  const { articleId: quoting } = await upsertMaterial({sourceId: SOURCE, url: `https://x.com/reader/status/${quotingTweet}`, title: `Quoting ${T}`, language: 'en',
+    bodyText: 'Worth reading', bodyStatus: 'ok', via: 'fetch', publishedAt: new Date(), discoveredAt: new Date(Date.now()+1_900_000),
+    xPost: {tweetId: quotingTweet, authorName: 'Reader', handle: 'reader', text: 'Worth reading',
+      quoted: {authorName: 'Writer', handle: 'writer', text: `My long piece ${T} is out now`, url: `https://x.com/writer/status/${longTweet}`}}});
+  await sql`INSERT INTO analyses(article_id,input_revision,origin,relevance,category,title_zh,summary_zh,reason_zh,score,selected)
+    VALUES(${quoting},1,'rule','pass','ai-models',${`引用长文-${T}`},'摘要','理由',90,true)`;
+  await publishArticle(quoting,{releasedAt:new Date(Date.now()-60_000)});
+  await translateQuotes();
+  const [q] = await sql<{ text_zh: string; origin: string }[]>`SELECT text_zh,origin FROM quote_translations WHERE tweet_id=${longTweet}`;
+  assert.equal(q!.origin, 'model', 'the quoted words are translated themselves');
+  assert.notEqual(q!.text_zh, '整篇长文的译文。');
 });
 
 test("external model translation import restores against the exact body and rejects a stale source", async () => {
@@ -483,4 +526,39 @@ test("external model translation import restores against the exact body and reje
     bodyHtml:'<p>The price is twenty dollars.</p>',bodyText:'The price is twenty dollars.',bodyStatus:'ok',via:'import'});
   await assert.rejects(importBodyTranslation(input),/source changed/);
   assert.equal((await sql`SELECT revision FROM translations WHERE article_id=${articleId}`)[0].revision,saved.revision);
+});
+
+test("a failed old translation does not consume or overwrite the corrected revision's attempts", async () => {
+  for (const newerAttempt of [false, true]) {
+    const input = {sourceId:SOURCE,url:`${URL_}-late-failure-${newerAttempt}`,title:`Corrected translation ${T}`,
+      language:"en",bodyText:`The price is ten dollars ${T}.`,bodyHtml:`<p>The price is ten dollars ${T}.</p>`,
+      bodyStatus:"ok" as const,via:"fetch" as const,publishedAt:new Date(),discoveredAt:new Date(Date.now()+40_000_000)};
+    const {articleId:id}=await upsertMaterial(input);
+    await sql`INSERT INTO analyses(article_id,input_revision,origin,relevance,category,title_zh,summary_zh,reason_zh,score,selected)
+      VALUES(${id},1,'rule','pass','ai-models','价格更正','摘要','理由',90,true)`;
+    await publishArticle(id,{releasedAt:new Date(Date.now()-60_000)});
+    const entered=gate(),release=gate();
+    const rejected=await stub(async()=>{entered.open();await release.promise;return new Reply(400,{error:"invalid old request"});});
+    process.env.DEEPSEEK_BASE_URL=`${rejected.url}/v1`;
+    try {
+      const run=translatePending({limit:1});
+      await entered.promise;
+      await upsertMaterial({...input,bodyText:`The price is twenty dollars ${T}.`,bodyHtml:`<p>The price is twenty dollars ${T}.</p>`});
+      if(newerAttempt) await sql`INSERT INTO translation_attempts(article_id,revision,attempts,outcome,reason)
+        VALUES(${id},2,2,'failed','new revision attempt')`;
+      release.open();
+      await run;
+      const [attempt]=await sql`SELECT revision,attempts,reason FROM translation_attempts WHERE article_id=${id}`;
+      assert.equal(attempt!.revision,newerAttempt?2:1,"failure belongs to the body sent to the model");
+      assert.equal(attempt!.attempts,newerAttempt?2:1,"an old completion cannot spend the new revision's attempts");
+      if(newerAttempt) assert.equal(attempt!.reason,'new revision attempt');
+    } finally {
+      release.open();process.env.DEEPSEEK_BASE_URL=`${provider.url}/v1`;await rejected.close();
+    }
+    await sql`INSERT INTO analyses(article_id,input_revision,origin,relevance,category,title_zh,summary_zh,reason_zh,score,selected)
+      VALUES(${id},2,'rule','pass','ai-models','价格已更正','摘要','理由',90,true)`;
+    await publishArticle(id,{releasedAt:new Date(Date.now()-60_000)});
+    assert.equal((await translatePending({limit:1})).done.find(r=>r.articleId===id)?.status,'translated');
+    assert.match((await detail(id)).body.zh??'',/二十美元/);
+  }
 });

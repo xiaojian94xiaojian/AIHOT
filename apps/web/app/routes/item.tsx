@@ -1,13 +1,15 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Await, isRouteErrorResponse, Link, useAsyncError, useLoaderData, useNavigate, useRevalidator, type ClientLoaderFunctionArgs } from "react-router";
 import type { Route } from "./+types/item";
-import type { FeedItemSummary, SiteItemDetail, StoryFollowupsResponse } from "@aihot/contracts/site";
-import { ITEM_COPY, SITE } from "@aihot/site";
+import { REPORT_NAMES, reportDateLabel, type FeedItemSummary, type SiteItemDetail, type StoryFollowupsResponse } from "@aihot/contracts/site";
+import { ITEM_COPY, SITE, withSubject } from "@aihot/site";
+import { linkMentions } from "@aihot/contracts/mentions";
+import { addressRuns } from "@aihot/contracts/addresses";
 import { cachedPage, loadOr404 } from "../lib/api.server";
 import { loadFollowups } from "../features/item/followups.server";
 import { pageReuse } from "../lib/page-reuse";
 import { articleLd, breadcrumbLd, pageMeta, siteUrl, titled } from "../lib/seo";
-import { fullDateTime, relativeTime } from "../lib/format";
+import { fullDateTime, timeAgo } from "../lib/format";
 import { markRead } from "../lib/local-state";
 import { copyText } from "../lib/clipboard";
 import { SameEventBadge, SelectedBadge } from "../components/ui/Badge";
@@ -21,6 +23,7 @@ import { StoryFollowups } from "../features/item/StoryFollowups";
 import { MediaGallery } from "../features/item/MediaGallery";
 import { QuotedPost } from "../features/item/QuotedPost";
 import { ArticleBody } from "../features/item/ArticleBody";
+import { MentionText } from "../components/ui/MentionText";
 import { ActionsSheet, ReaderToolbar, type ActionRow } from "../features/item/ReaderTools";
 import { OutlineSheet } from "../components/ui/OutlineSheet";
 import { scrollToAnchor } from "../lib/motion";
@@ -67,8 +70,9 @@ export function meta({ loaderData }: Route.MetaArgs) {
     image: `/og/items/${item.id}.png`,
     type: "article",
     noindex: !item.indexable,
+    googleNoindex: item.googleNoindex,
     jsonLd: [
-      articleLd({ path: `/items/${item.id}`, headline: item.title, description: item.summary, publishedAt: item.publishedAt, image: `/og/items/${item.id}.png`, basedOn: item.links.original }),
+      articleLd({ path: `/items/${item.id}`, headline: item.title, description: item.summary, publishedAt: item.publishedAt ?? item.discoveredAt, image: `/og/items/${item.id}.png`, basedOn: item.links.original }),
       breadcrumbLd([
         { name: SITE.name, path: "/" },
         { name: item.selected ? "精选" : "全部动态", path: item.selected ? "/" : "/all" },
@@ -155,6 +159,33 @@ function hostOf(url: string): string {
   }
 }
 
+/** The byline, unless the source's name already says it (公众号：卡尔的AI沃茨 by AI沃茨, Claude：YouTube by Claude). */
+function bylineOf(author: string | null, source: string): string | null {
+  const key = (s: string) => s.toLowerCase().replace(/[\s\p{P}]/gu, "");
+  const a = author ? key(author) : "";
+  const s = key(source);
+  return a && !s.includes(a) && !a.includes(s) ? author : null;
+}
+
+/** "11月7日 AI 日报 · 头条": the daily that carries the article, named as the site names its issues. */
+function dailyName(daily: NonNullable<SiteItemDetail["daily"]>): string {
+  return `${reportDateLabel("daily", daily.key)} ${withSubject(REPORT_NAMES.daily)}${daily.lead ? " · 头条" : ""}`;
+}
+
+/**
+ * The tag chips that go beside the article's topic chips (every place showing tags shows all its topics): a
+ * tag that is a topic's own leads to the topic's page, not to a filtered list search engines are kept from,
+ * and beside that topic's chip it is not repeated.
+ */
+function tagChips(item: SiteItemDetail): Array<{ tag: string; to: string }> {
+  const shown = new Set(item.topics.map((t) => t.slug));
+  return item.tags.flatMap((tag) => {
+    const topic = item.tagTopics[tag];
+    if (topic && shown.has(topic)) return [];
+    return [{ tag, to: topic ? `/topics/${topic}` : `/all?tag=${encodeURIComponent(tag)}` }];
+  });
+}
+
 async function shareOrCopy(item: Pick<SiteItemDetail, "id" | "title">): Promise<"shared" | "copied" | null> {
   const url = `${siteUrl()}/items/${item.id}`;
   try {
@@ -205,11 +236,13 @@ export default function ItemPage() {
 function ItemPreview({ preview }: { preview: FeedItemSummary }) {
   const [toast, setToast] = useToast();
   const isX = preview.channel === "x" && !!preview.x;
+  // A post reads under its author; one that publishes a long X Article reads like an article, under its headline.
+  const isPost = isX && !preview.x!.article;
   // Without a reliable date from the original, the card's time is when it was collected, and says so.
   const shownAt = preview.publishedAt ?? preview.timelineAt;
   return (
     <div className="mx-auto max-w-[var(--page-max-reading)] pb-8">
-      <PhoneBar back={{ to: preview.selected ? "/" : "/all", label: preview.selected ? "精选" : "全部" }} title={isX ? preview.x!.authorName : preview.title} />
+      <PhoneBar back={{ to: preview.selected ? "/" : "/all", label: preview.selected ? "精选" : "全部" }} title={isPost ? preview.x!.authorName : preview.title} />
       <article className="pb-6 pt-3" aria-busy="true">
         <div className="mb-3 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px] text-ink-3">
           <span className="font-semibold text-ink-2">{isX ? preview.x!.authorName : preview.source.name}</span>
@@ -224,11 +257,11 @@ function ItemPreview({ preview }: { preview: FeedItemSummary }) {
             </span>
           )}
         </div>
-        {!isX && <h1 data-page-title="" className="text-[26px] font-bold leading-[1.38] tracking-[-0.01em] text-ink">{preview.title}</h1>}
+        {!isPost && <h1 data-page-title="" className="text-[26px] font-bold leading-[1.38] tracking-[-0.01em] text-ink">{preview.title}</h1>}
         {preview.summary && (
-          <section className={isX ? "mt-4" : "mt-7"}>
-            <div className="mb-2 text-[12px] font-semibold text-accent">{isX && preview.summary.replace(/\s+/g, " ").trim() === preview.title ? "原文" : "AI 导读"}</div>
-            <p className="text-[18px] leading-[1.7] text-ink">{preview.summary}</p>
+          <section className={isPost ? "mt-4" : "mt-7"}>
+            <div className="mb-2 text-[12px] font-semibold text-accent">{isPost && preview.summary.replace(/\s+/g, " ").trim() === preview.title ? "原文" : "AI 导读"}</div>
+            <p className="text-[18px] leading-[1.7] text-ink"><MentionText runs={addressRuns(preview.summary)} /></p>
           </section>
         )}
         {preview.reason && (
@@ -317,6 +350,9 @@ function ItemView({ item, followups }: Loaded) {
   const bodyHtml = lang === "zh" ? (item.body?.zh ?? item.body?.original) : (item.body?.original ?? item.body?.zh);
   const bodyLabel = !item.body ? null : lang === "zh" && item.body.zhKind === "translation" ? "正文 · AI 翻译" : lang === "original" ? "正文 · 原文" : "正文";
   const isX = item.channel === "x" && !!item.x;
+  // A post reads under its author; one that publishes a long X Article reads like an article, under its headline.
+  const isPost = isX && !item.x!.article;
+  const byline = isX ? null : bylineOf(item.author, item.source.name);
   // Without a reliable date from the original, the time shown is when it was collected, labelled as such.
   const shownAt = item.publishedAt ?? item.discoveredAt;
   const timeLabel = item.publishedAt ? "发布时间" : "收录时间";
@@ -325,6 +361,9 @@ function ItemView({ item, followups }: Loaded) {
   const originalLabel = isX ? "在 X 查看原推" : "打开原文";
 
   const related = item.relatedStories.filter((s) => s.publicId !== item.story?.publicId);
+  const [summaryRuns] = useMemo(() => linkMentions([item.summary], item.mentions), [item.summary, item.mentions]);
+  const daily = item.daily && { to: `/daily/${item.daily.key}`, name: dailyName(item.daily) };
+  const tags = tagChips(item);
 
   const back = () => {
     if (window.history.state?.idx > 0) navigate(-1);
@@ -396,14 +435,14 @@ function ItemView({ item, followups }: Loaded) {
     <RailSection title="来源">
       <div className="text-[14px] font-semibold leading-snug text-ink">{isX ? item.x!.authorName : item.source.name}</div>
       <div className="mt-1 text-[12.5px] leading-relaxed text-ink-3">
-        {isX ? `@${item.x!.handle} · X` : item.author ?? hostOf(item.links.original)}
+        {isX ? `@${item.x!.handle} · X` : byline ?? hostOf(item.links.original)}
       </div>
       <div className="mt-3 text-[12px] text-ink-4">{timeLabel}</div>
       <time dateTime={shownAt} className="mono mt-0.5 block text-[12.5px] text-ink-2">
         {fullDateTime(shownAt)}
       </time>
-      <div className="mt-0.5 text-[12px] text-ink-4" suppressHydrationWarning>
-        {relativeTime(shownAt)}
+      <div className="mt-0.5 text-[12px] text-ink-4 empty:hidden" suppressHydrationWarning>
+        {timeAgo(shownAt)}
       </div>
     </RailSection>
   );
@@ -418,6 +457,15 @@ function ItemView({ item, followups }: Loaded) {
       ) : (
         verdict && <RailSection title={shownScore(item.score) !== null ? "AI 评分" : undefined}>{verdict}</RailSection>
       )}
+      {daily && (
+        <RailSection title="收录于">
+          <div className="flex flex-wrap gap-1.5">
+            <Link viewTransition to={daily.to} className="chip">
+              {daily.name}
+            </Link>
+          </div>
+        </RailSection>
+      )}
       {item.topics.length > 0 && (
         <RailSection title="主题">
           <div className="flex flex-wrap gap-1.5">
@@ -429,12 +477,12 @@ function ItemView({ item, followups }: Loaded) {
           </div>
         </RailSection>
       )}
-      {item.tags.length > 0 && (
+      {tags.length > 0 && (
         <RailSection title="标签">
           <div className="flex flex-wrap gap-1.5">
-            {item.tags.slice(0, 8).map((t) => (
-              <Link key={t} to={`/all?tag=${encodeURIComponent(t)}`} className="chip">
-                #{t}
+            {tags.slice(0, 8).map(({ tag, to }) => (
+              <Link key={tag} to={to} className="chip">
+                #{tag}
               </Link>
             ))}
           </div>
@@ -450,7 +498,7 @@ function ItemView({ item, followups }: Loaded) {
       {/* Phones: back to where the reader came from, the title once it has scrolled away, more actions. */}
       <PhoneBar
         back={{ to: item.selected ? "/" : "/all", label: item.selected ? "精选" : "全部" }}
-        title={isX ? item.x!.authorName : item.title}
+        title={isPost ? item.x!.authorName : item.title}
         actions={
           <BarButton label="更多操作" onClick={() => setActionsOpen(true)}>
             <IconMore size={22} />
@@ -491,14 +539,14 @@ function ItemView({ item, followups }: Loaded) {
           </div>
         </div>
         <article className="pb-6 pt-3 lg:pt-2 2xl:pt-1">
-          <div className={`flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px] text-ink-3 2xl:hidden ${isX ? "" : "mb-3"}`}>
+          <div className={`flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px] text-ink-3 2xl:hidden ${isPost ? "" : "mb-3"}`}>
             <span className="font-semibold text-ink-2">{isX ? item.x!.authorName : item.source.name}</span>
             {isX && <span>· @{item.x!.handle} · X</span>}
-            {item.author && !isX && <span>· {item.author}</span>}
+            {byline && <span>· {byline}</span>}
             <span>·</span>
             {!item.publishedAt && <span>收录于</span>}
             <time dateTime={shownAt} className="mono">{fullDateTime(shownAt)}</time>
-            <span suppressHydrationWarning>· {relativeTime(shownAt)}</span>
+            <span className="empty:hidden" suppressHydrationWarning>{timeAgo(shownAt) && `· ${timeAgo(shownAt)}`}</span>
             {item.selected && (
               <span className="ml-1 side:hidden">
                 {item.sameEvent ? <SameEventBadge /> : <SelectedBadge />}
@@ -510,13 +558,13 @@ function ItemView({ item, followups }: Loaded) {
               </span>
             )}
           </div>
-          {!isX && <h1 data-page-title="" className="text-[26px] font-bold leading-[1.38] tracking-[-0.01em] text-ink lg:text-[32px] lg:leading-[1.34] xl:text-[36px] xl:leading-[1.3]">{item.title}</h1>}
-          {!isX && item.originalTitle && <p className="mt-2.5 text-[14px] leading-relaxed text-ink-4">{item.originalTitle}</p>}
+          {!isPost && <h1 data-page-title="" className="text-[26px] font-bold leading-[1.38] tracking-[-0.01em] text-ink lg:text-[32px] lg:leading-[1.34] xl:text-[36px] xl:leading-[1.3]">{item.title}</h1>}
+          {!isPost && item.originalTitle && <p className="mt-2.5 text-[14px] leading-relaxed text-ink-4">{item.originalTitle}</p>}
 
-          {item.summary && (!isX || item.summary.replace(/\s+/g, " ").trim() !== item.title) && (
-            <section className={isX ? "mt-4" : "mt-7 xl:mt-8"}>
+          {item.summary && (!isPost || item.summary.replace(/\s+/g, " ").trim() !== item.title) && (
+            <section className={isPost ? "mt-4" : "mt-7 xl:mt-8"}>
               <div className="mb-2 text-[12px] font-semibold text-accent">{summaryOnly ? "摘要" : "AI 导读"}</div>
-              <p className="text-[18px] leading-[1.7] text-ink xl:text-[20px] xl:leading-[1.7]">{item.summary}</p>
+              <p className="text-[18px] leading-[1.7] text-ink xl:text-[20px] xl:leading-[1.7]"><MentionText runs={summaryRuns} /></p>
             </section>
           )}
 
@@ -570,7 +618,7 @@ function ItemView({ item, followups }: Loaded) {
           )}
 
           {isX && item.x!.media.length > 0 && <MediaGallery media={item.x!.media} postUrl={item.links.original} />}
-          {isX && item.x!.quoted?.text && <QuotedPost quoted={item.x!.quoted} original={lang === "original"} />}
+          {isX && item.x!.quoted?.html && <QuotedPost quoted={item.x!.quoted} original={lang === "original"} />}
 
           <p className="mt-8 text-[13px] text-ink-4">
             来源：
@@ -580,16 +628,21 @@ function ItemView({ item, followups }: Loaded) {
             <span> · {hostOf(item.links.original)}</span>
           </p>
 
-          {(item.topics.length > 0 || item.tags.length > 0) && (
+          {(daily || item.topics.length > 0 || tags.length > 0) && (
             <div className="mt-4 flex flex-wrap gap-1.5 side:hidden">
+              {daily && (
+                <Link viewTransition to={daily.to} className="chip">
+                  收录于 {daily.name}
+                </Link>
+              )}
               {item.topics.map((t) => (
                 <Link viewTransition key={t.slug} to={`/topics/${t.slug}`} className="chip">
                   {t.name}
                 </Link>
               ))}
-              {item.tags.slice(0, 6).map((t) => (
-                <Link key={t} to={`/all?tag=${encodeURIComponent(t)}`} className="chip">
-                  #{t}
+              {tags.slice(0, 6).map(({ tag, to }) => (
+                <Link key={tag} to={to} className="chip">
+                  #{tag}
                 </Link>
               ))}
             </div>

@@ -68,6 +68,7 @@ const CHECKS: Check[] = [
   moduleAlerts,
   // Follow-ups
   sourceFollowUps,
+  baiduPushFailing,
   unknownOutcomes,
   agentTransportFindings,
   waitingQueues,
@@ -104,6 +105,7 @@ async function contentCollection(now: number, open: AlertState): Promise<Finding
     impact: last?.at ? `读者看不到新文章：最后一篇收录于 ${beijingStamp(last.at)}` : "读者看不到新文章：一天内没有收录任何文章",
     heals: ALERTS.usualFlow ? `没有，${ALERTS.usualFlow}` : "没有",
     action: "把这条发给 AI 排查处理",
+    agentFirst: true,
     detail: quietFor <= QUIET_FETCHING_MINUTES * 60_000
       ? `editorial articles.discovered_at 超过 ${QUIET_MINUTES} 分钟没有新值，期间没有一次成功的 editorial fetch_runs（热度信号单独评估）；查 worker、sources.schedule、出网代理与采集失败`
       : `editorial articles.discovered_at 超过 ${QUIET_FETCHING_MINUTES} 分钟没有新值（采集仍成功也算）；查采集结果为何一直是 new_count=0：解析、去重与入库`,
@@ -256,6 +258,27 @@ async function backupAge(now: number): Promise<Finding[]> {
     return [{ key: "backup.stale", level: "later", title: "数据库备份超过一天没成功", detail: b ? `最近一次 ${beijingStamp(b.value.at)}${state ? `（${state}）` : ""}；看 ops.backup` : "还没有成功的备份记录" }];
   }
   return [];
+}
+
+/**
+ * Baidu's push (operations/baidu-push.ts) failing for a whole day: a revoked token or a site that lost its
+ * verification does not heal, while Baidu answering "please retry later" for an hour does. Readers see
+ * nothing; new pages reach Baidu later, so it is a follow-up.
+ */
+async function baiduPushFailing(now: number): Promise<Finding[]> {
+  const [r] = await sql<{ since: Date | null; error: string | null }[]>`
+    WITH last_ok AS (SELECT max(started_at) AS at FROM job_runs WHERE job = 'seo.baidu-push' AND status = 'ok')
+    SELECT min(f.started_at) AS since, (array_agg(f.error ORDER BY f.started_at DESC))[1] AS error
+    FROM job_runs f, last_ok
+    WHERE f.job = 'seo.baidu-push' AND f.status = 'failed' AND f.started_at > coalesce(last_ok.at, '-infinity') AND f.started_at <= ${new Date(now)}`;
+  if (!r?.since || now - r.since.getTime() < DAY_MS) return [];
+  return [{
+    key: "seo.baidu-push",
+    level: "later",
+    title: "百度主动推送一天没成功",
+    detail: `从 ${beijingStamp(r.since)} 起 seo.baidu-push 一直失败，最近一次：${(r.error ?? "").slice(0, 200)}；401 是令牌失效（百度搜索资源平台 · 普通收录 · API提交 重新取，写进生产 backend.env 的 BAIDU_PUSH_TOKEN），400 site error 是站点掉了验证（首页的 baidu-site-verification 标签）`,
+    since: r.since,
+  }];
 }
 
 /** What the site's modules find. */
@@ -568,7 +591,7 @@ export async function checkAlerts(now = Date.now()) {
     // Claim AI was notified only after the hub actually accepts this incident's wake; persist the occurrence
     // timestamp first so a failed owner send or crash after waking cannot mint a second incident ID on retry.
     let woken = false;
-    if (handing && f.key !== "webhook.transport" && f.owner !== "only" && f.action === "把这条发给 AI 排查处理") {
+    if (handing && f.agentFirst) {
       if (!open) {
         const entry = { title: f.title, since: since.toISOString() };
         state[f.key] = entry;
@@ -599,7 +622,7 @@ export async function checkAlerts(now = Date.now()) {
       continue;
     }
     const [dropped] = key === "deliveries.failed" ? await sql`SELECT count(*)::int AS n FROM deliveries d
-      WHERE d.status='failed' AND d.updated_at>${new Date(Date.parse(open.since)-86400_000)}
+      WHERE d.status IN ('failed','skipped') AND d.updated_at>${new Date(Date.parse(open.since)-86400_000)}
         AND EXISTS(SELECT 1 FROM audit_log a WHERE a.action='delivery.drop' AND a.subject='delivery:' || d.id AND a.created_at>=d.updated_at)` : [];
     const msg = formatRecovery(open.title, new Date(open.since), now);
     if (dropped?.n) await sendAlert(`已结束跟进：${open.title}`, [`${dropped.n} 条旧通知已决定不再补发，未确认送达`]);

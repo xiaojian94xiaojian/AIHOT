@@ -8,6 +8,7 @@ export {
   QueryError,
   sendJsonWithEtag,
   sendJsonWithNotice,
+  sendPageMarkdown,
   sendProblem,
   sendTextWithEtag,
   strictQuery,

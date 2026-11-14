@@ -5,7 +5,7 @@
 import { sql, type Tx } from "../db.ts";
 import { audit } from "../audit.ts";
 import { enqueue, QUEUES } from "../jobs/queue.ts";
-import { publishArticle, republishTx } from "../publication/publish.ts";
+import { republishTx } from "../publication/publish.ts";
 
 /** The moves of a story merge, in the caller's transaction. Null when missing/already merged, or when grouping would change an editor-confirmed identity. */
 async function mergeStoryTx(tx: Tx, fromId: number, intoId: number, actor: string): Promise<true | null> {
@@ -31,15 +31,21 @@ async function mergeStoryTx(tx: Tx, fromId: number, intoId: number, actor: strin
 /** Null when missing/already merged, or when grouping would change an editor-confirmed identity. */
 export async function mergeStoryInto(fromId: number, intoId: number, reason: string, actor: string): Promise<{ moved: number } | null> {
   if (fromId === intoId) throw new Error("cannot merge a story into itself");
-  const articles = await sql.begin(async (tx) => {
+  return sql.begin(async (tx) => {
+    // Locks in mergeFactInto's order, facts, then their reports, then the stories: corrections and
+    // grouping take an article's row lock before its story's, a single publication before its fact's
+    // seat, and each republication below holds its seat until commit. NO KEY UPDATE leaves the key
+    // share a new membership takes on its fact free.
+    await tx`SELECT 1 FROM facts WHERE story_id IN (${fromId}, ${intoId}) ORDER BY id FOR NO KEY UPDATE`;
+    const ids = (await tx<{ article_id: string }[]>`SELECT DISTINCT fa.article_id FROM fact_articles fa JOIN facts f ON f.id = fa.fact_id WHERE f.story_id IN (${fromId}, ${intoId})`).map((r) => r.article_id);
+    await tx`SELECT 1 FROM articles WHERE id = ANY(${ids}) ORDER BY id FOR UPDATE`;
     if (!(await mergeStoryTx(tx, fromId, intoId, actor))) return null;
-    return tx<{ article_id: string }[]>`SELECT DISTINCT fa.article_id FROM fact_articles fa JOIN facts f ON f.id = fa.fact_id WHERE f.story_id = ${intoId}`;
+    const articles = await tx<{ article_id: string }[]>`SELECT DISTINCT fa.article_id FROM fact_articles fa JOIN facts f ON f.id = fa.fact_id WHERE f.story_id = ${intoId}`;
+    for (const a of articles) await republishTx(tx, a.article_id);
+    await enqueue(QUEUES.digest, { storyId: intoId }, { singletonKey: `story:${intoId}` }, tx);
+    await audit(actor, "story.merge", `story:${fromId}`, reason, null, { into: intoId }, { db: tx });
+    return { moved: articles.length };
   });
-  if (!articles) return null;
-  for (const a of articles) await publishArticle(a.article_id);
-  await enqueue(QUEUES.digest, { storyId: intoId }, { singletonKey: `story:${intoId}` });
-  await audit(actor, "story.merge", `story:${fromId}`, reason, null, { into: intoId });
-  return { moved: articles.length };
 }
 
 /**

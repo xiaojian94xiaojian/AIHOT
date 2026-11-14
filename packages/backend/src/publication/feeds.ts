@@ -8,8 +8,10 @@ import { config } from "../config.ts";
 import { sql } from "../db.ts";
 import { escapeXml } from "../lib/text.ts";
 import { proxyBodyImages } from "../media/imgproxy.ts";
+import { withCover, type Cover } from "../content/cover.ts";
 import { feedIssues, type FeedIssue, type ReportKind } from "./reports.ts";
 import { textToHtml } from "../content/sanitize.ts";
+import { xArticleBody } from "../content/posts.ts";
 import { publicCategoryCondition, exportTranslation, xView, type ItemRow } from "./items.ts";
 import { publicSourceName } from "./rules.ts";
 import { SELECTION } from "@aihot/industry/selection";
@@ -80,7 +82,7 @@ ${items.join("\n")}
 
 type FeedRow = Pick<ItemRow, "id" | "title" | "summary" | "url" | "category" | "published_at" | "source_name"> &
   Partial<Pick<ItemRow, "channel" | "x_post" | "x_article" | "zh_text" | "quoted_zh" | "language"> & {
-    syndicate: boolean; body_text: string | null; body_html: string | null; tr_html: string | null; tr_complete: boolean | null;
+    syndicate: boolean; body_text: string | null; body_html: string | null; cover: Cover | null; tr_html: string | null; tr_complete: boolean | null;
   }>;
 
 /** Readers keep feed items for days: body images in full RSS are signed for a week, not a day. */
@@ -95,7 +97,12 @@ function fullContent(r: FeedRow, aihot: string): string | null {
   let html: string | null = null;
   const x = r.channel === "x" ? xView({ x_post: r.x_post ?? null, x_article: r.x_article ?? null, zh_text: r.zh_text ?? null, quoted_zh: r.quoted_zh ?? null }) : null;
   if (x) {
-    html = textToHtml(x.translation ?? x.text);
+    // A long X Article as its page shows it (after what the post says besides its link), in Chinese when
+    // its translation is complete, as an article's body is.
+    const article = r.x_article?.html;
+    html = article
+      ? exportTranslation({ language: r.language, body_text: r.x_article?.text ?? "", tr_html: r.tr_html, tr_complete: r.tr_complete }) ?? xArticleBody(String(r.x_post?.text ?? ""), article)
+      : textToHtml(x.translation ?? x.text);
     if (x.quoted?.text) {
       html += `<blockquote><p>引用 @${escapeXml(x.quoted.handle)}：</p>${textToHtml(x.quoted.translation ?? x.quoted.text)}${x.quoted.url ? `<p><a href="${escapeXml(x.quoted.url)}">${escapeXml(x.quoted.url)}</a></p>` : ""}</blockquote>`;
     }
@@ -107,7 +114,7 @@ function fullContent(r: FeedRow, aihot: string): string | null {
         : `<p><img src="${escapeXml(url)}" alt="${escapeXml(String(media.alt ?? ""))}"></p>`;
     }
   } else if (r.body_html) {
-    html = exportTranslation(r) ?? r.body_html;
+    html = withCover(exportTranslation(r) ?? r.body_html, r.cover, r.body_html);
   }
   if (!html) return null;
   return `${proxyBodyImages(html, true, FEED_IMAGE_SECONDS)}<p>—— 本文由 ${escapeXml(SITE.name)} 聚合整理，完整版与${escapeXml(subjectAfter("更多", "动态"))}见 <a href="${aihot}">${aihot}</a></p>`;
@@ -154,7 +161,7 @@ export async function itemFeed(kind: ItemFeedKind, category: PublicApiCategoryKe
     SELECT p.article_id AS id, p.title, p.summary, p.url, p.category, p.published_at, s.name AS source_name
       ${includeContent ? sql`, p.channel, p.syndicate, a.language, a.x_post, a.x_article,
         CASE WHEN p.channel = 'x' THEN tr.body_text END AS zh_text, qt.text_zh AS quoted_zh,
-        a.body_text, a.body_html, tr.body_html AS tr_html, tr.complete AS tr_complete` : sql``}
+        a.body_text, a.body_html, a.cover, tr.body_html AS tr_html, tr.complete AS tr_complete` : sql``}
     FROM page JOIN publications p ON p.article_id = page.article_id JOIN sources s ON s.id = p.source_id
     ${includeContent ? sql`LEFT JOIN articles a ON a.id = p.article_id AND p.syndicate
       LEFT JOIN translations tr ON tr.article_id = p.article_id AND tr.lang = 'zh' AND tr.revision >= a.revision

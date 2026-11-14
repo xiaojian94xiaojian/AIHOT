@@ -24,8 +24,12 @@ export interface PageMetaInput {
   rawTitle?: boolean;
   description?: string | null;
   path: string;
+  /** Optional in-site Markdown representation for machine readers. */
+  markdown?: string;
   image?: string | null;
   noindex?: boolean;
+  /** Only Google is asked not to index the page; other engines index it unless `noindex`. */
+  googleNoindex?: boolean;
   nofollow?: boolean;
   type?: "website" | "article";
   jsonLd?: Record<string, unknown> | Array<Record<string, unknown>>;
@@ -94,7 +98,13 @@ export function pageMeta(input: PageMetaInput): MetaDescriptor[] {
     { name: "twitter:description", content: description },
     { name: "twitter:image", content: image },
   ];
+  if (input.markdown) tags.push({ tagName: "link", rel: "alternate", type: "text/markdown", href: `${base}${input.markdown}` });
   if (input.noindex) tags.push({ name: "robots", content: input.nofollow ? "noindex, nofollow" : "noindex, follow" });
+  else {
+    // Search results and Discover may show an indexable page's picture large, as they do for news sites.
+    tags.push({ name: "robots", content: "max-image-preview:large" });
+    if (input.googleNoindex) tags.push({ name: "googlebot", content: "noindex" });
+  }
   if (input.jsonLd) tags.push({ "script:ld+json": input.jsonLd });
   return tags;
 }
@@ -132,6 +142,15 @@ export function breadcrumbLd(items: Array<{ name: string; path: string }>) {
 }
 
 const orgRef = () => ({ "@id": `${siteUrl()}/#organization` });
+
+/**
+ * The site as an article's author and publisher, spelled out: the id alone resolves only where the full
+ * Organization node is on the same page (the home and about pages), so an article page would name no one.
+ */
+function siteOrganization() {
+  const base = siteUrl();
+  return { "@type": "Organization", "@id": `${base}/#organization`, name: SITE.organization.name, url: base, logo: { "@type": "ImageObject", url: `${base}/icon.png` } };
+}
 
 /**
  * The home page's machine description: the site, and the site as a dataset with its feeds and API.
@@ -213,8 +232,8 @@ export function articleLd(input: { path: string; headline: string; description?:
     ...(input.image ? { image: new URL(input.image, base).href } : {}),
     ...(input.section?.length ? { articleSection: input.section } : {}),
     isAccessibleForFree: true,
-    author: orgRef(),
-    publisher: orgRef(),
+    author: siteOrganization(),
+    publisher: siteOrganization(),
     ...(input.basedOn ? { isBasedOn: input.basedOn } : {}),
   };
 }
@@ -235,9 +254,36 @@ export function archiveLd(path: string, name: string, entries: Array<{ path: str
 
 /** An issue's Chinese date and actual editorial lead, falling back only to a still-public visible highlight. */
 export function reportTitle(report: ReportDetail): string {
-  const lead = report.lead?.title.trim() || report.highlights.find((item) => item.available)?.title.trim();
+  // Without a lead, the first highlight the issue carries as an entry heads it; the reports a thin daily's
+  // highlights were filled with are not its news.
+  const entries = new Set(report.sections.flatMap((s) => s.items.map((i) => i.itemId)));
+  const lead = report.lead?.title.trim() || report.highlights.find((item) => item.available && entries.has(item.itemId))?.title.trim();
   const name = `${withSubject(REPORT_NAMES[report.kind])}｜${reportDateLabel(report.kind, report.key)}`;
   return lead ? `${name}：${lead}` : name;
+}
+
+/**
+ * What an issue says, for search results. A daily by its own headlines: its lead's paragraph is that article's
+ * own description, and two pages that read alike compete for one result. A weekly or monthly by its lead or
+ * overview. Null when the issue has neither.
+ */
+export function reportDescription(r: ReportDetail): string | null {
+  const date = reportDateLabel(r.kind, r.key);
+  if (r.kind === "daily") {
+    const titles = [...new Set([r.lead?.title, ...r.highlights.filter((h) => h.available).map((h) => h.title)]
+      .map((t) => t?.trim()).filter((t): t is string => !!t))];
+    if (titles.length) {
+      // As many as a result shows in full (about 150 characters).
+      let text = titles[0]!;
+      for (const t of titles.slice(1)) {
+        if (text.length + t.length > 120) break;
+        text += `；${t}`;
+      }
+      return `${date} ${withSubject("新闻")}：${text}${/[。！？!?]$/.test(text) ? "" : "。"}`;
+    }
+  }
+  const lead = r.lead?.leadParagraph ?? r.overview?.slice(0, 150);
+  return lead ? `${date} ${withSubject("资讯")}：${lead}` : null;
 }
 
 /** One report issue: an editorial round-up by the site (no personal byline), sections as its sections. */
@@ -269,6 +315,7 @@ export function storyLd(story: StoryDetail) {
     ...(description ? { description } : {}),
     inLanguage: SITE.locale,
     isPartOf: { "@id": `${base}/#website` },
+    publisher: siteOrganization(),
     ...(updated ? { dateModified: updated } : {}),
     ...(reports.length ? {
       mainEntity: {
