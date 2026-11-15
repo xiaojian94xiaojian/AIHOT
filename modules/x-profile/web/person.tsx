@@ -390,7 +390,7 @@ function PostList({ posts, followers }: { posts: XPost[]; followers?: number | n
 }
 
 export default function PersonPage() {
-  const { person, structure, weekly, trend, hours, weekdays, heatmap, formats, hits, best, categories, tags, languages, media, topPosts, growth } = useLoaderData<typeof loader>();
+  const { person, structure, weekly, trend, hours, weekdays, heatmap, formats, hits, best, categories, tags, languages, media, topPosts, recentPosts, growth } = useLoaderData<typeof loader>();
   const [heatMetric, setHeatMetric] = useState<"medViews" | "posts">("medViews");
   // 当前小时只在客户端算：SSR 和 hydration 跨小时会不一致，页面还被 edge 缓存 10 分钟。
   const [nowHour, setNowHour] = useState<number | null>(null);
@@ -692,6 +692,10 @@ export default function PersonPage() {
           </p>
         </Section>
       </div>
+
+      <Section className="mt-3" title="最近发布" hint="按时间倒序，最近 10 条">
+        <PostList posts={recentPosts} followers={person.followers} />
+      </Section>
 
       <Section className="mt-3" title="浏览最高的帖子" hint="按浏览排序">
         <PostList posts={topPosts} followers={person.followers} />

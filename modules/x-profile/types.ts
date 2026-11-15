@@ -147,6 +147,8 @@ export interface XPersonResponse {
   languages: XCount[];
   media: XCount[];
   topPosts: XPost[];
+  /** 最近发布的 10 条（按时间倒序，含回复），用来查看刚发出的帖子是否还在试水位。 */
+  recentPosts: XPost[];
   /** 粉丝快照与涨粉；这个账号还没有快照时为 null。 */
   growth: XPersonGrowth | null;
 }

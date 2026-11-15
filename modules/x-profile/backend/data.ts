@@ -271,7 +271,7 @@ export async function loadPerson(handle: string): Promise<XPersonResponse | null
   const id = who.source_id;
   const resolvedHandle = who.handle ?? handle;
 
-  const [[row], weekly, hours, weekdays, categories, tags, languages, media, topRows, heatRows, hitsRows, formats] = await Promise.all([
+  const [[row], weekly, hours, weekdays, categories, tags, languages, media, topRows, recentRows, heatRows, hitsRows, formats] = await Promise.all([
     sql<SummaryRow[]>`WITH p AS (${posts(id)}) SELECT ${SUMMARY} FROM p WHERE source_id = ${id} GROUP BY source_id`,
     sql<{ week: string; posts: number; med_views: string; likes: string; views: string }[]>`
       WITH p AS (${posts(id)})
@@ -320,6 +320,12 @@ export async function loadPerson(handle: string): Promise<XPersonResponse | null
       WHERE a.source_id = ${id} AND a.published_at > now() - make_interval(days => ${WINDOW_DAYS})
         AND ${notWithdrawn}
       ORDER BY coalesce((a.raw->>'views')::bigint, 0) DESC LIMIT 12
+    `,
+    sql<PostRow[]>`
+      SELECT ${postColumns} FROM articles a
+      WHERE a.source_id = ${id} AND a.published_at > now() - make_interval(days => ${WINDOW_DAYS})
+        AND ${notWithdrawn}
+      ORDER BY a.published_at DESC LIMIT 10
     `,
     sql<{ weekday: number; hour: number; posts: number; med_views: string }[]>`
       WITH p AS (${posts(id)})
@@ -433,6 +439,7 @@ export async function loadPerson(handle: string): Promise<XPersonResponse | null
     languages,
     media,
     topPosts: topRows.map((r) => withInsight(toPost(r, resolvedHandle), followers)),
+    recentPosts: recentRows.map((r) => withInsight(toPost(r, resolvedHandle), followers)),
     // 粉丝快照在 followers.ts 里读：接口层把 loadPersonGrowth 的结果填进来。
     growth: null,
   };

@@ -103,3 +103,26 @@ test("withdrawn posts leave the profile; summary-only and unpublished ones stay"
   await sql`DELETE FROM articles WHERE source_id = 'x-account-lab-c'`;
   await sql`DELETE FROM sources WHERE id = 'x-account-lab-c'`;
 });
+
+test("recent posts are the newest ten, in time order", async () => {
+  await sql`DELETE FROM articles WHERE source_id = 'x-account-recent'`;
+  await sql`
+    INSERT INTO sources (id, name, kind, config) VALUES
+      ('x-account-recent', '@Recent', 'x_search', ${sql.json({ query: "from:Recent -filter:replies" })})
+    ON CONFLICT (id) DO NOTHING`;
+  const now = Date.now();
+  for (let n = 1; n <= 12; n += 1) {
+    const at = new Date(now - n * 3_600_000);
+    await sql`
+      INSERT INTO articles (id, source_id, identity_key, url, title, language, published_at, discovered_at, timeline_at, raw, x_post)
+      VALUES (${`recent-${n}`}, 'x-account-recent', ${`test:recent-${n}`}, ${`https://x.com/recent/${n}`}, ${`recent ${n}`}, 'zh', ${at}, ${at}, ${at},
+              ${sql.json({ views: n * 10 })}, ${sql.json({ handle: "Recent", lang: "zh", text: `recent ${n}` })})`;
+  }
+  const person = await loadPerson("Recent");
+  assert.equal(person?.recentPosts.length, 10, "only the latest ten");
+  assert.deepEqual(person?.recentPosts.map((post) => post.text), [
+    "recent 1", "recent 2", "recent 3", "recent 4", "recent 5", "recent 6", "recent 7", "recent 8", "recent 9", "recent 10",
+  ], "newest first");
+  await sql`DELETE FROM articles WHERE source_id = 'x-account-recent'`;
+  await sql`DELETE FROM sources WHERE id = 'x-account-recent'`;
+});
