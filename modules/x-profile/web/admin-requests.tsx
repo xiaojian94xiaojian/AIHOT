@@ -29,6 +29,7 @@ const STATUS: Record<string, { label: string; tone: "ok" | "bad" | "muted" | "ac
 export default function AdminRequests({ loaderData }: { loaderData: Data }) {
   const { run, pending } = useAdminAction();
   const [rejecting, setRejecting] = useState<XAccountRequest | null>(null);
+  const [approving, setApproving] = useState<XAccountRequest | null>(null);
 
   const review = (r: XAccountRequest, action: "approve" | "reject", reason: string | null) =>
     run("POST", `/api/admin/x-people/requests/${encodeURIComponent(r.handle)}`, { action, reason }, {
@@ -73,7 +74,7 @@ export default function AdminRequests({ loaderData }: { loaderData: Data }) {
                 </div>
                 {r.status === "pending" && (
                   <div className="flex shrink-0 gap-2">
-                    <Button size="sm" busy={pending === `approve-${r.handle}`} onClick={() => review(r, "approve", null)}>
+                    <Button size="sm" busy={pending === `approve-${r.handle}`} onClick={() => setApproving(r)}>
                       通过并收录
                     </Button>
                     <Button size="sm" tone="ghost" onClick={() => setRejecting(r)}>
@@ -98,6 +99,22 @@ export default function AdminRequests({ loaderData }: { loaderData: Data }) {
           if (!rejecting) return false;
           const done = await review(rejecting, "reject", reason);
           if (done !== null) setRejecting(null);
+          return done !== null;
+        }}
+      />
+
+      <ReasonDialog
+        open={approving !== null}
+        title={`通过并收录 @${approving?.handle ?? ""}`}
+        description={<>会立刻建立一个 hot_signal 采集源（120 分钟一读，付费），并出现在榜单和画像里；这个页面里不能撤销。</>}
+        confirmLabel="通过并收录"
+        requireReason={false}
+        busy={pending === `approve-${approving?.handle ?? ""}`}
+        onClose={() => setApproving(null)}
+        onSubmit={async () => {
+          if (!approving) return false;
+          const done = await review(approving, "approve", null);
+          if (done !== null) setApproving(null);
           return done !== null;
         }}
       />
