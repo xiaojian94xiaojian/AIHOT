@@ -173,6 +173,14 @@ export default function TodayPage() {
               <div className="num mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-ink-3 pt-2 border-t border-line-soft">
                 <span>浏览 {compact(card.commentable.views)}</span>
                 <span>回复 {card.commentable.replies}</span>
+                {card.commentable.early && (
+                  <span
+                    className="rounded-full bg-amber/10 px-1.5 py-0.5 text-[10.5px] text-amber"
+                    title="小号刚发、浏览还少：还在 X 的试水位上，低互动不代表内容不行，别急着删或下结论"
+                  >
+                    还在试水期
+                  </span>
+                )}
                 <a href={card.commentable.url} target="_blank" rel="noreferrer" className="ml-auto text-accent hover:underline font-bold">去 X 回复 →</a>
               </div>
             </div>
@@ -252,6 +260,14 @@ export default function TodayPage() {
                       <span className="font-semibold text-ink-3">@{tw.handle}</span>
                       <span>浏览 {compact(tw.views)}</span>
                       <span>回复 {tw.replies}</span>
+                      {tw.early && (
+                        <span
+                          className="rounded-full bg-amber/10 px-1.5 py-0.5 text-[10.5px] text-amber"
+                          title="小号刚发、浏览还少：还在 X 的试水位上，低互动不代表内容不行"
+                        >
+                          还在试水期
+                        </span>
+                      )}
                       <a href={tw.url} target="_blank" rel="noreferrer" className="ml-auto text-accent hover:underline font-medium">看原帖 →</a>
                     </div>
                   </div>

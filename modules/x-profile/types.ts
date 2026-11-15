@@ -403,6 +403,10 @@ export interface XCommentable {
   reason: string;
   /** 剩余机会分：窗口内预计剩余浏览 ÷（已有回复 + 平滑），越大越值得现在回。 */
   opportunity?: number | null;
+  /** 作者最近一次快照的粉丝数；没有快照为 null。 */
+  authorFollowers?: number | null;
+  /** 冷启动：粉丝 ≤5 万、发出 ≤2 小时、浏览 <200，还在 X 的试水位上。 */
+  early?: boolean;
 }
 
 /** 今天发什么：一条可以现在写的选题（站内热度 + 48 小时里的 X 讨论量）。 */

@@ -114,8 +114,8 @@ async function referencesOf(storyIds: number[]): Promise<Map<number, XPost[]>> {
  */
 async function commentablesOf(storyIds: number[]): Promise<Map<number, XCommentable[]>> {
   if (storyIds.length === 0) return new Map();
-  const rows = await sql<{ story_id: number; id: string; handle: string | null; author: string | null; text: string | null; tweet_id: string | null; published_at: Date; views: string; replies: string; likes: string }[]>`
-    SELECT story_id, id, handle, author, text, tweet_id, published_at, views, replies, likes FROM (
+  const rows = await sql<{ story_id: number; id: string; handle: string | null; author: string | null; text: string | null; tweet_id: string | null; published_at: Date; views: string; replies: string; likes: string; author_followers: string | null }[]>`
+    SELECT story_id, id, handle, author, text, tweet_id, published_at, views, replies, likes, author_followers FROM (
       SELECT ss.story_id, a.id,
              a.x_post->>'handle' AS handle,
              a.x_post->>'authorName' AS author,
@@ -125,6 +125,7 @@ async function commentablesOf(storyIds: number[]): Promise<Map<number, XCommenta
              coalesce((a.raw->>'views')::bigint, 0)::text AS views,
              coalesce((a.raw->>'reply')::bigint, 0)::text AS replies,
              coalesce((a.raw->>'favorite')::bigint, 0)::text AS likes,
+             f.followers::bigint AS author_followers,
              row_number() OVER (
                PARTITION BY ss.story_id
                ORDER BY coalesce((a.raw->>'views')::bigint, 0) DESC
@@ -132,6 +133,11 @@ async function commentablesOf(storyIds: number[]): Promise<Map<number, XCommenta
       FROM story_signals ss
       JOIN articles a ON a.id = ss.article_id
       LEFT JOIN x_account_meta m ON lower(m.handle) = lower(a.x_post->>'handle')
+      LEFT JOIN LATERAL (
+        SELECT s.followers FROM x_follower_snapshots s
+        WHERE s.handle = lower(a.x_post->>'handle')
+        ORDER BY s.captured_on DESC LIMIT 1
+      ) f ON true
       WHERE ss.story_id IN ${sql(storyIds.map(Number))}
         AND ss.observed_at > now() - make_interval(hours => ${WINDOW_HOURS}::int)
         AND coalesce(a.language, a.x_post->>'lang', '') LIKE 'zh%'
@@ -161,12 +167,20 @@ async function commentablesOf(storyIds: number[]): Promise<Map<number, XCommenta
       minutesAgo,
       opportunity: replyOpportunity({ views: Number(row.views), age: minutesAgo / 60, replies })?.score ?? null,
       reason: commentReason({ minutesAgo, views: Number(row.views), replies }),
+      authorFollowers: row.author_followers === null ? null : Number(row.author_followers),
+      // 冷启动：小号、刚发、浏览还很少——低互动不代表内容不行，别急着删或下结论。
+      early: isEarlyStart({ followers: row.author_followers === null ? null : Number(row.author_followers), minutesAgo, views: Number(row.views) }),
     });
     out.set(row.story_id, list);
   }
   // 同一话题下的候选按「剩余机会」重排：回复少、还在涨的排前面。
   for (const list of out.values()) list.sort((a, b) => (b.opportunity ?? 0) - (a.opportunity ?? 0));
   return out;
+}
+
+/** 冷启动：小号（≤5 万粉）、刚发（≤2 小时）、浏览还很少（<200）——低互动不代表内容不行。 */
+export function isEarlyStart(input: { followers: number | null; minutesAgo: number; views: number }): boolean {
+  return input.followers !== null && input.followers <= 50_000 && input.minutesAgo <= 120 && input.views < 200;
 }
 
 /** 「接一句」的理由：为什么这一条现在接得上（浏览和回复数已经显示在上一行，这里不重复）。 */

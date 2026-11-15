@@ -3,7 +3,7 @@ import "../../../tests/setup.ts";
 import assert from "node:assert/strict";
 import { after, test } from "node:test";
 import { closeDb } from "@aihot/backend/db";
-import { adviceOf, commentReason } from "../backend/today.ts";
+import { adviceOf, commentReason, isEarlyStart } from "../backend/today.ts";
 
 after(closeDb);
 
@@ -29,4 +29,13 @@ test("讨论很少但还新鲜是首发窗口，放久了提醒加结论", () =>
 test("可评帖的理由说清「多久前、多少浏览、多少回复」", () => {
   assert.match(commentReason({ minutesAgo: 150, views: 1200, replies: 3 }), /2\.5 小时前发的，刚起步/);
   assert.match(commentReason({ minutesAgo: 480, views: 320, replies: 12 }), /还没过 50/);
+});
+
+test("冷启动：小号、刚发、浏览少才提示，三条缺一条就不算", () => {
+  assert.equal(isEarlyStart({ followers: 12_000, minutesAgo: 40, views: 120 }), true);
+  assert.equal(isEarlyStart({ followers: 50_000, minutesAgo: 120, views: 199 }), true, "边界值算在内");
+  assert.equal(isEarlyStart({ followers: 50_001, minutesAgo: 40, views: 120 }), false, "粉丝过线不算");
+  assert.equal(isEarlyStart({ followers: 12_000, minutesAgo: 121, views: 120 }), false, "发出超过两小时不算");
+  assert.equal(isEarlyStart({ followers: 12_000, minutesAgo: 40, views: 200 }), false, "浏览到 200 不算");
+  assert.equal(isEarlyStart({ followers: null, minutesAgo: 40, views: 10 }), false, "没有粉丝快照时不下结论");
 });

@@ -322,7 +322,7 @@ function GrowthBlock({ growth, person, structure, categories, formats }: { growt
         <div className="min-w-0">
           <h3 className="text-[12.5px] font-medium text-ink">近 7 日代表帖<span className="ml-1.5 text-[11px] font-normal text-ink-4">浏览前 5 + 互动率前 3，最多 10 条</span></h3>
           <div className="mt-2">
-            {growth.topPosts.length ? <PostList posts={growth.topPosts} /> : <p className="text-[13px] text-ink-3">这一周还没有抓到它的帖子。</p>}
+            {growth.topPosts.length ? <PostList posts={growth.topPosts} followers={person.followers} /> : <p className="text-[13px] text-ink-3">这一周还没有抓到它的帖子。</p>}
           </div>
         </div>
       </div>
@@ -356,7 +356,7 @@ function GrowthBlock({ growth, person, structure, categories, formats }: { growt
   );
 }
 
-function PostList({ posts }: { posts: XPost[] }) {
+function PostList({ posts, followers }: { posts: XPost[]; followers?: number | null }) {
   if (!posts.length) return <p className="text-[13px] text-ink-3">暂无。</p>;
   return (
     <ol className="divide-y divide-line-soft">
@@ -367,6 +367,9 @@ function PostList({ posts }: { posts: XPost[] }) {
             <p className="line-clamp-2 break-words text-[13px] leading-relaxed text-ink">{post.text || "（无文字）"}</p>
             <div className="num mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-ink-3">
               <span className="text-ink-2">浏览 {compact(post.views)}</span>
+              {followers != null && followers <= 50_000 && post.views < 200 && Date.now() - new Date(post.at).getTime() <= 2 * 3_600_000 && (
+                <span className="rounded-full bg-amber/10 px-1.5 py-0.5 text-[10.5px] text-amber" title="小号刚发、浏览还少：还在 X 的试水位上，低互动不代表内容不行，别急着删">还在试水期</span>
+              )}
               {post.projected24h != null && <span title="按 X 热门池的 8 小时半衰模型，从采集那一刻反推">预计 24h {compact(post.projected24h)}</span>}
               {post.breakout != null && post.breakout >= 1.1 && (<span className="text-accent font-medium" title="看的人比关注它的人多：说明这条被推荐给了没关注它的人">浏览是粉丝的 {post.breakout.toFixed(1)} 倍</span>)}
               <span>赞 {compact(post.likes)}</span>
@@ -691,7 +694,7 @@ export default function PersonPage() {
       </div>
 
       <Section className="mt-3" title="浏览最高的帖子" hint="按浏览排序">
-        <PostList posts={topPosts} />
+        <PostList posts={topPosts} followers={person.followers} />
       </Section>
 
       <p className="mt-5 text-[11.5px] leading-relaxed text-ink-4">
