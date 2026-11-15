@@ -6,10 +6,10 @@ import http from "node:http";
 import { after, test } from "node:test";
 import { config } from "@aihot/backend/config";
 import { getBoss, enqueue, QUEUES, recordRun, stopBoss } from "@aihot/backend/jobs/queue";
-import { BudgetExceededError } from "@aihot/backend/providers/receipts";
 
 import { closeDb, sql } from "@aihot/backend/db";
 import { closeInterruptedRuns, runOwner } from "@aihot/backend/jobs/runs";
+import { BudgetExceededError } from "@aihot/backend/providers/receipts";
 
 after(async () => { await stopBoss(); await closeDb(); });
 

@@ -168,9 +168,16 @@ export interface RequestNotices {
   json: (req: FastifyRequest) => JsonNotice | null;
 }
 
+export interface Previewer {
+  name: string;
+  actor: string;
+}
+
 export interface ServerModule {
   /** Its folder under modules/. */
   name: string;
+  /** Who besides the engine's admin may open gray pages (ModulePage.gray) and read their data (admin/preview.ts). */
+  preview?: (cookieHeader: string | undefined) => Promise<Previewer | null>;
   /** Sources whose selected articles keep independent cards/seats without changing admission or event identity (publication/rules.ts, scope.ts). */
   independentSelectedSources?: readonly string[];
   /** Another account of an independent source's author, by source id: its post gives way to the article on the same news (events/cards.ts). */
@@ -201,6 +208,8 @@ export interface ServerModule {
     entries?: () => Promise<SitemapEntry[]>;
   };
   models?: Record<string, ModelStep>;
+  /** Paid services it supplies, named in provider-access and budget alerts (operations/alerts.ts). */
+  providers?: Record<string, { name: string; where: string; stops: string }>;
   /** Cron schedules (the worker). */
   schedules?: Scheduled[];
   /** What is wrong now, for the owner's alerts (operations/alerts.ts), after the engine's problems. */
@@ -269,6 +278,7 @@ let installed: readonly ServerModule[] = [];
 
 /** Called once by each process's entry point, and by a module's tests for that module. */
 export function installModules(modules: readonly ServerModule[]): void {
+  if (modules.filter((module) => module.preview).length > 1) throw new Error("Only one module may provide preview identity");
   installed = modules;
 }
 

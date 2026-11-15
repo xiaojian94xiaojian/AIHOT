@@ -103,9 +103,16 @@ export interface TopicPagePart {
   news: (data: unknown) => string[];
 }
 
+/** Where the reader's account shows: the 我的 page's first row, the desktop sidebar's foot, the 收藏 page's note, the 卡册. */
+export type AccountPlace = "me" | "sidebar" | "starred" | "album";
+
 export interface WebModule {
   /** Its folder under modules/. */
   name: string;
+  /** The reader's account, from a module that offers one, drawn where the place asks (before hydration: signed out). */
+  account?: ComponentType<{ place: AccountPlace }>;
+  /** The email of the reader signed in in this browser, or null (read after hydration). */
+  signedInEmail?: () => string | null;
   /** Desktop sidebar: entries in a section between the engine's 内容 and 更多; modules naming the same section share it. */
   sidebar?: { section: string; items: NavItem[] };
   /** Phone tab bar: tabs before 我的. */

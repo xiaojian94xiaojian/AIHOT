@@ -82,6 +82,11 @@ const OWNERS: Record<string, string> = {
   story_digests: "events/", grouping_decisions: "events/", grouping_overrides: "events/",
   audit_log: "audit.ts",
   feedback_submission_state: "operations/feedback.ts",
+  reader_previewers: "../../../modules/accounts/backend/",
+  reader_sync_usage: "../../../modules/accounts/backend/",
+  reader_accounts: "../../../modules/accounts/backend/", reader_logins: "../../../modules/accounts/backend/",
+  reader_sessions: "../../../modules/accounts/backend/", reader_codes: "../../../modules/accounts/backend/",
+  reader_code_sends: "../../../modules/accounts/backend/", reader_data: "../../../modules/accounts/backend/",
 };
 
 test("the tables that carry a rule are written only by the code that owns it", () => {
@@ -255,7 +260,7 @@ test("scripts read the reduced-motion preference only through lib/motion.ts", ()
   assert.deepEqual(found, [], "use reducedMotion() or scrollBehavior() from lib/motion.ts");
 });
 
-test("a gray page is the admin's alone: its loader goes through grayGet and answers with GRAY_HEADERS", async () => {
+test("a gray page is only for previewers: its loader goes through grayGet and answers with GRAY_HEADERS", async () => {
   const { MODULES } = await import("@aihot/site/modules");
   const gray = MODULES.flatMap((m) => (m.pages ?? []).flatMap((p) => ("layout" in p ? p.pages : [p])).filter((p) => p.gray).map((p) => `modules/${m.name}/${p.file}`));
   for (const file of gray) {
