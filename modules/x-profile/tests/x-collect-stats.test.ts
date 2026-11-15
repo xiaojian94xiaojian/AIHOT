@@ -3,7 +3,7 @@ import "../../../tests/setup.ts";
 import assert from "node:assert/strict";
 import { after, test } from "node:test";
 import { closeDb, sql } from "@aihot/backend/db";
-import { collectStatsFor, emptyRate, snapshotCollectStats } from "../backend/collect-stats.ts";
+import { beijingToday, budgetSkipsOn, collectStatsFor, emptyRate, snapshotCollectStats } from "../backend/collect-stats.ts";
 
 after(async () => {
   await sql`DELETE FROM receipts WHERE logical_key LIKE 'stats-test-%'`;
@@ -50,4 +50,11 @@ test("没有调用的一天是 0，不是 NaN", async () => {
   assert.equal(stat.calls, 0);
   assert.equal(stat.sources, 0);
   assert.equal(emptyRate(stat), 0);
+});
+
+test("预算跳过次数只数当天、只数 skipped", async () => {
+  const job = `stats-budget-${Date.now()}`;
+  await sql`INSERT INTO job_runs (job, status, finished_at) VALUES (${job}, 'skipped', now()), (${`${job}-ok`}, 'ok', now())`;
+  assert.equal(await budgetSkipsOn(beijingToday()), 1, "今天的 skipped 任务算一次，ok 的不算");
+  await sql`DELETE FROM job_runs WHERE job IN (${job}, ${`${job}-ok`})`;
 });

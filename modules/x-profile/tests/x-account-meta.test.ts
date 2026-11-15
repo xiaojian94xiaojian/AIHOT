@@ -126,3 +126,27 @@ test("recent posts are the newest ten, in time order", async () => {
   await sql`DELETE FROM articles WHERE source_id = 'x-account-recent'`;
   await sql`DELETE FROM sources WHERE id = 'x-account-recent'`;
 });
+
+test("a renamed account shows its former handle from the audit trail", async () => {
+  await sql`DELETE FROM articles WHERE source_id = 'x-account-renamed'`;
+  await sql`DELETE FROM audit_log WHERE subject = 'source:x-account-renamed'`;
+  await sql`
+    INSERT INTO sources (id, name, kind, config) VALUES
+      ('x-account-renamed', '@NewName', 'x_search', ${sql.json({ query: "from:NewName -filter:replies" })})
+    ON CONFLICT (id) DO NOTHING`;
+  const at = new Date(Date.now() - 2 * 86_400_000);
+  await sql`
+    INSERT INTO articles (id, source_id, identity_key, url, title, language, published_at, discovered_at, timeline_at, raw, x_post)
+    VALUES ('renamed-1', 'x-account-renamed', 'test:renamed-1', 'https://x.com/renamed/1', 'renamed', 'zh', ${at}, ${at}, ${at},
+            ${sql.json({ views: 100 })}, ${sql.json({ handle: "NewName", lang: "zh", text: "renamed" })})`;
+  await sql`
+    INSERT INTO audit_log (actor, action, subject, reason, before, after)
+    VALUES ('system', 'source.update', 'source:x-account-renamed', 'X 账号 @OldName 已改名 @NewName（已存帖子作者的现名）',
+            ${sql.json({ name: "@OldName", config: { query: "from:OldName -filter:replies" } })},
+            ${sql.json({ name: "@NewName", config: { query: "from:NewName -filter:replies" } })})`;
+  const person = await loadPerson("NewName");
+  assert.deepEqual(person?.formerHandles.map((f) => f.handle), ["OldName"]);
+  await sql`DELETE FROM articles WHERE source_id = 'x-account-renamed'`;
+  await sql`DELETE FROM sources WHERE id = 'x-account-renamed'`;
+  await sql`DELETE FROM audit_log WHERE subject = 'source:x-account-renamed'`;
+});

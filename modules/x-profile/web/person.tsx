@@ -390,7 +390,7 @@ function PostList({ posts, followers }: { posts: XPost[]; followers?: number | n
 }
 
 export default function PersonPage() {
-  const { person, structure, weekly, trend, hours, weekdays, heatmap, formats, hits, best, categories, tags, languages, media, topPosts, recentPosts, growth } = useLoaderData<typeof loader>();
+  const { person, structure, weekly, trend, hours, weekdays, heatmap, formats, hits, best, categories, tags, languages, media, topPosts, recentPosts, formerHandles, growth } = useLoaderData<typeof loader>();
   const [heatMetric, setHeatMetric] = useState<"medViews" | "posts">("medViews");
   // 当前小时只在客户端算：SSR 和 hydration 跨小时会不一致，页面还被 edge 缓存 10 分钟。
   const [nowHour, setNowHour] = useState<number | null>(null);
@@ -416,6 +416,15 @@ export default function PersonPage() {
             <h1 className="truncate text-[24px] font-black tracking-[-0.02em] text-ink lg:text-[28px]">{person.author}</h1>
             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-ink-3">
               <span className="num font-mono">@{person.handle}</span>
+              {formerHandles.length > 0 && (
+                <span className="text-[11px] text-ink-4" title="改名由采集时的自动核对发现，记录在审计里">
+                  曾用名 {formerHandles.map((f, index) => (
+                    <span key={f.handle}>
+                      {index > 0 ? "、" : ""}@{f.handle}（{monthDay(f.at.slice(0, 10))}）
+                    </span>
+                  ))}
+                </span>
+              )}
               <span className="rounded-full bg-bg-sunk px-2 py-0.5 text-[11px] text-ink-2">{REGION_LABEL[person.region]}</span>
               <span className="rounded-full bg-bg-sunk px-2 py-0.5 text-[11px] text-ink-2">{KIND_LABEL[person.kind]}</span>
               {person.category && <span className="rounded-full bg-bg-sunk px-2 py-0.5 text-[11px] text-ink-2">{CATEGORY_LABEL[person.category]}</span>}

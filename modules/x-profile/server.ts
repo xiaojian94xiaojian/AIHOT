@@ -16,7 +16,7 @@ import { growthDigest } from "./backend/digest.ts";
 import { todaysTopics } from "./backend/today.ts";
 import { algorithmPage } from "./backend/algorithm.ts";
 import { loadDailyCardCached } from "./backend/card.ts";
-import { recentCollectStats, snapshotCollectStats } from "./backend/collect-stats.ts";
+import { beijingToday, budgetSkipsOn, recentCollectStats, snapshotCollectStats } from "./backend/collect-stats.ts";
 import { config } from "@aihot/backend/config";
 import { AlertRejected, runDailyAlerts, runReplyAlerts, subscribe, unsubscribe } from "./backend/alerts.ts";
 
@@ -151,7 +151,10 @@ export const xProfileServerModule: ServerModule = {
     }));
 
     // 后台：采集成本看板（近 14 天，今天实时算）。
-    app.get("/api/admin/x-collect", adminHandler(async () => ({ days: await recentCollectStats(14) })));
+    app.get("/api/admin/x-collect", adminHandler(async () => ({
+    days: await recentCollectStats(14),
+    budgetSkips: await budgetSkipsOn(beijingToday()),
+  })));
     // 后台：待审列表与通过/驳回。
     app.get("/api/admin/x-people/requests", adminHandler(async (req) => {
       const status = String((req.query as { status?: string }).status ?? "pending");

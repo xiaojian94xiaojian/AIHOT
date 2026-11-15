@@ -3,9 +3,10 @@ import { type MetaFunction } from "react-router";
 import { SITE } from "@aihot/site";
 import { adminGet } from "@aihot/web/lib/admin.server";
 import { AdminPage, Card, DataTable, Stat } from "@aihot/web/features/admin/ui";
+import { Bars } from "./charts";
 import type { XCollectStat } from "../types.ts";
 
-type Data = { days: XCollectStat[] };
+type Data = { days: XCollectStat[]; budgetSkips: number };
 
 export async function loader({ request }: { request: Request }): Promise<Data> {
   return adminGet<Data>(request, "/api/admin/x-collect");
@@ -18,6 +19,7 @@ const rate = (stat: XCollectStat) => (stat.calls === 0 ? 0 : (stat.emptyCalls / 
 
 export default function AdminCollect({ loaderData }: { loaderData: Data }) {
   const days = loaderData.days;
+  const budgetSkips = loaderData.budgetSkips;
   const week = days.slice(0, 7);
   const sum = (pick: (stat: XCollectStat) => number) => week.reduce((total, stat) => total + pick(stat), 0);
   const usd = sum((stat) => stat.usd);
@@ -35,12 +37,28 @@ export default function AdminCollect({ loaderData }: { loaderData: Data }) {
         </>
       }
     >
-      <div className="grid gap-3 sm:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-5">
         <Stat label="近 7 天花费" value={money(usd)} hint={usd > 1.4 ? "接近日预算 ×7" : "在预算内"} tone={usd > 1.4 ? "warn" : undefined} />
         <Stat label="近 7 天调用" value={calls.toLocaleString("en-US")} hint={`平均每天 ${Math.round(calls / Math.max(1, week.length))} 次`} />
         <Stat label="空抓占比" value={calls ? `${((empty / calls) * 100).toFixed(1)}%` : "—"} hint={`${empty.toLocaleString("en-US")} 次没返回帖子`} />
         <Stat label="返回对象" value={objects.toLocaleString("en-US")} hint="采集搜索按这个数计费" />
+        <Stat
+          label="今天预算跳过"
+          value={budgetSkips.toLocaleString("en-US")}
+          hint={budgetSkips > 0 ? "有定时任务被预算熔断暂停" : "今天还没有任务被预算拦下"}
+          tone={budgetSkips > 0 ? "warn" : undefined}
+        />
       </div>
+
+      <Card title="空抓率趋势（近 14 天）" className="mt-3">
+        <Bars
+          data={[...days].reverse().map((d) => ({ label: d.day.slice(5), value: d.calls ? Math.round((d.emptyCalls / d.calls) * 1000) / 10 : 0 }))}
+          height={72}
+          format={(n) => `${n}%`}
+          labelEvery={2}
+        />
+        <p className="mt-2 text-[11px] text-ink-4">空抓率 = 没返回帖子的采集搜索 ÷ 当天采集搜索。降档有效时应往下走。</p>
+      </Card>
 
       <Card title="每天明细" className="mt-3">
         <DataTable

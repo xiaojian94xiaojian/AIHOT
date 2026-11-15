@@ -110,3 +110,11 @@ export function beijingYesterday(now = new Date()): string {
 export function emptyRate(stat: Pick<XCollectStat, "calls" | "emptyCalls">): number {
   return stat.calls === 0 ? 0 : Math.round((stat.emptyCalls / stat.calls) * 1000) / 10;
 }
+
+/** 某天因预算熔断被跳过（记 skipped）的定时任务次数：预算被打穿的直接信号。 */
+export async function budgetSkipsOn(day: string): Promise<number> {
+  const [row] = await sql<{ n: number }[]>`
+    SELECT count(*)::int AS n FROM job_runs
+    WHERE status = 'skipped' AND (finished_at AT TIME ZONE ${BEIJING_TIMEZONE})::date = ${day}::date`;
+  return row?.n ?? 0;
+}

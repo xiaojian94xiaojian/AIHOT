@@ -271,7 +271,7 @@ export async function loadPerson(handle: string): Promise<XPersonResponse | null
   const id = who.source_id;
   const resolvedHandle = who.handle ?? handle;
 
-  const [[row], weekly, hours, weekdays, categories, tags, languages, media, topRows, recentRows, heatRows, hitsRows, formats] = await Promise.all([
+  const [[row], weekly, hours, weekdays, categories, tags, languages, media, topRows, recentRows, renameRows, heatRows, hitsRows, formats] = await Promise.all([
     sql<SummaryRow[]>`WITH p AS (${posts(id)}) SELECT ${SUMMARY} FROM p WHERE source_id = ${id} GROUP BY source_id`,
     sql<{ week: string; posts: number; med_views: string; likes: string; views: string }[]>`
       WITH p AS (${posts(id)})
@@ -326,6 +326,12 @@ export async function loadPerson(handle: string): Promise<XPersonResponse | null
       WHERE a.source_id = ${id} AND a.published_at > now() - make_interval(days => ${WINDOW_DAYS})
         AND ${notWithdrawn}
       ORDER BY a.published_at DESC LIMIT 10
+    `,
+    sql<{ before_q: string | null; at: Date }[]>`
+      SELECT before->'config'->>'query' AS before_q, created_at AS at
+      FROM audit_log
+      WHERE subject = ${`source:${id}`} AND action = 'source.update' AND reason LIKE '%已改名%'
+      ORDER BY created_at ASC
     `,
     sql<{ weekday: number; hour: number; posts: number; med_views: string }[]>`
       WITH p AS (${posts(id)})
@@ -440,6 +446,13 @@ export async function loadPerson(handle: string): Promise<XPersonResponse | null
     media,
     topPosts: topRows.map((r) => withInsight(toPost(r, resolvedHandle), followers)),
     recentPosts: recentRows.map((r) => withInsight(toPost(r, resolvedHandle), followers)),
+    // 曾用名来自改名时写进审计的旧查询串（from:handle）；同一个 handle 只留一次。
+    formerHandles: [...new Map(renameRows.flatMap((r) => {
+      const handle = /from:([A-Za-z0-9_]+)/i.exec(r.before_q ?? "")?.[1];
+      return handle && handle.toLowerCase() !== resolvedHandle.toLowerCase()
+        ? [[handle.toLowerCase(), { handle, at: new Date(r.at).toISOString() }] as const]
+        : [];
+    })).values()],
     // 粉丝快照在 followers.ts 里读：接口层把 loadPersonGrowth 的结果填进来。
     growth: null,
   };
