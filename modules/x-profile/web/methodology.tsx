@@ -7,6 +7,7 @@ import { pageMeta } from "@aihot/web/lib/seo";
 import { Bars } from "./charts";
 import { categoryName, compact, languageName, mediaName, percent } from "./format";
 import { IconAlertTriangle, IconClock, IconDoc, IconFlame, IconImage, IconLink, IconMessageCircle, IconSend, IconShieldAlert, IconTag, IconUsers, IconZap } from "./icons";
+import { Untestable } from "./notes";
 
 export async function loader({ request }: { request: Request }) {
   return loadOr404<XMethodologyResponse>("/api/site/x-people/methodology", { signal: request.signal });
@@ -368,6 +369,14 @@ export default function MethodologyPage() {
           <li className="border-l-2 border-accent/40 pl-3.5 py-0.5">样本与口径：爆款 = 账号自己浏览前 10%，互动是采集瞬间的快照；不同赛道差异很大，建议先用自己账号的画像对照再抄。</li>
         </ul>
       </Section>
+
+      <Untestable
+        items={[
+          { label: "跨账号汇总", text: "P90 按每个账号自己的浏览切，不同粉丝量级和赛道不能直接相加；成熟原创不足 20 条的账号不进池，样本少时结论会偏。" },
+          { label: "因果", text: "这里只写相关性（哪些特征更常一起出现），不能证明「这样做就会火」；发帖时间、题材和账号本身的影响力是混在一起的。" },
+          { label: "实际分发", text: "我们没有每条帖子的曝光曲线和负向信号（举报、静音），看不到限流，也看不到推荐系统给每个人算了什么。" },
+        ]}
+      />
     </div>
   );
 }

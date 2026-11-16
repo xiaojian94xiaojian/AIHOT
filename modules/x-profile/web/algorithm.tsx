@@ -4,6 +4,7 @@ import type { XAlgorithmResponse } from "../types";
 import { edgeTtl, loadOr404 } from "@aihot/web/lib/api.server";
 import { pageMeta } from "@aihot/web/lib/seo";
 import { stamp } from "./format";
+import { Untestable } from "./notes";
 
 export async function loader({ request }: { request: Request }) {
   return loadOr404<XAlgorithmResponse>("/api/site/x-people/algorithm", { signal: request.signal });
@@ -94,16 +95,32 @@ export default function AlgorithmPage() {
         ))}
       </ol>
 
-      <section className="rounded-card border border-line-soft bg-bg-sunk/50 p-4 text-[12.5px] leading-relaxed text-ink-2 space-y-2">
-        <h2 className="text-[13px] font-bold text-ink flex items-center gap-1.5">
-          <span>ℹ 我们测不了的三件事</span>
-        </h2>
-        <ul className="space-y-1.5 text-ink-3">
-          <li><b className="text-ink">48 小时窗口：</b>只看排序，看不到每条帖子的曝光曲线；我们的快照只记采集那一刻的值，无法还原「过 48 小时就掉」。这条我们照官方文档写，没法自证。</li>
-          <li><b className="text-ink">负向信号（举报、静音、不想看）：</b>这些动作发生在别人的信息流里，本站看不到。</li>
-          <li><b className="text-ink">「预测概率」本身：</b>权重乘的是模型对每个人会不会互动的预测概率，我们没有这个概率，只能用互动计数做代理。</li>
-        </ul>
+      <section className="rounded-card border border-line bg-surface p-4 lg:p-5 space-y-2">
+        <h2 className="text-[15px] font-bold text-ink">账号权重分（user-cred-v2）</h2>
+        <p className="text-[13px] leading-relaxed text-ink-2">
+          X 2026 年公开的代码里还有一个账号级信誉分，叫 <code className="rounded-mark bg-bg-sunk px-1 text-[12px]">user-cred-v2</code>：
+          在关注图上跑 PageRank，把传递到的「质量」按 <code className="rounded-mark bg-bg-sunk px-1 text-[12px]">rawScore = 165.2 + 7.07 × ln(mass)</code> 换算后截到 0–100。
+          按公开代码的默认参数，随机跳转的权重一半分给 Premium 账号、一半跟随最近 7 天的点赞和转帖；受限、封禁、停用、注销的账号不参与计算。
+          它不是某条帖子的排序分，而是账号进入推荐与安全系统的一个信号。
+        </p>
+        <p className="text-[13px] leading-relaxed text-ink-2">
+          <b className="text-ink">这个分数我们算不了。</b>mass 是 X 内部的图权重，公开数据推不出来；站外工具给的都只是估算。
+          本站不展示「你的权重是多少」，也不建议按估分做发帖决策——我们能观察的粉丝、曝光和互动结构只是代理，不是这个分数。
+        </p>
+        <p className="text-[11px] leading-relaxed text-ink-4">
+          依据：<a href="https://github.com/xai-org/x-algorithm" target="_blank" rel="noreferrer" className="text-accent hover:underline">xai-org/x-algorithm</a> 的
+          <code className="rounded-mark bg-bg-sunk px-1 text-[11px]">user-cred-v2/UserCredV2.scala</code>；公式与默认参数以仓库为准。
+        </p>
       </section>
+
+      <Untestable
+        title="我们测不了的三件事"
+        items={[
+          { label: "48 小时窗口", text: "只看排序，看不到每条帖子的曝光曲线；我们的快照只记采集那一刻的值，无法还原「过 48 小时就掉」。这条我们照官方文档写，没法自证。" },
+          { label: "负向信号（举报、静音、不想看）", text: "这些动作发生在别人的信息流里，本站看不到。" },
+          { label: "「预测概率」本身", text: "权重乘的是模型对每个人会不会互动的预测概率，我们没有这个概率，只能用互动计数做代理。" },
+        ]}
+      />
 
       <p className="text-[11.5px] leading-relaxed text-ink-4 pt-1">
         口径：只算 120 天内的原创帖（不含回复）；「×倍数」= 该群体浏览中位 ÷ 该账号自己的浏览中位，按账号逐一对照，避免大号把结论带偏。
