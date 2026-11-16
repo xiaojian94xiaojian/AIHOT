@@ -153,6 +153,8 @@ export interface XPersonResponse {
   formerHandles: Array<{ handle: string; at: string }>;
   /** 粉丝快照与涨粉；这个账号还没有快照时为 null。 */
   growth: XPersonGrowth | null;
+  /** 曝光自查：近 14 天和自身基线对照；没有数据时为 null。 */
+  reach: XReachCheck | null;
 }
 
 /** 涨粉榜的一行：一个账号在窗口内的粉丝变化。 */
@@ -614,6 +616,8 @@ export interface XPersonV1 {
     d7: XPersonGrowth["d7"];
     d30: XPersonGrowth["d30"];
   } | null;
+  /** 曝光自查（W9）。 */
+  reach: XReachCheck | null;
   coverage: { posts: number; activeDays: number; days: number; postsPerDay: number };
   engagement: {
     avgLikes: number;
@@ -632,4 +636,18 @@ export interface XPersonV1 {
   best: XPersonResponse["best"];
   formerHandles: XPersonResponse["formerHandles"];
   topPosts: Array<{ id: string; url: string; at: string; views: number; likes: number; retweets: number; replies: number; quotes: number; text: string }>;
+}
+
+/** 曝光自查（W9）：近 14 天中位浏览和自身基线对照，结合粉丝走势给结论与置信度。 */
+export interface XReachCheck {
+  status: "normal" | "mixed" | "content" | "check" | "insufficient" | "quiet";
+  label: string;
+  confidence: "high" | "medium" | "low";
+  conclusion: string;
+  windowDays: number;
+  recent: { posts: number; medViews: number | null };
+  baseline: { posts: number; medViews: number | null };
+  ratio: number | null;
+  followers: { now: number | null; d7: number | null; d30: number | null };
+  caveats: string[];
 }

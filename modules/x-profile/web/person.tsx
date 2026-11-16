@@ -3,7 +3,7 @@
 // 口径只讲数据里的相关性，不当作因果。
 import { Link, useLoaderData } from "react-router";
 import { useEffect, useState } from "react";
-import { CATEGORY_LABEL, KIND_LABEL, REGION_LABEL, type XCount, type XFormat, type XPersonGrowth, type XPersonResponse, type XPost } from "../types";
+import { CATEGORY_LABEL, KIND_LABEL, REGION_LABEL, type XCount, type XFormat, type XPersonGrowth, type XPersonResponse, type XPost, type XReachCheck } from "../types";
 import { edgeTtl, loadOr404 } from "@aihot/web/lib/api.server";
 import { pageMeta } from "@aihot/web/lib/seo";
 import { beijingTime, monthDay } from "@aihot/contracts/time";
@@ -12,6 +12,7 @@ import { SourceAvatar } from "@aihot/web/components/ui/SourceAvatar";
 import { AreaChart, Bars, Heatmap, Rows, Spark } from "./charts";
 import { SubscribeButton } from "./subscribe";
 import { categoryName, compact, languageName, mediaName, percent, signed, signedPercent, stamp } from "./format";
+import { Confidence } from "./notes";
 import { IconClock, IconFlame, IconZap, IconHeart, IconImage, IconMessageCircle, IconQuote, IconRepeat } from "./icons";
 
 export async function loader({ params, request }: { params: { handle?: string }; request: Request }) {
@@ -389,8 +390,59 @@ function PostList({ posts, followers }: { posts: XPost[]; followers?: number | n
   );
 }
 
+const REACH_TONE: Record<XReachCheck["status"], string> = {
+  normal: "border-accent/30 bg-accent/5 text-accent",
+  mixed: "border-amber-soft bg-amber-soft text-amber-ink",
+  content: "border-amber-soft bg-amber-soft text-amber-ink",
+  check: "border-hot/40 bg-hot-soft text-hot",
+  insufficient: "border-line text-ink-3",
+  quiet: "border-line text-ink-3",
+};
+
+/** 曝光自查：近 14 天中位浏览对标自己的基线，再结合粉丝走势；只给对照，不下「限流」结论。 */
+function ReachBlock({ reach }: { reach: XReachCheck }) {
+  const delta = (value: number | null) => (value === null ? "—" : signed(value));
+  return (
+    <Section title="曝光自查" hint={`近 ${reach.windowDays} 天 vs 自己的基线`} className="mt-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${REACH_TONE[reach.status]}`}>{reach.label}</span>
+        <Confidence level={reach.confidence} />
+      </div>
+      <p className="mt-2 text-[12.5px] leading-relaxed text-ink-2">{reach.conclusion}</p>
+
+      <div className="mt-3 grid gap-2.5 sm:grid-cols-3">
+        <div className="rounded-card border border-line px-3 py-2.5">
+          <div className="text-[11.5px] text-ink-3">近 {reach.windowDays} 天中位浏览</div>
+          <div className="num mt-1 text-[22px] font-black leading-none tracking-[-0.02em] text-ink">{reach.recent.medViews === null ? "—" : compact(reach.recent.medViews)}</div>
+          <div className="mt-1 text-[11px] text-ink-4">{reach.recent.posts} 条原创</div>
+        </div>
+        <div className="rounded-card border border-line px-3 py-2.5">
+          <div className="text-[11.5px] text-ink-3">自己的基线</div>
+          <div className="num mt-1 text-[22px] font-black leading-none tracking-[-0.02em] text-ink">{reach.baseline.medViews === null ? "—" : compact(reach.baseline.medViews)}</div>
+          <div className="mt-1 text-[11px] text-ink-4">{reach.baseline.posts} 条（此前 120 天）</div>
+        </div>
+        <div className="rounded-card border border-line px-3 py-2.5">
+          <div className="text-[11.5px] text-ink-3">倍数</div>
+          <div className={`num mt-1 text-[22px] font-black leading-none tracking-[-0.02em] ${reach.ratio !== null && reach.ratio < 0.5 ? "text-hot" : "text-ink"}`}>
+            {reach.ratio === null ? "—" : `${reach.ratio}×`}
+          </div>
+          <div className="mt-1 text-[11px] text-ink-4">近 14 天 ÷ 基线</div>
+        </div>
+      </div>
+
+      <div className="mt-2 text-[11.5px] text-ink-4">
+        粉丝 {reach.followers.now === null ? "—" : compact(reach.followers.now)} · 7 天 {delta(reach.followers.d7)} · 30 天 {delta(reach.followers.d30)}
+      </div>
+
+      <ul className="mt-3 space-y-1 text-[11px] leading-relaxed text-ink-4">
+        {reach.caveats.map((caveat) => <li key={caveat}>· {caveat}</li>)}
+      </ul>
+    </Section>
+  );
+}
+
 export default function PersonPage() {
-  const { person, structure, weekly, trend, hours, weekdays, heatmap, formats, hits, best, categories, tags, languages, media, topPosts, recentPosts, formerHandles, growth } = useLoaderData<typeof loader>();
+  const { person, structure, weekly, trend, hours, weekdays, heatmap, formats, hits, best, categories, tags, languages, media, topPosts, recentPosts, formerHandles, growth, reach } = useLoaderData<typeof loader>();
   const [heatMetric, setHeatMetric] = useState<"medViews" | "posts">("medViews");
   // 当前小时只在客户端算：SSR 和 hydration 跨小时会不一致，页面还被 edge 缓存 10 分钟。
   const [nowHour, setNowHour] = useState<number | null>(null);
@@ -448,6 +500,7 @@ export default function PersonPage() {
       </header>
 
       {growth && <GrowthBlock growth={growth} person={person} structure={structure} categories={categories} formats={formats} />}
+      {reach && <ReachBlock reach={reach} />}
 
       <div className="mt-3 grid gap-2.5 sm:grid-cols-3">
         <Kpi

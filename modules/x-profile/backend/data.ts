@@ -460,5 +460,7 @@ export async function loadPerson(handle: string): Promise<XPersonResponse | null
     })).values()],
     // 粉丝快照在 followers.ts 里读：接口层把 loadPersonGrowth 的结果填进来。
     growth: null,
+    // 曝光自查在 reach.ts 里算：接口层把结果填进来。
+    reach: null,
   };
 }

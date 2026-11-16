@@ -4,6 +4,7 @@ import { growthBoard, loadPersonGrowth } from "./followers.ts";
 import { methodologyPage } from "./methodology.ts";
 import { personPage } from "./data.ts";
 import { beijingToday } from "./collect-stats.ts";
+import { reachCheck } from "./reach.ts";
 import type {
   XGrowthV1,
   XMethodologyV1,
@@ -70,7 +71,7 @@ export async function methodologyV1(): Promise<XMethodologyV1> {
 
 /** 单个账号：画像摘要 + 粉丝涨粉；没有这个账号时返回 null。 */
 export async function personV1(handle: string): Promise<XPersonV1 | null> {
-  const [page, growth] = await Promise.all([personPage(handle), loadPersonGrowth(handle)]);
+  const [page, growth, reach] = await Promise.all([personPage(handle), loadPersonGrowth(handle), reachCheck(handle)]);
   if (!page) return null;
   const person = page.person;
   return {
@@ -80,6 +81,7 @@ export async function personV1(handle: string): Promise<XPersonV1 | null> {
     followers: growth?.followers ?? person.followers,
     updatedOn: growth?.updatedOn ?? null,
     growth: growth ? { freshness: growth.freshness, d7: growth.d7, d30: growth.d30 } : null,
+    reach,
     coverage: {
       posts: person.posts,
       activeDays: person.activeDays,

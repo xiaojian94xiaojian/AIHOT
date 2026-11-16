@@ -21,6 +21,7 @@ import { config } from "@aihot/backend/config";
 import { AlertRejected, runDailyAlerts, runReplyAlerts, subscribe, unsubscribe } from "./backend/alerts.ts";
 import { z } from "zod";
 import { growthMarkdown, growthV1, methodologyMarkdown, methodologyV1, personV1 } from "./backend/public.ts";
+import { reachCheck } from "./backend/reach.ts";
 
 /** 画像按天变化，站点接口缓存五分钟、共享缓存十分钟。 */
 const CACHE = "public, max-age=300, s-maxage=600, stale-while-revalidate=900";
@@ -187,7 +188,7 @@ export const xProfileServerModule: ServerModule = {
       if (!HANDLE.test(handle)) return sendProblem(req, reply, { status: 404, code: "not_found", detail: "no such account" });
       const body = await personPage(handle);
       if (!body) return sendProblem(req, reply, { status: 404, code: "not_found", detail: "no such account" });
-      const [growth, report] = await Promise.all([loadPersonGrowth(handle), latestReportFor(handle)]);
+      const [growth, report, reach] = await Promise.all([loadPersonGrowth(handle), latestReportFor(handle), reachCheck(handle)]);
       if (growth && report) {
         growth.report = {
           conclusion: report.report.conclusion,
@@ -200,6 +201,7 @@ export const xProfileServerModule: ServerModule = {
         };
       }
       body.growth = growth;
+      body.reach = reach;
       return sendJsonWithEtag(req, reply, body, { etagPrefix: `xp-${handle.toLowerCase()}`, cacheControl: CACHE });
     }));
 
