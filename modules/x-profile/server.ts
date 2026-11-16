@@ -19,9 +19,13 @@ import { loadDailyCardCached } from "./backend/card.ts";
 import { beijingToday, budgetSkipsOn, recentCollectStats, snapshotCollectStats } from "./backend/collect-stats.ts";
 import { config } from "@aihot/backend/config";
 import { AlertRejected, runDailyAlerts, runReplyAlerts, subscribe, unsubscribe } from "./backend/alerts.ts";
+import { z } from "zod";
+import { growthMarkdown, growthV1, methodologyMarkdown, methodologyV1, personV1 } from "./backend/public.ts";
 
 /** 画像按天变化，站点接口缓存五分钟、共享缓存十分钟。 */
 const CACHE = "public, max-age=300, s-maxage=600, stale-while-revalidate=900";
+/** 版本化接口：字段稳定，缓存短一些，改动靠版本而不是悄悄换语义。 */
+const V1_CACHE = "public, max-age=300, s-maxage=300, must-revalidate";
 const HANDLE = /^[A-Za-z0-9_]{1,30}$/;
 
 function guarded(fn: (req: FastifyRequest, reply: FastifyReply) => Promise<unknown>) {
@@ -198,6 +202,25 @@ export const xProfileServerModule: ServerModule = {
       body.growth = growth;
       return sendJsonWithEtag(req, reply, body, { etagPrefix: `xp-${handle.toLowerCase()}`, cacheControl: CACHE });
     }));
+
+    // 版本化公开接口：外部工具（creator-ops 等）和 Agent 读这一份，字段发布后只增不改。
+    app.get("/api/v1/x-people/growth", guarded(async (req, reply) => {
+      const window = Number((req.query as { window?: string }).window ?? 7);
+      if (!(GROWTH_WINDOWS as readonly number[]).includes(window)) {
+        return sendProblem(req, reply, { status: 400, code: "invalid_request", detail: "window must be 7 or 30" });
+      }
+      return sendJsonWithEtag(req, reply, await growthV1(window as 7 | 30), { etagPrefix: `v1-x-growth-${window}`, cacheControl: V1_CACHE });
+    }));
+    app.get("/api/v1/x-people/methodology", guarded(async (req, reply) => {
+      return sendJsonWithEtag(req, reply, await methodologyV1(), { etagPrefix: "v1-x-method", cacheControl: V1_CACHE });
+    }));
+    app.get("/api/v1/x-people/people/:handle", guarded(async (req, reply) => {
+      const handle = String((req.params as { handle?: string }).handle ?? "").toLowerCase();
+      if (!HANDLE.test(handle)) return sendProblem(req, reply, { status: 404, code: "not_found", detail: "no such account" });
+      const body = await personV1(handle);
+      if (!body) return sendProblem(req, reply, { status: 404, code: "not_found", detail: "no such account" });
+      return sendJsonWithEtag(req, reply, body, { etagPrefix: `v1-x-person-${handle}`, cacheControl: V1_CACHE });
+    }));
   },
 
   // 这里两处模型步骤只属于本模块：涨粉报告每周跑，账号初标是一次性脚本。
@@ -214,6 +237,53 @@ export const xProfileServerModule: ServerModule = {
         return row?.n ?? 0;
       },
     },
+  },
+
+  // Agent 指南与 MCP：只读聚合，静态路径（HTTP 不能带参数，窗口/数量在 MCP 工具里选）。
+  agent: {
+    abilities: [
+      {
+        path: "/x-people-growth",
+        title: "X 涨粉榜",
+        ask: "最近哪些 X 账号涨粉最快",
+        answer: async () => growthMarkdown(await growthV1(7), 20),
+        etagPrefix: "agent-x-growth",
+        cacheControl: CACHE,
+        mcp: {
+          tool: "get_x_people_growth",
+          use: "for the X follower growth board",
+          description: "X 账号涨粉榜：7 天或 30 天的粉丝变化、涨粉率、发帖与浏览。数据来自本站粉丝快照，不是 X 官方数据。",
+          input: z.object({
+            window: z.union([z.literal(7), z.literal(30)]).optional(),
+            limit: z.number().int().min(1).max(50).optional(),
+          }),
+          run: async (args) => {
+            const window: 7 | 30 = args.window === 30 ? 30 : 7;
+            const limit = typeof args.limit === "number" ? Math.trunc(args.limit) : 20;
+            const board = await growthV1(window);
+            return { text: growthMarkdown(board, limit), structured: board as unknown as Record<string, unknown> };
+          },
+        },
+      },
+      {
+        path: "/x-people-methodology",
+        title: "X 内容方法论",
+        ask: "发什么形态、什么时间发更容易起量",
+        answer: async () => methodologyMarkdown(await methodologyV1()),
+        etagPrefix: "agent-x-method",
+        cacheControl: CACHE,
+        mcp: {
+          tool: "get_x_people_methodology",
+          use: "for the X content methodology",
+          description: "本站 X 账号的方法论：形态、字数、时段、题材的爆款率与中位浏览，附示例链接；只描述相关性，不保证因果。",
+          input: z.object({}),
+          run: async () => {
+            const page = await methodologyV1();
+            return { text: methodologyMarkdown(page), structured: page as unknown as Record<string, unknown> };
+          },
+        },
+      },
+    ],
   },
 
   schedules: [

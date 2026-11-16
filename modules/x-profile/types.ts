@@ -559,3 +559,77 @@ export interface XWeeklyResponse {
   summary: XWeeklySummary;
   generatedAt: string;
 }
+/** 版本化公开接口（/api/v1/x-people/*）的响应。字段发布后只增不改；外部工具和 Agent 共用同一份。 */
+export interface XGrowthV1Account {
+  handle: string;
+  name: string | null;
+  region: Region;
+  followers: number;
+  growth: number;
+  growthPct: number;
+  /** 两次快照相隔的天数：等于窗口时没有折算。 */
+  spanDays: number;
+  fromOn: string;
+  toOn: string;
+  posts: number;
+  views: number;
+  perPost: number | null;
+  perK: number | null;
+}
+
+export interface XGrowthV1 {
+  window: 7 | 30;
+  /** 最近一次快照的日期（北京时间）。 */
+  asOf: string | null;
+  generatedAt: string;
+  freshness: XFreshnessRecord;
+  accounts: XGrowthV1Account[];
+}
+
+export interface XMethodologyV1 {
+  /** 生成日期（北京时间）。 */
+  asOf: string;
+  /** 统计窗口：120 天内的原创帖。 */
+  windowDays: number;
+  totals: XMethodologyResponse["totals"];
+  overall: XMethodologyResponse["overall"];
+  formats: XMethodologyResponse["formats"];
+  lengths: XMethodologyResponse["lengths"];
+  hours: XMethodologyResponse["hours"];
+  weekdays: XMethodologyResponse["weekdays"];
+  languages: XMethodologyResponse["languages"];
+  categories: XMethodologyResponse["categories"];
+  regions: XMethodologyResponse["regions"];
+  examples: Array<{ handle: string; author: string; url: string; views: number; likes: number; ratio: number; at: string }>;
+}
+
+export interface XPersonV1 {
+  handle: string;
+  author: string;
+  region: Region;
+  followers: number | null;
+  updatedOn: string | null;
+  growth: {
+    freshness: XFreshnessRecord;
+    d7: XPersonGrowth["d7"];
+    d30: XPersonGrowth["d30"];
+  } | null;
+  coverage: { posts: number; activeDays: number; days: number; postsPerDay: number };
+  engagement: {
+    avgLikes: number;
+    medLikes: number;
+    topLikes: number;
+    avgViews: number;
+    medViews: number;
+    p90Views: number;
+    engagementRate: number;
+    perK: XPersonSummary["perK"];
+    mediaPct: number;
+    replyPct: number;
+    quotePct: number;
+  };
+  structure: XPersonResponse["structure"];
+  best: XPersonResponse["best"];
+  formerHandles: XPersonResponse["formerHandles"];
+  topPosts: Array<{ id: string; url: string; at: string; views: number; likes: number; retweets: number; replies: number; quotes: number; text: string }>;
+}

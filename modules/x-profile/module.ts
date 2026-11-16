@@ -17,7 +17,7 @@ export const xProfileModule = defineModule({
     { path: "x-people/:handle", file: "web/person.tsx", id: "x-person" },
   ],
   // 网页与 api 是两个进程：公开查询走 /api/site/x-people*，审核走 /api/admin/x-people*，都由 api 进程回答。
-  apiPaths: [/^\/api\/site\/x-people(\/|$)/, /^\/api\/admin\/x-people(\/|$)/, /^\/feed\/x-people\//, /^\/feed\/x\//],
+  apiPaths: [/^\/api\/site\/x-people(\/|$)/, /^\/api\/v1\/x-people(\/|$)/, /^\/api\/admin\/x-people(\/|$)/, /^\/feed\/x-people\//, /^\/feed\/x\//],
   // 账号收录申请的后台页（本站保留了 adminPages 插口）。
   adminPages: [
     { path: "admin/x-people", file: "web/admin-requests.tsx" },

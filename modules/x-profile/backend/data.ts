@@ -260,16 +260,20 @@ const postColumns = sql`
 
 /** 一个账号的全部维度；`handle` 不区分大小写。没有这个账号时返回 null。 */
 export async function loadPerson(handle: string): Promise<XPersonResponse | null> {
-  const [who] = await sql<{ source_id: string; handle: string | null }[]>`
-    SELECT source_id, max(x_post->>'handle') AS handle
-    FROM articles
-    WHERE source_id LIKE 'x-account-%' AND lower(x_post->>'handle') = lower(${handle})
-    GROUP BY source_id
+  // 改名后同一个 source 里既有旧 handle 也有新 handle：当前名字以 source 的查询串为准，
+  // 不能用 max(x_post->>'handle')（按字典序会挑到旧名，画像页会一直显示曾用名）。
+  const [who] = await sql<{ source_id: string; handle: string | null; current_handle: string | null }[]>`
+    SELECT a.source_id, max(a.x_post->>'handle') AS handle,
+           (SELECT substring(s.config->>'query' from '^from:([A-Za-z0-9_]+)')
+              FROM sources s WHERE s.id = a.source_id) AS current_handle
+    FROM articles a
+    WHERE a.source_id LIKE 'x-account-%' AND lower(a.x_post->>'handle') = lower(${handle})
+    GROUP BY a.source_id
     LIMIT 1
   `;
   if (!who) return null;
   const id = who.source_id;
-  const resolvedHandle = who.handle ?? handle;
+  const resolvedHandle = who.current_handle ?? who.handle ?? handle;
 
   const [[row], weekly, hours, weekdays, categories, tags, languages, media, topRows, recentRows, renameRows, heatRows, hitsRows, formats] = await Promise.all([
     sql<SummaryRow[]>`WITH p AS (${posts(id)}) SELECT ${SUMMARY} FROM p WHERE source_id = ${id} GROUP BY source_id`,
@@ -417,6 +421,7 @@ export async function loadPerson(handle: string): Promise<XPersonResponse | null
   ).flat();
 
   const summary = toSummary(row);
+  summary.handle = resolvedHandle;
   const [meta, median, snap] = await Promise.all([
     accountMeta([summary.handle]),
     structureMediansCached(),
