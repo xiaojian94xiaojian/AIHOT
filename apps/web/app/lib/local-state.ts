@@ -15,6 +15,8 @@ export const KEYS = {
   recentSearches: "aihot-recent-searches",
   // 工具页「查我的账号」：跨页面记住一个 handle，只在显式提交时写入。
   xMineHandle: "aihot-x-mine-handle",
+  // 工具页「发布前检查」：正文草稿只留在本机。
+  xDraft: "aihot-x-draft",
 } as const;
 
 const STARRED_LIMIT = 500;

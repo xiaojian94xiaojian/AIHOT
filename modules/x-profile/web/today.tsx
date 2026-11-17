@@ -207,6 +207,12 @@ export default function TodayPage() {
               <IconSend size={13} className="shrink-0" />
               <span>去发 →</span>
             </a>
+            <Link
+              to="/x-people/check"
+              className="inline-flex min-h-[34px] items-center rounded-full border border-line bg-surface px-3.5 py-1 text-[12.5px] text-ink-2 transition-colors hover:border-accent hover:text-accent"
+            >
+              发布前检查
+            </Link>
             {card.links.reply && (
               <a
                 href={card.links.reply}
