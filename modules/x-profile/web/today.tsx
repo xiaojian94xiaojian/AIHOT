@@ -2,23 +2,25 @@
 // 排序 = 热度 + 48 小时里的 X 帖数 + 报道数；写法建议只按讨论程度给，不预测流量。
 import { Link, useLoaderData } from "react-router";
 import { useEffect, useRef, useState } from "react";
-import type { XDailyCard, XTodayResponse } from "../types";
+import type { XDailyCard, XDeskResponse, XTodayResponse } from "../types";
 import { apiGet, edgeTtl, loadOr404 } from "@aihot/web/lib/api.server";
 import { pageMeta } from "@aihot/web/lib/seo";
 import { SourceAvatar } from "@aihot/web/components/ui/SourceAvatar";
-import { compact, stamp } from "./format";
+import { compact, signed, signedPercent, stamp } from "./format";
 import { IconBell, IconCheck, IconReply, IconSend, IconTarget } from "./icons";
 import { IconCopy } from "@aihot/web/components/icons";
+import { monthDay } from "@aihot/contracts/time";
 import { copyText } from "@aihot/web/lib/clipboard";
 import { KEYS, readRaw, writeRaw } from "@aihot/web/lib/local-state";
 
 export async function loader({ request }: { request: Request }) {
   const handle = (new URL(request.url).searchParams.get("handle") ?? "").trim().replace(/^@/, "");
-  const [data, card] = await Promise.all([
+  const [data, card, desk] = await Promise.all([
     loadOr404<XTodayResponse>("/api/site/x-people/today?limit=6", { signal: request.signal }),
     apiGet<XDailyCard>(`/api/site/x-people/card${handle ? `?handle=${encodeURIComponent(handle)}` : ""}`, { signal: request.signal }).catch(() => null),
+    handle ? apiGet<XDeskResponse>(`/api/site/x-people/desk?mine=${encodeURIComponent(handle)}`, { signal: request.signal }).catch(() => null) : Promise.resolve(null),
   ]);
-  return { ...data, card, mineHandle: handle };
+  return { ...data, card, mineHandle: handle, desk };
 }
 
 export function meta() {
@@ -38,7 +40,16 @@ export const handle = { tab: "x-tools", name: "今天发什么" } as const;
 
 export default function TodayPage() {
   const data = useLoaderData<typeof loader>();
-  const { card, mineHandle } = data;
+  const { card, mineHandle, desk } = data;
+  // 先把满了 7 天的结果放前面，再看还在等的；不然最新 8 条全是 pending，看不到闭环。
+  const deskPosts = desk
+    ? [...desk.posts]
+        .sort((a, b) => {
+          const rank = (post: (typeof desk.posts)[number]) => (post.status === "matured" ? 0 : post.status === "pending" ? 1 : 2);
+          return rank(a) - rank(b) || b.at.localeCompare(a.at);
+        })
+        .slice(0, 8)
+    : [];
   const [handleInput, setHandleInput] = useState(mineHandle ?? "");
   const [detectedHandle, setDetectedHandle] = useState<string | null>(null);
   const [copiedAngle, setCopiedAngle] = useState(false);
@@ -225,6 +236,56 @@ export default function TodayPage() {
               {card.me.followers === null ? "粉丝快照积累中" : `${compact(card.me.followers)} 粉`} · {card.me.verdict}
             </p>
           )}
+        </section>
+      )}
+
+      {mineHandle && (
+        <section className="rounded-card border border-line bg-surface p-4 lg:p-5 space-y-3">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="text-[13px] font-bold text-ink">我的发布闭环</h2>
+            <span className="text-[11px] text-ink-4">@{mineHandle} · 最近 21 天自动对上的帖</span>
+          </div>
+          {!desk ? (
+            <p className="text-[12.5px] text-ink-3">暂时读不到你的发布记录：账号可能还没被收录，或数据源暂时不可用。</p>
+          ) : desk.posts.length === 0 ? (
+            <p className="text-[12.5px] text-ink-3">最近 21 天没有采集到你的原创帖。</p>
+          ) : (
+            <ul className="space-y-2">
+              {deskPosts.map((post) => (
+                <li key={post.id} className="rounded-control border border-line-soft bg-bg-sunk/30 p-3 space-y-1.5">
+                  <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[11px] text-ink-4">
+                    <span className="num">{monthDay(post.at.slice(0, 10))}</span>
+                    <span className="num">{compact(post.views)} 浏览</span>
+                    <span className="num">{compact(post.likes)} 赞</span>
+                    {post.status === "pending" && <span>发布 {post.ageDays} 天 · 待满 7 天</span>}
+                    {post.status === "matured" && (
+                      <span className={post.growth7 !== null && post.growth7 >= 0 ? "text-accent" : "text-hot"}>
+                        账号 7 天 {signed(post.growth7 ?? 0)} 粉（{signedPercent(post.growth7Pct ?? 0)}）
+                      </span>
+                    )}
+                    {post.status === "unavailable" && <span>快照不足，算不出 7 天增量</span>}
+                  </div>
+                  <p className="line-clamp-2 break-words text-[12.5px] leading-relaxed text-ink-2">{post.text || "（无文字）"}</p>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+                    {post.topics.length > 0 ? (
+                      post.topics.map((topic) => (
+                        <Link key={topic.url} to={topic.url} className="text-accent hover:underline">
+                          对上：{topic.title}
+                        </Link>
+                      ))
+                    ) : (
+                      <span className="text-ink-4">没对上当前推荐话题</span>
+                    )}
+                    <a href={post.url} target="_blank" rel="noreferrer" className="ml-auto text-accent hover:underline">去 X 看 →</a>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+          {desk && desk.posts.some((post) => post.status === "pending") && (
+            <p className="text-[11px] text-ink-4">另有 {desk.posts.filter((post) => post.status === "pending").length} 条还在等满 7 天，满了会自动出现在这里。</p>
+          )}
+          {desk && <p className="text-[11px] leading-relaxed text-ink-4">{desk.notes[0]}</p>}
         </section>
       )}
 

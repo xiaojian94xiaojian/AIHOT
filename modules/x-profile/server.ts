@@ -22,6 +22,7 @@ import { AlertRejected, runDailyAlerts, runReplyAlerts, subscribe, unsubscribe }
 import { z } from "zod";
 import { growthMarkdown, growthV1, methodologyMarkdown, methodologyV1, personV1 } from "./backend/public.ts";
 import { reachCheck } from "./backend/reach.ts";
+import { loadDesk } from "./backend/desk.ts";
 
 /** 画像按天变化，站点接口缓存五分钟、共享缓存十分钟。 */
 const CACHE = "public, max-age=300, s-maxage=600, stale-while-revalidate=900";
@@ -93,7 +94,16 @@ export const xProfileServerModule: ServerModule = {
       const card = await loadDailyCardCached(handle);
       if (!card) return sendProblem(req, reply, { status: 404, code: "not_found", detail: "热点榜还没有数据" });
       return sendJsonWithEtag(req, reply, card, { etagPrefix: `xp-card-${handle.toLowerCase()}`, cacheControl: CACHE });
-    }));    // 今天发什么：热点榜 + 48 小时里的 X 讨论量，只读本站数据。
+    }));
+
+    // 发布闭环（W19）：用自己的 handle 找最近发的帖、对推荐话题、算 7 天粉丝增量。
+    app.get("/api/site/x-people/desk", guarded(async (req, reply) => {
+      const mine = String((req.query as { mine?: string }).mine ?? "").trim().replace(/^@/, "");
+      if (!HANDLE.test(mine)) return sendProblem(req, reply, { status: 400, code: "invalid_request", detail: "mine 必须是 X handle" });
+      return sendJsonWithEtag(req, reply, await loadDesk(mine), { etagPrefix: `xp-desk-${mine.toLowerCase()}`, cacheControl: CACHE });
+    }));
+
+    // 今天发什么：热点榜 + 48 小时里的 X 讨论量，只读本站数据。
     app.get("/api/site/x-people/today", guarded(async (req, reply) => {
       const raw = Number((req.query as { limit?: string }).limit ?? 6);
       const limit = Number.isFinite(raw) ? Math.min(10, Math.max(1, Math.trunc(raw))) : 6;

@@ -664,3 +664,30 @@ export interface XGrowthAnomaly {
   /** 当天浏览最高的 1–2 条；当天没有采集到帖子时为空。 */
   posts: XPost[];
 }
+
+/** 发布闭环（W19）：自己的新帖、和当天推荐话题的匹配、发布后 7 天的粉丝增量。 */
+export interface XDeskPost {
+  id: string;
+  url: string;
+  text: string;
+  at: string;
+  views: number;
+  likes: number;
+  /** 发布到今天过了几天。 */
+  ageDays: number;
+  /** 不满 7 天时为 pending；没有足够快照时为 unavailable。 */
+  status: "matured" | "pending" | "unavailable";
+  /** 发布后第 7 天的粉丝增量；拿不到快照时为 null。 */
+  growth7: number | null;
+  growth7Pct: number | null;
+  /** 匹配到的当日/当前推荐话题（按关键词重合，最多 2 个）。 */
+  topics: Array<{ title: string; url: string; score: number }>;
+}
+
+export interface XDeskResponse {
+  handle: string;
+  generatedAt: string;
+  topics: Array<{ title: string; url: string; angle: string }>;
+  posts: XDeskPost[];
+  notes: string[];
+}
