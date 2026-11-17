@@ -177,6 +177,45 @@ function copyNotes(person: XPersonResponse["person"], growth: XPersonGrowth, cat
 }
 
 /** 粉丝与涨粉：KPI、值得借鉴、每日涨粉、代表帖和每周模型观察。 */
+/** 涨粉异常日：按这个账号自己近 30 天的日常波动找尖峰，挂当天浏览最高的帖。 */
+function GrowthAnomalies({ anomalies }: { anomalies: XPersonGrowth["anomalies"] }) {
+  if (anomalies.length === 0) return null;
+  return (
+    <div className="rounded-card border border-line-soft bg-bg-sunk/40 p-3">
+      <h3 className="text-[12.5px] font-medium text-ink">
+        涨粉异常日
+        <span className="ml-1.5 text-[11px] font-normal text-ink-4">按自己近 30 天的日常波动找的；点帖子看当天发生了什么</span>
+      </h3>
+      <ul className="mt-2 space-y-2">
+        {anomalies.map((anomaly) => (
+          <li key={anomaly.on} className="text-[12px] leading-relaxed">
+            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+              <span className="num text-ink-3">{monthDay(anomaly.on)}</span>
+              <span className={`num font-semibold ${anomaly.delta > 0 ? "text-accent" : "text-hot"}`}>{signed(anomaly.delta)}</span>
+              <span className="text-[11px] text-ink-4">{anomaly.delta > 0 ? "净增" : "净减"}</span>
+            </div>
+            {anomaly.posts.length > 0 ? (
+              <ul className="mt-1 space-y-1">
+                {anomaly.posts.map((post) => (
+                  <li key={post.id}>
+                    <a href={post.url} target="_blank" rel="noreferrer" className="inline-flex items-baseline gap-1.5 text-ink-2 hover:text-accent">
+                      <span className="num shrink-0 text-[11px] text-ink-4">{compact(post.views)} 浏览</span>
+                      <span className="line-clamp-1">{post.text.replace(/\s+/g, " ").slice(0, 60)}</span>
+                      <IconExternal size={11} />
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-0.5 text-[11px] text-ink-4">当天没有采集到帖子，涨粉可能来自站外或被删。</p>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function GrowthBlock({ growth, person, structure, categories, formats }: { growth: XPersonGrowth; person: XPersonResponse["person"]; structure: XPersonResponse["structure"]; categories: XCount[]; formats: XFormat[] }) {
   const d7 = growth.d7;
   const d30 = growth.d30;
@@ -317,6 +356,10 @@ function GrowthBlock({ growth, person, structure, categories, formats }: { growt
 
       <div className="mt-4">
         <DailyDeltas daily={growth.daily} />
+      </div>
+
+      <div className="mt-3">
+        <GrowthAnomalies anomalies={growth.anomalies} />
       </div>
 
       <div className="mt-4">

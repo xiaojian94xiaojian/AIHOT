@@ -517,6 +517,9 @@ export async function loadPersonGrowth(handle: string, now = new Date()): Promis
     : [];
   const perKMedian = peers.length ? peers[Math.floor(peers.length / 2)]! : null;
   const topPosts = await topPostsOf(key, now);
+  const anomalyRows = growthAnomalies(daily);
+  const postsByDay = await postsOnDays(key, anomalyRows.map((row) => row.on));
+  const anomalies = anomalyRows.map((row) => ({ ...row, posts: postsByDay.get(row.on) ?? [] }));
   const [allTime] = await sql<{ n: number; since: string | null }[]>`
     SELECT count(*)::int AS n, to_char(min(captured_on), 'YYYY-MM-DD') AS since
     FROM x_follower_snapshots WHERE handle = ${key}`;
@@ -525,6 +528,7 @@ export async function loadPersonGrowth(handle: string, now = new Date()): Promis
     followers: Number(latest.followers),
     updatedOn: latest.on,
     daily,
+    anomalies,
     d7: weekRow
       ? {
           growth: weekRow.growth,
@@ -594,4 +598,68 @@ async function topPostsOf(handle: string, now: Date): Promise<XPost[]> {
   const picked = new Map<string, XPost>();
   for (const post of [...byViews, ...byRate]) if (!picked.has(post.id)) picked.set(post.id, post);
   return [...picked.values()].slice(0, 10);
+}
+
+/**
+ * 涨粉异常日（W3）：用这个账号自己近 30 天的每日净增找尖峰。
+ * 日常波动取 |delta| 的中位数，阈值至少 20 粉丝、且是日常的 5 倍；最多 5 天，按幅度排。
+ * 样本少于 3 个变化日时返回空——小号刚建快照时不硬找异常。
+ */
+export function growthAnomalies(daily: XPersonGrowth["daily"], limit = 5): Array<{ on: string; delta: number; kind: "up" | "down" }> {
+  const points = daily.filter((point): point is { on: string; followers: number; delta: number } => point.delta !== null);
+  if (points.length < 3) return [];
+  const sorted = points.map((point) => Math.abs(point.delta)).sort((a, b) => a - b);
+  const median = sorted[Math.floor(sorted.length / 2)]!;
+  const threshold = Math.max(20, median * 5);
+  return points
+    .filter((point) => Math.abs(point.delta) >= threshold)
+    .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta))
+    .slice(0, limit)
+    .map((point) => ({ on: point.on, delta: point.delta, kind: point.delta > 0 ? "up" as const : "down" as const }));
+}
+
+/** 指定几天里，这个账号每天浏览最高的 1–2 条帖；用来挂在涨粉异常日旁边。 */
+async function postsOnDays(handle: string, days: string[]): Promise<Map<string, XPost[]>> {
+  const out = new Map<string, XPost[]>();
+  if (days.length === 0) return out;
+  const ids = await sourceIdsOf([handle]);
+  const all = [...ids.values()].flat();
+  if (all.length === 0) return out;
+  const rows = await sql<{ day: string; id: string; text: string | null; tweet_id: string | null; published_at: Date; likes: string; retweets: string; replies: string; quotes: string; views: string; media_kind: string; lang: string | null; is_reply: boolean }[]>`
+    SELECT to_char((a.published_at AT TIME ZONE ${BEIJING_TIMEZONE})::date, 'YYYY-MM-DD') AS day,
+           a.id, a.x_post->>'text' AS text, a.x_post->>'tweetId' AS tweet_id, a.published_at,
+           coalesce((a.raw->>'favorite')::bigint, 0)::text AS likes,
+           coalesce((a.raw->>'retweet')::bigint, 0)::text AS retweets,
+           coalesce((a.raw->>'reply')::bigint, 0)::text AS replies,
+           coalesce((a.raw->>'quote')::bigint, 0)::text AS quotes,
+           coalesce((a.raw->>'views')::bigint, 0)::text AS views,
+           coalesce(a.x_post->'media'->0->>'kind', '') AS media_kind,
+           coalesce(a.language, a.x_post->>'lang') AS lang,
+           (a.x_post->'replyTo' IS NOT NULL AND a.x_post->'replyTo' <> 'null'::jsonb) AS is_reply
+    FROM articles a
+    WHERE a.source_id = ANY(${all}::text[])
+      AND (a.published_at AT TIME ZONE ${BEIJING_TIMEZONE})::date = ANY(${days}::date[])
+      AND ${notWithdrawn}
+    ORDER BY (a.published_at AT TIME ZONE ${BEIJING_TIMEZONE})::date, coalesce((a.raw->>'views')::bigint, 0) DESC
+    LIMIT 400`;
+  for (const row of rows) {
+    const post: XPost = {
+      id: row.id,
+      text: row.text ?? "",
+      url: row.tweet_id ? `https://x.com/${handle}/status/${row.tweet_id}` : `https://x.com/${handle}`,
+      at: new Date(row.published_at).toISOString(),
+      views: Number(row.views),
+      likes: Number(row.likes),
+      retweets: Number(row.retweets),
+      replies: Number(row.replies),
+      quotes: Number(row.quotes),
+      mediaKind: row.media_kind,
+      language: row.lang,
+      isReply: row.is_reply,
+    };
+    const list = out.get(row.day) ?? [];
+    if (list.length < 2) list.push(post);
+    out.set(row.day, list);
+  }
+  return out;
 }

@@ -80,7 +80,7 @@ export async function personV1(handle: string): Promise<XPersonV1 | null> {
     region: person.region,
     followers: growth?.followers ?? person.followers,
     updatedOn: growth?.updatedOn ?? null,
-    growth: growth ? { freshness: growth.freshness, d7: growth.d7, d30: growth.d30 } : null,
+    growth: growth ? { freshness: growth.freshness, d7: growth.d7, d30: growth.d30, anomalies: growth.anomalies } : null,
     reach,
     coverage: {
       posts: person.posts,

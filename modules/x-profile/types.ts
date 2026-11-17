@@ -257,6 +257,8 @@ export interface XPersonGrowth {
   updatedOn: string;
   /** 近 30 天每天的最后一次粉丝数；delta 是相邻两次快照的差（缺天时为 null）。 */
   daily: Array<{ on: string; followers: number; delta: number | null }>;
+  /** 涨粉异常日（按自己日常波动找的），挂当天浏览最高的帖；没有帖子时为空。 */
+  anomalies: XGrowthAnomaly[];
   d7: {
     growth: number;
     pct: number;
@@ -615,6 +617,8 @@ export interface XPersonV1 {
     freshness: XFreshnessRecord;
     d7: XPersonGrowth["d7"];
     d30: XPersonGrowth["d30"];
+    /** 涨粉异常日及当天的高互动帖。 */
+    anomalies: XGrowthAnomaly[];
   } | null;
   /** 曝光自查（W9）。 */
   reach: XReachCheck | null;
@@ -650,4 +654,13 @@ export interface XReachCheck {
   ratio: number | null;
   followers: { now: number | null; d7: number | null; d30: number | null };
   caveats: string[];
+}
+
+/** 涨粉异常日：当天粉丝净增/净减明显偏离这个账号自己的日常波动。 */
+export interface XGrowthAnomaly {
+  on: string;
+  delta: number;
+  kind: "up" | "down";
+  /** 当天浏览最高的 1–2 条；当天没有采集到帖子时为空。 */
+  posts: XPost[];
 }
