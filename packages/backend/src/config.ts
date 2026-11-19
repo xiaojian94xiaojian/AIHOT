@@ -31,6 +31,12 @@ function bool(name: string, fallback: boolean): boolean {
   return value === "true";
 }
 
+function hotPokeMode(): "off" | "dry-run" | "on" {
+  const value = str("HOT_POKE_MODE", "off").trim();
+  if (value !== "off" && value !== "dry-run" && value !== "on") throw new Error("HOT_POKE_MODE must be off, dry-run or on");
+  return value;
+}
+
 export const isProduction = env.NODE_ENV === "production";
 
 /** AIHOT_CREDENTIALS_DIR, else the site's own default (relative to the repository). */
@@ -61,6 +67,12 @@ export const config = {
   // External-action valve: off unless the environment turns it on, like COLLECT_ENABLED (read by the
   // worker).
   modelCallsEnabled: bool("MODEL_CALLS_ENABLED", false),
+  /** 热点 poke：off（默认，不花钱）/ dry-run（只记录要抓谁）/ on（真的入队抓取）。 */
+  hotPokeMode: hotPokeMode(),
+  hotPokeMaxEvents: int("HOT_POKE_MAX_EVENTS", 3),
+  hotPokeMaxSources: int("HOT_POKE_MAX_SOURCES", 20),
+  hotPokeCooldownMinutes: int("HOT_POKE_COOLDOWN_MINUTES", 30),
+  hotPokeMinSignals: int("HOT_POKE_MIN_SIGNALS", 3),
   devAdmin: env.DEV_AUTH_ROLE === "admin" ? { displayName: env.DEV_AUTH_DISPLAY_NAME || "Dev Admin" } : null,
   /** The admin password (at least 12 characters), for sites with admin pages. */
   adminPassword: env.ADMIN_PASSWORD || null,

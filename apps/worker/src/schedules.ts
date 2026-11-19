@@ -6,6 +6,8 @@ import { serverModules, type Scheduled } from "@aihot/backend/modules";
 import { sweepUnprocessed } from "@aihot/backend/jobs/content";
 import { translatePending } from "@aihot/backend/editorial/translate";
 import { adaptIntervals, scheduleDueSources } from "@aihot/backend/sources/collect";
+import { hotPoke } from "@aihot/backend/sources/poke";
+import { config } from "@aihot/backend/config";
 import { scheduleMpReconcile } from "@aihot/backend/sources/mp";
 import { followXRenames } from "@aihot/backend/sources/x-renames";
 import { dajialaConfigured } from "@aihot/backend/providers/dajiala";
@@ -59,6 +61,8 @@ const ENGINE_SCHEDULES: Scheduled[] = [
         { name: "sources.x-renames", cron: "50 4 * * *", missed: "once" as const, run: () => followXRenames() },
         // Icons are read from the sources' own sites, so they stop with collection.
         { name: "sources.icons", cron: "40 4 * * *", missed: "once" as const, run: () => refreshSourceIcons() },
+        // 热点 poke：默认 HOT_POKE_MODE=off，不排程也不花钱；dry-run 只记录候选，on 才入队抓取。
+        ...(config.hotPokeMode !== "off" ? [{ name: "sources.hot-poke", cron: "*/5 * * * *", run: hotPoke }] : []),
       ]
     : []),
   // WeChat official accounts through Dajiala (paid), each once per its interval; only with its key.
