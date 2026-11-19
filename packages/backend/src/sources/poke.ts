@@ -76,11 +76,12 @@ async function pokeCandidates(): Promise<PokeCandidate[]> {
   const out: PokeCandidate[] = [];
   for (const row of rows) {
     const sources = await sql<{ source_id: string }[]>`
-      SELECT DISTINCT ss.source_id
+      SELECT ss.source_id
       FROM story_signals ss
       JOIN sources src ON src.id = ss.source_id
       WHERE ss.story_id = ${row.id} AND src.enabled AND src.kind = 'x_search'
-      ORDER BY ss.source_id`;
+      GROUP BY ss.source_id
+      ORDER BY max(ss.observed_at) DESC`;
     out.push({ storyId: Number(row.id), title: row.title, signals: Number(row.signals), sources: sources.map((source) => source.source_id) });
   }
   return out;
