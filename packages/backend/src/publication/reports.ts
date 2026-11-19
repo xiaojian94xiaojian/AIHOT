@@ -6,7 +6,7 @@ import { sql } from "../db.ts";
 import { cached, type Cached } from "../lib/cache.ts";
 import { proxiedImage, proxiedImageSet } from "../media/imgproxy.ts";
 import { isoWeekRange, monthRange } from "@aihot/contracts/time";
-import { dailyUrl, itemUrl, periodUrl, siteUrl } from "./links.ts";
+import { dailyUrl, itemUrl, periodUrl } from "./links.ts";
 import { publicSourceName } from "./rules.ts";
 import { listedCondition } from "./scope.ts";
 import { mentionsIn } from "./mentions.ts";
@@ -309,7 +309,7 @@ async function leadCover(itemId: string): Promise<{ url: string; srcSet?: string
       WHERE m->>'kind' = 'image' AND coalesce((m->>'width')::numeric, 800) >= 480 LIMIT 1
     ) img
     WHERE (p.article_id = ${itemId} OR p.story_id = (SELECT story_id FROM publications WHERE article_id = ${itemId}))
-      AND ${listedCondition(new Date())} AND p.body_mode <> 'summary'
+      AND ${listedCondition(new Date())} AND p.body_mode <> 'summary' AND NOT p.suppress_original
     ORDER BY (p.article_id = ${itemId}) DESC, p.first_party DESC, coalesce(p.score, 0) DESC, p.article_id
     LIMIT 1`;
   if (!row) return null;
@@ -701,8 +701,6 @@ export async function v1Period(kind: PeriodKind, key: string | "latest") {
     },
   };
 }
-
-export { siteUrl };
 
 export function reportNavigation(kind: ReportKind, index: ReportIndexEntry[], key: string): ReportNavigationEntry[] {
   const at = index.findIndex((e) => e.key === key);

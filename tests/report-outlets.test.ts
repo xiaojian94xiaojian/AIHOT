@@ -39,8 +39,8 @@ async function citation(title: string) {
 }
 
 async function issue(kind: ReportKind, key: string, content: Record<string, unknown>) {
-  await sql`INSERT INTO reports (kind, key, window_start, window_end, content, generated_at, origin)
-    VALUES (${kind}, ${key}, ${generatedAt}, ${generatedAt}, ${sql.json(content as never)}, ${generatedAt}, 'manual')`;
+  await sql`INSERT INTO reports (kind, key, window_start, window_end, content, generated_at)
+    VALUES (${kind}, ${key}, ${generatedAt}, ${generatedAt}, ${sql.json(content as never)}, ${generatedAt})`;
 }
 
 async function dailyOutlets(key: string) {
@@ -130,7 +130,7 @@ test('a daily citation without a frozen summary, and a flash with an earlier fro
 
 test('discovery counts exactly the publicly indexed topics it lists', () => {
   const text = llmsTxt({ hasDailies: false, hasWeekly: false, hasMonthly: false, topics: [{ slug: 'sample', name: 'Example', definition: 'Example topic' }], tools: [],
-    modules: { api: [], pace: [], pages: [], topics: [], access: [], usage: [], guideClients: [], ways: [] } });
+    modules: { api: [], pace: [], pages: [], topics: [], access: [], guideClients: [], ways: [] } });
   assert.match(text, /（1 个主题，下一节逐个列出）/);
 });
 

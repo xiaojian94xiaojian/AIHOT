@@ -17,7 +17,6 @@ import { sendJsonWithEtag, sendProblem, looseQuery } from "@aihot/backend/lib/ht
 import { cached } from "@aihot/backend/lib/cache";
 import { sql } from "@aihot/backend/db";
 import { siteUrl } from "@aihot/backend/publication/links";
-import { beijingStamp } from "@aihot/contracts/time";
 import { duration, type Finding } from "@aihot/backend/notify/feishu";
 import { CODEX_RESET_SCAN_MINUTES } from "@aihot/contracts/monitor";
 import { codexAnswer, codexPageAnswer } from "./backend/answer.ts";
@@ -155,7 +154,7 @@ export const monitorServerModule: ServerModule = {
     monitor: { label: "Codex 重置公告识别", env: "MONITOR_MODEL", purposes: ["monitor.recognize", "monitor.context"] },
   },
 
-  admin: { counts: { monitor: pendingCount } },
+  adminTools: { counts: { monitor: pendingCount } },
 
   alerts: monitorFindings,
 

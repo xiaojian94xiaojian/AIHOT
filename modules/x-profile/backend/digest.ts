@@ -4,7 +4,6 @@ import { sql } from "@aihot/backend/db";
 import { config } from "@aihot/backend/config";
 import { addDays, beijingAt, beijingDate } from "@aihot/contracts/time";
 
-const DAY = 86_400_000;
 /** 默认给最近八周：够看清趋势，又不至于让订阅源太长。 */
 const DEFAULT_WEEKS = 8;
 

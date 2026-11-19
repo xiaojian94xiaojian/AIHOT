@@ -13,7 +13,7 @@ export async function navCounts(): Promise<AdminNavCounts> {
     SELECT (SELECT count(*)::int FROM feedback WHERE status = 'new') AS feedback,
            (SELECT count(*)::int FROM sources WHERE enabled AND health = 'failing') AS sources,
            (SELECT count(*)::int FROM receipts WHERE ${awaitingRelease()}) + (SELECT count(*)::int FROM deliveries WHERE status = 'unknown') AS runs`,
-    Promise.all(serverModules().flatMap((m) => Object.entries(m.admin?.counts ?? {}).map(async ([key, count]) => [key, await count()] as const))),
+    Promise.all(serverModules().flatMap((m) => Object.entries(m.adminTools?.counts ?? {}).map(async ([key, count]) => [key, await count()] as const))),
   ]);
   return { ...c!, ...Object.fromEntries(counts) };
 }

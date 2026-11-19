@@ -84,7 +84,7 @@ async function fileSha256(file: string): Promise<string> {
 }
 
 const EMPTY_SHA = hex("");
-/** R2 wants each part to arrive within its own request; 64 MB keeps a slow link from holding one open. */
+/** One part per request: 64 MB keeps a slow link from holding one open long enough to be cut. */
 const PART_SIZE = 64 * 1024 * 1024;
 /** Below this a single PUT is cheaper than three requests and just as reliable. */
 const MULTIPART_FROM = 100 * 1024 * 1024;
@@ -112,8 +112,9 @@ async function readPart(file: string, start: number, length: number): Promise<Bu
 }
 
 /**
- * Upload one file. A dump outgrew what a single PUT survives: on a slow link R2 answers 502 or drops the
- * connection halfway, so above MULTIPART_FROM the file goes up in parts, each retried on its own.
+ * Upload one file. A dump can outgrow what a single PUT survives: on a slow link the store answers 502
+ * or drops the connection halfway, so above MULTIPART_FROM the file goes up in parts, each retried on
+ * its own.
  */
 export async function upload(
   s: Store, key: string, file: string, sha: string, size: number,
@@ -167,7 +168,6 @@ export async function upload(
     // COS can send HTTP 200 and keep the response open for minutes while it joins the parts.
     const res = await fetch(uploadUrl, { method: "POST", headers, body: xml, signal: AbortSignal.timeout(10 * 60_000) });
     const answer = (await res.text()).trim().replace(/^<\?xml[^>]*\?>\s*/, "");
-    // A complete may answer 200 with an <Error>, or without the joined result at all; only the result counts.
     if (!res.ok || !/^<CompleteMultipartUploadResult(?:\s[^>]*)?>[\s\S]*<\/CompleteMultipartUploadResult>$/.test(answer)) {
       const code = /<Code>([A-Za-z0-9]+)<\/Code>/.exec(answer)?.[1];
       throw new Error(`backup multipart ${key}: HTTP ${res.status}${code ? ` ${code}` : " without a complete upload result"}`);
@@ -185,7 +185,6 @@ export async function upload(
     throw error;
   }
 }
-
 
 export async function runBackup(now = new Date()) {
   const s = backupStore();
@@ -211,7 +210,9 @@ export async function runBackup(now = new Date()) {
     env[key === "user" ? "PGUSER" : "PGPASSWORD"] = decodeURIComponent(option.slice(separator + 1));
     return false;
   }).join("&");
-  await run("pg_dump", ["--format=custom", "--compress=6", "--no-owner", "--file", dump, connection.href], { env, maxBuffer: 16 * 1024 * 1024 });
+  // Raw analytics events keep their table but not their rows: the privacy notice keeps them 30 days, a backup
+  // lives up to 100, and their daily aggregates and visitor states are tables of their own.
+  await run("pg_dump", ["--format=custom", "--compress=6", "--no-owner", "--exclude-table-data=analytics_events", "--file", dump, connection.href], { env, maxBuffer: 16 * 1024 * 1024 });
   // Verify before shipping: the archive must list cleanly.
   await run("pg_restore", ["--list", dump], { maxBuffer: 64 * 1024 * 1024 });
   const files = path.join(dir, `${name}-files-${stamp}.tar.gz`);
@@ -246,7 +247,7 @@ export async function runBackup(now = new Date()) {
   for (const file of kept.length && !filesError ? [dump, files] : [dump]) {
     const size = (await stat(file)).size;
     const sha = await fileSha256(file);
-    // One upload per file; the chosen prefix carries its retention class.
+    // The chosen prefix carries the file's retention class.
     const key = `${prefix}/${path.basename(file)}`;
     if (s) await upload(s, key, file, sha, size);
     out.push({ key: s ? key : `local-only:${path.basename(file)}`, bytes: size, sha256: sha });

@@ -11,7 +11,7 @@ import { posts } from "./data.ts";
 import { reportsFor } from "./growth-report.ts";
 import { notWithdrawn } from "./visibility.ts";
 import { regionOf } from "./classify.ts";
-import type { XGrowthReport, XWeeklyDarkHorse, XWeeklyPattern, XWeeklyResponse, XWeeklyRow, XWeeklyShape, XWeeklySummary, XWeeklyViral } from "../types.ts";
+import type { XWeeklyDarkHorse, XWeeklyPattern, XWeeklyResponse, XWeeklyRow, XWeeklyShape, XWeeklySummary, XWeeklyViral } from "../types.ts";
 
 /** 页面上能回看的周数，也是 RSS 的条目数。 */
 export const WEEKLY_WEEKS = 8;

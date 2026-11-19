@@ -15,7 +15,6 @@ const STALE_HEARTBEAT_MS = 3 * 60_000;
 type Runs = BeforeJson<AdminRuns>;
 
 export async function runsOverview(): Promise<Runs> {
-  const currentJobs = (await Promise.all(serverModules().flatMap((m) => (m.admin?.currentJobs ? [m.admin.currentJobs()] : [])))).flat();
   const [
     heartbeats,
     latest,
@@ -80,7 +79,7 @@ export async function runsOverview(): Promise<Runs> {
     // Articles waiting to retry after a passing provider problem (they are not failed).
     sql<{ n: number; next: Date | null }[]>`
       SELECT count(*)::int AS n, min(processing_retry_at) AS next FROM articles WHERE processing_state = 'new' AND processing_attempts > 0`,
-    Promise.all(serverModules().flatMap((m) => (m.admin?.runs ? [m.admin.runs().then((part) => [m.name, part] as const)] : []))),
+    Promise.all(serverModules().flatMap((m) => (m.adminTools?.runs ? [m.adminTools.runs().then((part) => [m.name, part] as const)] : []))),
   ]);
   const now = Date.now();
   return {

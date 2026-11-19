@@ -485,13 +485,6 @@
           "owner.login"
         ],
         "externalIdPath": "full_name",
-        "rawDropKeys": [
-          "owner",
-          "license",
-          "topics",
-          "permissions",
-          "security_and_analysis"
-        ],
         "headers": {
           "accept": "application/vnd.github+json"
         }
@@ -1173,13 +1166,6 @@
           "owner.login"
         ],
         "externalIdPath": "full_name",
-        "rawDropKeys": [
-          "owner",
-          "license",
-          "topics",
-          "permissions",
-          "security_and_analysis"
-        ],
         "headers": {
           "accept": "application/vnd.github+json"
         }
@@ -1324,13 +1310,6 @@
           "owner.login"
         ],
         "externalIdPath": "full_name",
-        "rawDropKeys": [
-          "owner",
-          "license",
-          "topics",
-          "permissions",
-          "security_and_analysis"
-        ],
         "headers": {
           "accept": "application/vnd.github+json"
         }
@@ -1550,13 +1529,6 @@
           "owner.login"
         ],
         "externalIdPath": "full_name",
-        "rawDropKeys": [
-          "owner",
-          "license",
-          "topics",
-          "permissions",
-          "security_and_analysis"
-        ],
         "headers": {
           "accept": "application/vnd.github+json"
         }
@@ -1925,13 +1897,6 @@
           "owner.login"
         ],
         "externalIdPath": "full_name",
-        "rawDropKeys": [
-          "owner",
-          "license",
-          "topics",
-          "permissions",
-          "security_and_analysis"
-        ],
         "headers": {
           "accept": "application/vnd.github+json"
         }
@@ -2210,13 +2175,6 @@
           "owner.login"
         ],
         "externalIdPath": "full_name",
-        "rawDropKeys": [
-          "owner",
-          "license",
-          "topics",
-          "permissions",
-          "security_and_analysis"
-        ],
         "headers": {
           "accept": "application/vnd.github+json"
         }
@@ -2266,13 +2224,6 @@
           "owner.login"
         ],
         "externalIdPath": "full_name",
-        "rawDropKeys": [
-          "owner",
-          "license",
-          "topics",
-          "permissions",
-          "security_and_analysis"
-        ],
         "headers": {
           "accept": "application/vnd.github+json"
         }
@@ -2304,13 +2255,6 @@
           "owner.login"
         ],
         "externalIdPath": "full_name",
-        "rawDropKeys": [
-          "owner",
-          "license",
-          "topics",
-          "permissions",
-          "security_and_analysis"
-        ],
         "headers": {
           "accept": "application/vnd.github+json"
         }
@@ -5474,13 +5418,6 @@
           "owner.login"
         ],
         "externalIdPath": "full_name",
-        "rawDropKeys": [
-          "owner",
-          "license",
-          "topics",
-          "permissions",
-          "security_and_analysis"
-        ],
         "headers": {
           "accept": "application/vnd.github+json"
         }
@@ -5570,13 +5507,6 @@
           "owner.login"
         ],
         "externalIdPath": "full_name",
-        "rawDropKeys": [
-          "owner",
-          "license",
-          "topics",
-          "permissions",
-          "security_and_analysis"
-        ],
         "headers": {
           "accept": "application/vnd.github+json"
         }
@@ -5979,13 +5909,6 @@
           "owner.login"
         ],
         "externalIdPath": "full_name",
-        "rawDropKeys": [
-          "owner",
-          "license",
-          "topics",
-          "permissions",
-          "security_and_analysis"
-        ],
         "headers": {
           "accept": "application/vnd.github+json"
         }
@@ -6034,12 +5957,7 @@
         ],
         "urlTemplate": "https://huggingface.co/{id}",
         "publishedAtPath": "createdAt",
-        "externalIdPath": "id",
-        "rawDropKeys": [
-          "tags",
-          "siblings",
-          "config"
-        ]
+        "externalIdPath": "id"
       },
       "tier": "T2",
       "first_party": false,
@@ -6081,13 +5999,6 @@
           "owner.login"
         ],
         "externalIdPath": "full_name",
-        "rawDropKeys": [
-          "owner",
-          "license",
-          "topics",
-          "permissions",
-          "security_and_analysis"
-        ],
         "headers": {
           "accept": "application/vnd.github+json"
         }
@@ -6113,12 +6024,7 @@
         ],
         "urlTemplate": "https://huggingface.co/{id}",
         "publishedAtPath": "createdAt",
-        "externalIdPath": "id",
-        "rawDropKeys": [
-          "tags",
-          "siblings",
-          "config"
-        ]
+        "externalIdPath": "id"
       },
       "tier": "T1",
       "first_party": true,
@@ -6159,13 +6065,6 @@
           "owner.login"
         ],
         "externalIdPath": "full_name",
-        "rawDropKeys": [
-          "owner",
-          "license",
-          "topics",
-          "permissions",
-          "security_and_analysis"
-        ],
         "headers": {
           "accept": "application/vnd.github+json"
         }

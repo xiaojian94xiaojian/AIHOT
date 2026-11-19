@@ -213,7 +213,6 @@ export async function reviewRequest(
       participation_mode: "hot_signal",
       interval_minutes: 120,
       uses: [],
-      first_party: false,
       tags: [],
       site_fulltext: true,
       syndicate_fulltext: false,

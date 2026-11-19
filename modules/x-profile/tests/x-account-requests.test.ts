@@ -6,9 +6,6 @@ import { closeDb, sql } from "@aihot/backend/db";
 import { forwardRequestNotifications, listRequests, lookupAccount, RequestRejected, reviewRequest, submitRequest } from "../backend/requests.ts";
 
 const T = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
-// 这组用例会开关飞书通道：保存原值，结束后恢复，避免依赖外部环境。
-const FEISHU_ENV = ["FEISHU_INTERNAL_ENABLED", "FEISHU_ALERT_WEBHOOK_URL", "FEISHU_ALERT_CHAT_ID", "FEISHU_INTERNAL_CHAT_ID", "WEBHOOK_HUB_URL", "WEBHOOK_HUB_KEY"] as const;
-const savedEnv = new Map(FEISHU_ENV.map((name) => [name, process.env[name]]));
 const handle = (name: string) => `probe_${name}_${T}`;
 
 after(async () => {

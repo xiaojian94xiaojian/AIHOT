@@ -242,7 +242,7 @@ export const xProfileServerModule: ServerModule = {
   },
 
   // 后台导航的徽章：待审的收录申请（web.tsx 的 admin.content 用 count: "x-requests"）。
-  admin: {
+  adminTools: {
     counts: {
       "x-requests": async () => {
         const [row] = await sql<{ n: number }[]>`SELECT count(*)::int AS n FROM x_account_requests WHERE status = 'pending'`;

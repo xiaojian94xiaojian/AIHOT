@@ -2,13 +2,11 @@
 // (…/<bucket>/<key>); a bucket in the host name — what Tencent COS wants — comes back 403, which is
 // how this deployment's backups silently stopped. The switch is what the rest of the store settings
 // already assume, so it is a setting, not a second code path.
-import { tag } from "./setup.ts";
 import assert from "node:assert/strict";
 import { after, test } from "node:test";
 import { closeDb, sql } from "@aihot/backend/db";
 import { runBackup } from "@aihot/backend/operations/backup";
 
-const T = tag();
 const originalFetch = globalThis.fetch;
 const env = {
   DB_BACKUP_STORE_SECRET_ID: "test-backup-id", DB_BACKUP_STORE_SECRET_KEY: "test-backup-key",

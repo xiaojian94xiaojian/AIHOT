@@ -200,7 +200,7 @@ export const leaderboardServerModule: ServerModule = {
   // 厂商标志与评测来源的标志（本模块的 assets/），由上面的 http 插口发出。
 
   // 「榜单里有多少模型还没有厂商标志」给后台导航的徽章用（web 侧声明 count: "leaderboard"）。
-  admin: {
+  adminTools: {
     counts: { leaderboard: unmarkedCount },
     runs: runsPart,
   },

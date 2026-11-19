@@ -1,4 +1,3 @@
-import { motion } from "motion/react";
 import { Suspense } from "react";
 import { ADMIN, SITE } from "@aihot/site";
 import { Await, data, NavLink, Outlet, useLocation, useNavigation, type ShouldRevalidateFunction } from "react-router";
@@ -72,14 +71,14 @@ function NavCount({ counts, countsKey, name, className }: Counts & { name: strin
 
 function NavItem({ to, label, count, counts, countsKey, tone }: AdminNavEntry & Counts) {
   return (
-    <NavLink to={to} className="group relative block">
-      {({ isActive }) => (
-        <span className={`relative flex items-center justify-between rounded-control px-3 py-[7px] text-[13.5px] transition-colors ${isActive ? "font-medium text-ink" : "text-ink-3 hover:text-ink"}`}>
-          {isActive && <motion.span layoutId="admin-nav" className="absolute inset-0 rounded-control bg-surface shadow-sm ring-1 ring-line" transition={{ type: "spring", stiffness: 520, damping: 38 }} />}
-          <span className="relative">{label}</span>
-          <NavCount counts={counts} countsKey={countsKey} name={count} className={`num relative min-w-5 rounded-full px-1.5 text-center text-[11px] font-semibold leading-5 ${tone === "bad" ? "bg-hot text-white" : "bg-accent-soft text-accent"}`} />
-        </span>
-      )}
+    <NavLink
+      to={to}
+      className={({ isActive }) =>
+        `flex items-center justify-between rounded-control px-3 py-[7px] text-[13.5px] transition-colors ${isActive ? "bg-surface font-medium text-ink shadow-sm ring-1 ring-line" : "text-ink-3 hover:text-ink"}`
+      }
+    >
+      <span>{label}</span>
+      <NavCount counts={counts} countsKey={countsKey} name={count} className={`num min-w-5 rounded-full px-1.5 text-center text-[11px] font-semibold leading-5 ${tone === "bad" ? "bg-hot text-white" : "bg-accent-soft text-accent"}`} />
     </NavLink>
   );
 }
@@ -127,7 +126,7 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
             <span className="text-[14px] font-semibold text-ink">{`${SITE.name} 后台`}</span>
             {me.dev && <span className="rounded-mark bg-amber/15 px-1.5 text-[11px] font-medium text-amber">开发</span>}
           </div>
-          <nav className="no-scrollbar flex gap-1 overflow-x-auto px-3 py-2">
+          <nav className="scrollbar-none flex gap-1 overflow-x-auto px-3 py-2">
             {flat.map((i) => {
               const active = location.pathname === i.to || location.pathname.startsWith(`${i.to}/`);
               return (

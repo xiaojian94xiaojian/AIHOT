@@ -6,14 +6,14 @@
 //           closed on its own: a fix removes it, and one judged not worth fixing is closed with a reason.
 // A finding with agentOnly is still now or today, but it only wakes the agent: nothing is sent when it
 // opens, nothing is sent when it clears, and it stays off the 09:00 digest.
-// A module can name those alerts as well, including `name:<item>`, so a row saved before the flag still closes quietly.
 // With an agent taking the alerts (notify/agent.ts), a now or today problem that is not the owner's own
 // (Finding.owner) is handed to the agent instead. The owner hears of it when the same problem is handed over
 // a third time in a day, or when it is still open HANDED_MS after the handoff, and from then on as above;
 // an incident the agent judged not a fault (holdAlert) is not told before its hold ends. The agent is not
-// woken for what is the owner's alone (owner "only"). While the channel to the agent fails, the owner hears everything again.
+// woken for what is the owner's alone (owner "only" or "private"). While the channel to the agent fails, the owner hears everything again.
 // The shared hub owns serial execution and retry; accepted events are never dispatched again here.
 // Delivery goes through sendAlert (alert webhook or ops chat, internal-chat fallback; off unless FEISHU_INTERNAL_ENABLED).
+import { randomUUID } from "node:crypto";
 import { addDays, beijingAt, beijingDate, beijingDay, beijingStamp, isValidDate } from "@aihot/contracts/time";
 import { ALERTS, EDITION_TIMES } from "@aihot/site";
 import { audit } from "../audit.ts";
@@ -375,37 +375,20 @@ async function providerFindings(now: number, open: AlertState): Promise<Finding[
     summary.n += p.n;
     models.set(key, summary);
   }
-  // Earlier versions combined every model under a service key without saving its scope. Freeze the
-  // unresolved models once for those existing events; their old timestamps cannot establish that scope.
-  for (const [key, incident] of Object.entries(open)) {
-    if (!key.startsWith(REFUSED_PREFIX) || key.includes(":") || incident.refusedModels) continue;
-    const service = key.slice(REFUSED_PREFIX.length);
-    incident.refusedModels = [...models.values()].filter(p => p.service === service).map(p => p.model);
-  }
-  const refused = new Map<string, { service: string; n: number; last: string; models?: Set<string> }>();
-  for (const [modelKey, p] of models) {
-    const legacyKey = `${REFUSED_PREFIX}${p.service}`;
-    const legacy = open[legacyKey];
-    const key = legacy?.refusedModels?.includes(p.model) ? legacyKey : modelKey;
+  for (const [key, p] of models) {
     if (!open[key] && p.latest <= now - 3600_000) continue;
-    const summary = refused.get(key) ?? { service: p.service, n: 0, last: p.last, models: new Set<string>() };
-    summary.n += p.n;
-    if (p.model === null) summary.models = undefined;
-    else summary.models?.add(p.model);
-    refused.set(key, summary);
-  }
-  for (const [key, p] of refused) {
     const service = p.service;
-    const unused = p.models && !provider(service)?.stops && !(await stepsOnService(service, p.models)).length;
+    const scope = p.model === null ? undefined : new Set([p.model]);
+    const unused = scope && !provider(service)?.stops && !(await stepsOnService(service, scope)).length;
     out.push({
       key,
       level: unused ? "later" : "today",
       ...(unused ? {} : { owner: true as const }),
       title: unused ? `${providerName(service)} 的旧模型限制尚未验证` : `${providerName(service)} 拒绝调用，需要核对账号或额度`,
-      impact: unused ? "当前处理步骤未使用这些受限模型；旧限制仍未验证" : await providerStops(service, p.models),
+      impact: unused ? "当前处理步骤未使用这些受限模型；旧限制仍未验证" : await providerStops(service, scope),
       heals: "需先恢复访问，再确认失败任务已接续",
       action: `去${providerConsole(service)}看余额、套餐和消费上限；充值或恢复后让 AI 核实调用并补跑刚才失败的任务（后台看着都正常的话，也把这条发给 AI 查原因）`,
-      detail: `${p.models ? `模型 ${[...p.models].join("、")}；` : ""}最近一次成功后被拒 ${p.n} 次，尚未取得后续成功调用：${p.last}`,
+      detail: `${p.model !== null ? `模型 ${p.model}；` : ""}最近一次成功后被拒 ${p.n} 次，尚未取得后续成功调用：${p.last}`,
     });
   }
   const capped = await sql<{ service: string; per_day: number; used: number }[]>`
@@ -445,8 +428,22 @@ async function providerFindings(now: number, open: AlertState): Promise<Finding[
   return out;
 }
 
-interface AlertState {
-  [key: string]: { title: string; since: string; sentAt?: string; agentOnly?: true; handedAt?: string; refusedModels?: (string | null)[] };
+type PrivateNotice = ReturnType<typeof formatAlert> & { id: string; recovery: boolean };
+
+interface AlertEntry {
+  title: string;
+  since: string;
+  sentAt?: string;
+  agentOnly?: true;
+  privateOwner?: true;
+  privateNotice?: PrivateNotice;
+  handedAt?: string;
+}
+type AlertState = Record<string, AlertEntry>;
+
+async function saveAlertEntry(key: string, entry: AlertEntry) {
+  await sql`INSERT INTO settings (key, value, updated_by) VALUES ('alerts.state', ${sql.json({ [key]: entry } as never)}, 'alerts')
+            ON CONFLICT (key) DO UPDATE SET value = coalesce(settings.value, '{}'::jsonb) || EXCLUDED.value, updated_at = now()`;
 }
 
 const DAILY_PREFIX = "report.daily:";
@@ -558,8 +555,25 @@ export async function checkAlerts(now = Date.now()) {
   const returns = await returnsTold(now);
   const holds = await savedHolds();
   const sent: string[] = [];
+  async function tellPrivate(key: string, entry: AlertEntry, message: ReturnType<typeof formatAlert>, recovery = false) {
+    const notice = entry.privateNotice ?? { ...message, id: `alert-private-${randomUUID()}`, recovery };
+    if (!entry.privateNotice) {
+      // The hub may accept a notice before its response is lost. Keep its exact key and text across runs.
+      entry = { ...entry, privateNotice: notice };
+      await saveAlertEntry(key, entry);
+      state[key] = entry;
+    }
+    if (await sendAlert(notice.title, notice.lines, notice.id) === "pending") return;
+    if (notice.recovery) delete state[key];
+    else state[key] = { ...entry, sentAt: new Date(now).toISOString(), privateNotice: undefined };
+    sent.push(notice.recovery ? `${key}:recovered` : key);
+  }
+  for (const [key, entry] of Object.entries(state)) {
+    if (entry.privateNotice) await tellPrivate(key, entry, entry.privateNotice);
+  }
   for (const f of all) {
     const open = state[f.key];
+    if (open?.privateNotice) continue;
     if (f.level === "later") {
       // Switching before the first check changes the impact, not whether access has recovered.
       if (f.key.startsWith(REFUSED_PREFIX) && !open) state[f.key] = { title: f.title, since: new Date(now).toISOString() };
@@ -596,8 +610,7 @@ export async function checkAlerts(now = Date.now()) {
       if (!open) {
         const entry = { title: f.title, since: since.toISOString() };
         state[f.key] = entry;
-        await sql`INSERT INTO settings (key, value, updated_by) VALUES ('alerts.state', ${sql.json({ [f.key]: entry } as never)}, 'alerts')
-                  ON CONFLICT (key) DO UPDATE SET value = coalesce(settings.value, '{}'::jsonb) || ${sql.json({ [f.key]: entry } as never)}, updated_at = now()`;
+        await saveAlertEntry(f.key, entry);
       }
       woken = await wakeAgent({ ...f, since }, now);
     }
@@ -608,24 +621,33 @@ export async function checkAlerts(now = Date.now()) {
         ? { ...f, action: "已自动通知 AI 排查处理，修不好或要你拍板时会再找你；恢复后会再发一条通知" }
         : f;
     const msg = formatAlert(shown, since, now, !!open?.sentAt);
+    const entry = { ...open, title: f.title, since: since.toISOString() };
+    if (f.owner === "private") {
+      await tellPrivate(f.key, { ...entry, privateOwner: true }, msg);
+      continue;
+    }
     await sendAlert(msg.title, msg.lines);
-    state[f.key] = { ...open, title: f.title, since: since.toISOString(), sentAt: new Date(now).toISOString() };
+    state[f.key] = { ...entry, sentAt: new Date(now).toISOString() };
     sent.push(f.key);
   }
   const found = new Set(all.map((f) => f.key));
   const dailies = await settleDailies(state, found, now);
   sent.push(...dailies.sent);
   for (const [key, open] of Object.entries(state)) {
-    if (found.has(key) || dailies.missing.has(key)) continue;
+    if (found.has(key) || dailies.missing.has(key) || open.privateNotice) continue;
     // An agent-only incident was never told to the owner, so clearing it stays quiet too.
     if (open.agentOnly || !open.sentAt) {
       delete state[key];
       continue;
     }
+    const msg = formatRecovery(open.title, new Date(open.since), now);
+    if (open.privateOwner) {
+      await tellPrivate(key, open, msg, true);
+      continue;
+    }
     const [dropped] = key === "deliveries.failed" ? await sql`SELECT count(*)::int AS n FROM deliveries d
       WHERE d.status IN ('failed','skipped') AND d.updated_at>${new Date(Date.parse(open.since)-86400_000)}
         AND EXISTS(SELECT 1 FROM audit_log a WHERE a.action='delivery.drop' AND a.subject='delivery:' || d.id AND a.created_at>=d.updated_at)` : [];
-    const msg = formatRecovery(open.title, new Date(open.since), now);
     if (dropped?.n) await sendAlert(`已结束跟进：${open.title}`, [`${dropped.n} 条旧通知已决定不再补发，未确认送达`]);
     else await sendAlert(msg.title, msg.lines);
     sent.push(`${key}:${dropped?.n ? "closed" : "recovered"}`);
@@ -637,7 +659,7 @@ export async function checkAlerts(now = Date.now()) {
             ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`;
   // Revisit every open incident: a crash between saving the owner's alert and dispatching cannot lose it.
   // Transport receipts retain IDs across uncertain responses, independently from owner reminders.
-  for (const f of all) if (f.level !== "later" && f.key !== "webhook.transport" && f.owner !== "only" && state[f.key]) {
+  for (const f of all) if (f.level !== "later" && f.key !== "webhook.transport" && f.owner !== "only" && f.owner !== "private" && state[f.key]) {
     await wakeAgent({ ...f, since: new Date(state[f.key]!.since) }, now);
   }
   await flushAgentEvents();

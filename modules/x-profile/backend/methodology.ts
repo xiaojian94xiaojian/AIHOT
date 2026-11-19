@@ -13,19 +13,6 @@ const round1 = (value: number) => Math.round(value * 10) / 10;
  * 回复帖的浏览结构和原创不同，和卡片/画像页一样不进池；P90 也只从同一批成熟帖里切，
  * 否则切点会被还没攒够曝光的新帖往下拉。
  */
-const LABELED = sql`
-  WITH matured AS (
-    SELECT * FROM (${posts()}) m
-    WHERE m.published_at < now() - interval '3 days' AND NOT m.is_reply
-  )
-  SELECT p.*, (p.views >= per.cut) AS is_hit, per.cut
-  FROM matured p
-  JOIN (
-    SELECT source_id, percentile_cont(0.9) WITHIN GROUP (ORDER BY views)::numeric AS cut
-    FROM matured
-    GROUP BY 1 HAVING count(*) >= 20
-  ) per ON per.source_id = p.source_id
-`;
 
 interface TotalRow {
   accounts: number;

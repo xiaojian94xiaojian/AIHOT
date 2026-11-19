@@ -2,7 +2,6 @@
 //
 // 一张卡只回答一个问题：「今天写什么」。其他页面继续负责「看大盘」。
 import { sql } from "@aihot/backend/db";
-import { notWithdrawn } from "./visibility.ts";
 import { cached, cachedByKey } from "@aihot/backend/lib/cache";
 import { replyOpportunity } from "./insight.ts";
 import { sourceIdsOfHandle } from "./followers.ts";
