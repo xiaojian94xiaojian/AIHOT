@@ -122,14 +122,31 @@ export type AdminHandler = (req: FastifyRequest, reply: FastifyReply, admin: Adm
 /**
  * Guard for /api/admin/*: a live session; writes need the CSRF token. A module's own admin routes
  * (modules/<name>/server.ts) use this too, so the guard has one definition shared by the engine and modules.
+ * A read-only API token (ADMIN_API_TOKEN) may replace the session for GET/HEAD only.
  */
 export function adminHandler(fn: AdminHandler) {
   return async (req: FastifyRequest, reply: FastifyReply) => {
     reply.header("Cache-Control", "no-store");
-    const admin = await sessionPrincipal(req.headers.cookie);
-    if (!admin) return sendProblem(req, reply, { status: 401, code: "unauthorized", detail: "Sign in to the admin first." });
-    if (req.method !== "GET" && req.method !== "HEAD" && req.headers["x-csrf-token"] !== admin.csrf) {
-      return sendProblem(req, reply, { status: 403, code: "forbidden", detail: "Missing or stale CSRF token." });
+    // The token never reaches a write: an operator reading data from a script cannot change the site by accident.
+    const bearer = /^Bearer\s+/i.test(req.headers.authorization ?? "");
+    let admin: AdminPrincipal | null = null;
+    if (bearer) {
+      const match = /^Bearer\s+(.+)$/i.exec(req.headers.authorization ?? "");
+      const given = match?.[1]?.trim() ?? "";
+      const configured = config.adminApiToken;
+      if (!configured || !match || !timingSafeEqual(Buffer.from(sha256(given), "hex"), Buffer.from(sha256(configured), "hex"))) {
+        return sendProblem(req, reply, { status: 401, code: "unauthorized", detail: "Invalid API token." });
+      }
+      if (req.method !== "GET" && req.method !== "HEAD") {
+        return sendProblem(req, reply, { status: 403, code: "forbidden", detail: "API token is read-only." });
+      }
+      admin = { userId: null, name: "API token", csrf: "", dev: false };
+    } else {
+      admin = await sessionPrincipal(req.headers.cookie);
+      if (!admin) return sendProblem(req, reply, { status: 401, code: "unauthorized", detail: "Sign in to the admin first." });
+      if (req.method !== "GET" && req.method !== "HEAD" && req.headers["x-csrf-token"] !== admin.csrf) {
+        return sendProblem(req, reply, { status: 403, code: "forbidden", detail: "Missing or stale CSRF token." });
+      }
     }
     try {
       return await fn(req, reply, admin);
