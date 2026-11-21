@@ -66,7 +66,7 @@ async function get<T>(path: string, request: Omit<ReceiptRequest, "service">,
   const key = credential("collectors", "SOCIALDATA_API_KEY");
   if (!key) throw new Error("SOCIALDATA_API_KEY is not configured");
   return paidRequest({ service: "socialdata", ...request }, async () => {
-    const res = await guardedFetch(`${apiBase()}${path}`, {
+    const send = () => guardedFetch(`${apiBase()}${path}`, {
       headers: { authorization: `Bearer ${key}`, accept: "application/json" },
       timeoutMs: read.timeoutMs,
       maxBytes: read.maxBytes,
@@ -74,6 +74,15 @@ async function get<T>(path: string, request: Omit<ReceiptRequest, "service">,
       // remains useful when the direct connection itself times out before a request is sent.
       route: "direct-first",
     });
+    // SocialData's docs: 5xx means their side failed and "typically a retry will succeed". A search
+    // outage that lasts hours still lets some requests through, so retrying is what turns a source's
+    // scheduled fetch into a success instead of waiting a whole interval.
+    let res = await send();
+    for (const delay of [1_000, 3_000]) {
+      if (res.status !== 500 && res.status !== 502 && res.status !== 503 && res.status !== 504) break;
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      res = await send();
+    }
     if (res.status === 404 && read.missing) return { response: null, usage: read.missing, cost: objectsCost(0) };
     const text = res.text();
     assertAccepted("socialdata", res.status, text);

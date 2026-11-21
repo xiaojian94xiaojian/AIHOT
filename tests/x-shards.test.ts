@@ -28,14 +28,15 @@ const tweet = (p: { id: bigint; handle: string }) => ({
   id_str: String(p.id), tweet_created_at: new Date().toISOString(), full_text: `Post ${p.id} ${T}`, lang: "en", user: { name: p.handle, screen_name: p.handle },
 });
 
-let failNext = false;
+// A 5xx is retried twice, so a failure test has to refuse all three attempts.
+let failRequests = 0;
 let failPage2 = 0;
 const queries: string[] = [];
 const socialdata = await stub((_hit, req) => {
   const q = new URL(req.url, "http://stub").searchParams.get("query") ?? "";
   queries.push(q);
-  if (failNext) {
-    failNext = false;
+  if (failRequests > 0) {
+    failRequests -= 1;
     return new Reply(500, { error: "down" });
   }
   const handles = new Set([...q.matchAll(/from:(\w+)/g)].map((m) => m[1]!.toLowerCase()));
@@ -120,7 +121,7 @@ test("a page failing after the first keeps what was read and goes on from there 
   // Another watermark (still below every post): paid responses are reused only for the same search.
   await sql`UPDATE sources SET cursor = (cursor - 'lastOkAt') || ${sql.json({ lastTweetId: String(WATERMARK - 1n) })} WHERE id IN ${sql(IDS)}`;
   await sql`DELETE FROM articles WHERE source_id IN ${sql(IDS)}`;
-  failPage2 = 2; // the page, and the same run's second try at it from the stretch kept
+  failPage2 = 6; // three attempts on the page, then three on the stretch's second try at it
   const first = await collectXShard(`editorial:test-${T}`, IDS);
   assert.equal(first.status, "ok", "the accounts are not failed for a later page");
   assert.equal(first.found, 2, "the first page is kept");
@@ -188,7 +189,7 @@ test("a post in the ten minutes before a check leaves the next search those ten 
 test("a failed search fails every account of the shard and moves no watermark", async () => {
   await sql`UPDATE sources SET cursor = (cursor - 'lastOkAt') || ${sql.json({ lastTweetId: String(WATERMARK - 2n) })} WHERE id IN ${sql(IDS)}`;
   const watermark = String(WATERMARK - 2n);
-  failNext = true;
+  failRequests = 3;
   const res = await collectXShard(`editorial:test-${T}`, IDS);
   assert.equal(res.status, "failed");
   for (const id of IDS) assert.equal((await cursorOf(id)).lastTweetId, watermark);
@@ -286,7 +287,7 @@ test("a failure's run and source health either both commit or neither does", asy
       IF NEW.last_error IS NOT NULL THEN RAISE EXCEPTION 'injected source health failure'; END IF;
       RETURN NEW; END $$`);
     await sql`CREATE TRIGGER fail_source_health BEFORE UPDATE ON sources FOR EACH ROW EXECUTE FUNCTION fail_source_health()`;
-    failNext = true;
+    failRequests = 3;
     try {
       await assert.rejects(kind === "single" ? collectSource(IDS[0]!, { force: true }) : collectXShard(`editorial:health-${T}`, IDS), /injected source health failure/);
     } finally { await sql`DROP TRIGGER fail_source_health ON sources`; await sql`DROP FUNCTION fail_source_health()`; }
