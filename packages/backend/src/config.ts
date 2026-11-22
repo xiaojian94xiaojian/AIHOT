@@ -81,6 +81,8 @@ export const config = {
   devAdmin: env.DEV_AUTH_ROLE === "admin" ? { displayName: env.DEV_AUTH_DISPLAY_NAME || "Dev Admin" } : null,
   /** Read-only admin API token (32+ URL-safe characters), sent as Authorization: Bearer. Null when unset. */
   adminApiToken: /^[A-Za-z0-9_-]{32,}$/.test(env.ADMIN_API_TOKEN ?? "") ? env.ADMIN_API_TOKEN! : null,
+  /** Read-only token for the public X corpus endpoints (/x/posts/*), 32+ URL-safe characters. */
+  xPostsToken: /^[A-Za-z0-9_-]{32,}$/.test(env.X_POSTS_TOKEN ?? "") ? env.X_POSTS_TOKEN! : null,
   /** The admin password (at least 12 characters), for sites with admin pages. */
   adminPassword: env.ADMIN_PASSWORD || null,
 };

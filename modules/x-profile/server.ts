@@ -1,6 +1,7 @@
 // 博主画像接进后端的插口（packages/backend/src/modules.ts 的 ServerModule）。接口只读；
 // 定时任务只写本模块自己的表（粉丝快照、每周涨粉报告），不碰引擎的状态。
 import type { FastifyReply, FastifyRequest } from "fastify";
+import { createHash, timingSafeEqual } from "node:crypto";
 import type { ServerModule } from "@aihot/backend/modules";
 import { sql } from "@aihot/backend/db";
 import { clientIp, sendJsonWithEtag, sendProblem } from "@aihot/backend/lib/http";
@@ -23,12 +24,39 @@ import { z } from "zod";
 import { growthMarkdown, growthV1, methodologyMarkdown, methodologyV1, personV1 } from "./backend/public.ts";
 import { reachCheck } from "./backend/reach.ts";
 import { loadDesk } from "./backend/desk.ts";
+import { countXPosts, searchXPosts, type XPostsFilters } from "./backend/posts-search.ts";
 
 /** 画像按天变化，站点接口缓存五分钟、共享缓存十分钟。 */
 const CACHE = "public, max-age=300, s-maxage=600, stale-while-revalidate=900";
 /** 版本化接口：字段稳定，缓存短一些，改动靠版本而不是悄悄换语义。 */
 const V1_CACHE = "public, max-age=300, s-maxage=300, must-revalidate";
 const HANDLE = /^[A-Za-z0-9_]{1,30}$/;
+
+/** /x/posts/* 的独立只读 token；没配就一律 401。 */
+function postsTokenValid(header: string | undefined): boolean {
+  const match = /^Bearer\s+(.+)$/i.exec(header ?? "");
+  if (!match || !config.xPostsToken) return false;
+  const given = createHash("sha256").update(match[1]!.trim()).digest();
+  const wanted = createHash("sha256").update(config.xPostsToken).digest();
+  return timingSafeEqual(given, wanted);
+}
+
+/** 查询参数解析；返回字符串表示 400 的说明。 */
+function postsFilters(req: FastifyRequest): XPostsFilters | string {
+  const query = req.query as Record<string, string | undefined>;
+  if ((query.lang ?? "zh") !== "zh") return "lang 目前只支持 zh";
+  const from = query.from ?? "";
+  const to = query.to ?? "";
+  if (!from || !to) return "from 和 to 必填（YYYY-MM-DD）";
+  const replies = query.replies === "1" || query.replies === "true";
+  if (replies && query.originals === "1") return "originals=1 和 replies=1 不能同时用";
+  const originals = !replies && query.originals !== "0";
+  const q = (query.q ?? "").trim();
+  if (q.length > 100) return "q 最多 100 个字符";
+  const limit = Number(query.limit ?? 100);
+  if (!Number.isInteger(limit) || limit < 1 || limit > 100) return "limit 必须是 1–100";
+  return { from, to, q: q || null, originals, replies, limit, cursor: query.cursor ?? null };
+}
 
 function guarded(fn: (req: FastifyRequest, reply: FastifyReply) => Promise<unknown>) {
   return async (req: FastifyRequest, reply: FastifyReply) => {
@@ -44,6 +72,29 @@ function guarded(fn: (req: FastifyRequest, reply: FastifyReply) => Promise<unkno
 export const xProfileServerModule: ServerModule = {
   name: "x-profile",
   http(app) {
+    // 只读中文帖查询（本站收录的 X 账号）：全文检索、日期范围、游标翻页，不登录后台。
+    app.get("/x/posts/search", guarded(async (req, reply) => {
+      if (!postsTokenValid(req.headers.authorization)) return sendProblem(req, reply, { status: 401, code: "unauthorized", detail: "Invalid API token." });
+      const filters = postsFilters(req);
+      if (typeof filters === "string") return sendProblem(req, reply, { status: 400, code: "invalid_request", detail: filters });
+      try {
+        reply.header("Cache-Control", "no-store");
+        return await searchXPosts(filters);
+      } catch (error) {
+        return sendProblem(req, reply, { status: 400, code: "invalid_request", detail: (error as Error).message.slice(0, 300) });
+      }
+    }));
+    app.get("/x/posts/count", guarded(async (req, reply) => {
+      if (!postsTokenValid(req.headers.authorization)) return sendProblem(req, reply, { status: 401, code: "unauthorized", detail: "Invalid API token." });
+      const filters = postsFilters(req);
+      if (typeof filters === "string") return sendProblem(req, reply, { status: 400, code: "invalid_request", detail: filters });
+      try {
+        reply.header("Cache-Control", "no-store");
+        return await countXPosts({ from: filters.from, to: filters.to, q: filters.q, originals: filters.originals, replies: filters.replies });
+      } catch (error) {
+        return sendProblem(req, reply, { status: 400, code: "invalid_request", detail: (error as Error).message.slice(0, 300) });
+      }
+    }));
     // 每个账号的涨粉周报订阅源（RSS）：不登录、不留邮箱，阅读器里直接订阅。
     app.get("/feed/x/:handle.xml", guarded(async (req, reply) => {
       const raw = String((req.params as { handle?: string }).handle ?? "").replace(/\.xml$/, "");
