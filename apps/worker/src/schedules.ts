@@ -58,7 +58,7 @@ const ENGINE_SCHEDULES: Scheduled[] = [
         { name: "sources.schedule", cron: "* * * * *", run: () => scheduleDueSources() },
         { name: "sources.adapt-intervals", cron: "20 4 * * *", missed: "once" as const, run: adaptIntervals },
         // X accounts quiet for a day: a renamed one is followed to its new handle (SocialData, paid per lookup).
-        { name: "sources.x-renames", cron: "50 4 * * *", missed: "once" as const, run: () => followXRenames() },
+        { name: "sources.x-renames", cron: "50 4 * * *", missed: "once" as const, when: () => !config.xFetchPaused, run: () => followXRenames() },
         // Icons are read from the sources' own sites, so they stop with collection.
         { name: "sources.icons", cron: "40 4 * * *", missed: "once" as const, run: () => refreshSourceIcons() },
         // 热点 poke：默认 HOT_POKE_MODE=off，不排程也不花钱；dry-run 只记录候选，on 才入队抓取。

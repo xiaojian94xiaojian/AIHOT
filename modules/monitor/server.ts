@@ -12,6 +12,7 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import type { ServerModule } from "@aihot/backend/modules";
+import { config } from "@aihot/backend/config";
 import { adminHandler, actorOf } from "@aihot/backend/admin/auth";
 import { sendJsonWithEtag, sendProblem, looseQuery } from "@aihot/backend/lib/http";
 import { cached } from "@aihot/backend/lib/cache";
@@ -145,8 +146,8 @@ export const monitorServerModule: ServerModule = {
   // 每十分钟扫一次（页面就是这么写的），每天把最近 48 小时再读一遍；04:40 的两次由 monitorTick 轮流。
   // 它通过 SocialData 读 X，所以没有那个密钥就没什么可跑的。
   schedules: [
-    { name: "monitor.tick", cron: `*/${CODEX_RESET_SCAN_MINUTES} * * * *`, run: () => monitorTick() },
-    { name: "monitor.lookback", cron: "40 4 * * *", run: () => monitorTick({ lookbackHours: 48 }) },
+    { name: "monitor.tick", cron: `*/${CODEX_RESET_SCAN_MINUTES} * * * *`, when: () => !config.xFetchPaused, run: () => monitorTick() },
+    { name: "monitor.lookback", cron: "40 4 * * *", when: () => !config.xFetchPaused, run: () => monitorTick({ lookbackHours: 48 }) },
   ],
 
   // 识别帖子的那一步调模型，模型选择归本站（site/models.ts 的 DEFAULTS.monitor）。

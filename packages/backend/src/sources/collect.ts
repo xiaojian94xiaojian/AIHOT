@@ -7,6 +7,7 @@ import { HttpStatusError } from "../lib/http-fetch.ts";
 import { identityKeyForUrl } from "../lib/url.ts";
 import { sha256 } from "../lib/ids.ts";
 import { enqueue, QUEUES, shutdownSignal } from "../jobs/queue.ts";
+import { config } from "../config.ts";
 import { runOwner } from "../jobs/runs.ts";
 import { queueProcessing } from "../jobs/content.ts";
 import { BudgetExceededError, completeReceipt } from "../providers/receipts.ts";
@@ -331,6 +332,7 @@ export async function collectSource(sourceId: string, opts: { force?: boolean; x
   const source = await loadSource(sourceId);
   if (!source) return { sourceId, status: "skipped", found: 0, created: 0, revised: 0, error: "missing" };
   if (!source.enabled && !opts.force) return { sourceId, status: "skipped", found: 0, created: 0, revised: 0, error: "paused" };
+  if (source.kind === "x_search" && config.xFetchPaused) return { sourceId, status: "skipped", found: 0, created: 0, revised: 0, error: "x fetch paused" };
   if (source.kind === "mp_account" || source.kind === "external") {
     // WeChat accounts are reconciled by the mp job; external sources only receive reports.
     return { sourceId, status: "skipped", found: 0, created: 0, revised: 0 };
@@ -462,6 +464,7 @@ function coveredTo(m: SourceRow): bigint {
  * one account of the shard, so they survive a change of shards without every later shard buying them.
  */
 export async function collectXShard(key: string, sourceIds: string[]): Promise<{ key: string; status: "ok" | "failed" | "skipped"; accounts: number; found: number; created: number; error?: string }> {
+  if (config.xFetchPaused) return { key, status: "skipped", accounts: 0, found: 0, created: 0, error: "x fetch paused" };
   const members = (
     await sql<SourceRow[]>`
       SELECT id, name, kind, config, tier, participation_mode, uses, interval_minutes, enabled, cursor, fail_count
@@ -542,6 +545,7 @@ const sharded = () => sql`kind = 'x_search' AND config->>'query' ~* ${SHARDABLE_
 
 /** Every minute: a shard is read when any of its accounts is due, all of them at once. */
 async function scheduleXShards(): Promise<number> {
+  if (config.xFetchPaused) return 0;
   const rows = await sql<Array<Pick<SourceRow, "id" | "kind" | "config" | "cursor" | "participation_mode" | "interval_minutes"> & { due: boolean }>>`
     SELECT id, kind, config, cursor, participation_mode, interval_minutes, (next_fetch_at IS NULL OR next_fetch_at <= now()) AS due
     FROM sources WHERE enabled AND ${sharded()}`;
@@ -559,14 +563,15 @@ async function scheduleXShards(): Promise<number> {
 export async function scheduleDueSources(): Promise<{ enqueued: number; shards: number }> {
   const rows = await sql<{ id: string }[]>`
     SELECT id FROM sources
-    WHERE enabled AND kind IN ('rss', 'web_list', 'json_list', 'x_search') AND (next_fetch_at IS NULL OR next_fetch_at <= now()) AND NOT (${sharded()})
+    WHERE enabled AND kind IN ('rss', 'web_list', 'json_list', 'x_search') ${config.xFetchPaused ? sql`AND kind <> 'x_search'` : sql``}
+      AND (next_fetch_at IS NULL OR next_fetch_at <= now()) AND NOT (${sharded()})
     ORDER BY next_fetch_at NULLS FIRST LIMIT 40`;
   let enqueued = 0;
   for (const r of rows) {
     if (await enqueue(QUEUES.fetchSource, { sourceId: r.id }, { singletonKey: r.id })) enqueued += 1;
     await sql`UPDATE sources SET next_fetch_at = now() + interval '10 minutes' WHERE id = ${r.id}`;
   }
-  return { enqueued, shards: await scheduleXShards() };
+  return { enqueued, shards: config.xFetchPaused ? 0 : await scheduleXShards() };
 }
 
 /** Minutes between reads of a shard: editorial accounts every half hour, hot-signal accounts hourly. */
